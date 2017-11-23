@@ -1,7 +1,8 @@
 # myQC
 My crummy implementation of Hartree Fock
 
-To run:
+To run: pull 'mybasis' into current directory. In same directory, create or copy 'input'. Call calculation with the 'myQC' executable.
+
 1) I suggest adding the bin directory into your path
 2) edit the input file (in src) to what you need. The only atoms imlimented right now are H, He, Li, Be, and C, and only in STO-3G. 
 3) run the 'clean' script (in bin) after each run, or you will get errors. 

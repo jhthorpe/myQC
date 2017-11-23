@@ -26,16 +26,17 @@ PROGRAM int1e
   ! basinfo	: 2D int, array of basis information
   ! options	: 1D int, array of options
   ! S		: 2D dp, overlap matrix
+  ! F		: 2D dp, Fock matrix
   ! MOc		: 2D dp, molecular coefficients (u or v, ith MO) 
 
   ! Variables  
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: bas
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,MOc
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc
   INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
   INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
-  LOGICAL :: flag
+  LOGICAL :: flag1,flag2,flag
 
 ! input managment 
   CALL CPU_TIME(timeS)
@@ -65,7 +66,7 @@ PROGRAM int1e
   WRITE(*,*) "=================================="
   CALL nmem(fmem)
 
-! 1) calculate overlap matrix
+! 1) calculate overlap matrix and kinetic energy integrals
   !get number of orbitals
   npri = 0
   norb = 0
@@ -81,10 +82,14 @@ PROGRAM int1e
   WRITE(*,*)
 
   WRITE(*,*) "Allocating space for overlap matrix (MB) : ", norb*norb*8/1.0E6
-  WRITE(*,*) "Allocating space for MO coefficients (MB) : ", norb*norb*8/1.0E6
   ALLOCATE(S(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
+  WRITE(*,*) "Allocating space for Fock matrix (MB) : ", norb*norb*8/1.0E6
+  ALLOCATE(F(0:norb-1,0:norb-1),STAT=stat)
+  IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
+  fmem = fmem - norb*norb*8/1.0E6
+  WRITE(*,*) "Allocating space for MO coefficients (MB) : ", norb*norb*8/1.0E6
   ALLOCATE(MOc(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
@@ -96,19 +101,26 @@ PROGRAM int1e
     MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
   END DO
 
-  INQUIRE(file='Suv',EXIST=flag)
+  INQUIRE(file='Suv',EXIST=flag1)
+  INQUIRE(file='Fuv',EXIST=flag2)
+  flag = flag1 .AND. flag2
   IF (.NOT. flag) THEN
-    CALL overlap(S,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+    CALL SaT(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+    WRITE(*,*) "Overlap written to Suv"
+    WRITE(*,*) "Kinetic energy written to Fuv"
     CALL normS(S,MOc,norb,0)
   ELSE
     OPEN(unit=1,file='Suv',status='old',access='sequential')
+    OPEN(unit=2,file='Fuv',status='old',access='sequential')
+    WRITE(*,*) "Reading overlap matrix from file"
     READ(1,*) S(:,:)
+    WRITE(*,*) "Reading kinetic Fock from file"
+    READ(2,*) F(:,:)
     CLOSE(unit=1)
+    CLOSE(unit=2)
   END IF
 
-! 2) calculate kinetic energy integrals
-
-! 3) calculate coulombic integrals 
+! 2) calculate coulombic integrals 
 
 ! output
   CALL setenv(atoms,xyz,fmem,options)
@@ -118,11 +130,12 @@ PROGRAM int1e
   CONTAINS 
 
 !~~~~~
-  ! calculate overlap matrix
-  SUBROUTINE overlap(S,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+  ! calculate overlap matrix and kinetic energy terms of fock matrix
+  SUBROUTINE SaT(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     IMPLICIT NONE
     ! Values
     ! S		: 2D dp, overlap matrix
+    ! F		: 2D dp, Fock matrix
     ! xyz	: 2D dp, array of nuclear positions
     ! atoms	: 1D int, array of which atom is which
     ! fmem	: dp, free memory left in MB
@@ -133,7 +146,7 @@ PROGRAM int1e
     ! options	: 1D int, array of options
 
     !Inout
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S 
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S,F 
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
     INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
@@ -158,11 +171,7 @@ PROGRAM int1e
         row = basinfo(v,2) ! number of orbitals in b
         !construct overlap within block
         !WRITE(*,*) "u,v, col, row", col0, col, row0, row
-        CALL Sblock(S(col0:col0+col-1,row0:row0+row-1),bas,basinfo,atoms,xyz,u,v,col,row)
-        WRITE(*,*) "~~~~~~~~~~~~~~  OVERLAP          ~~~~~~~~~~~~~~~~~~~~"
-        WRITE(*,*) u,v 
-        WRITE(*,*) S(col0:col0+col-1,row0:row0+row-1)
-        WRITE(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        CALL block(S(col0:col0+col-1,row0:row0+row-1),F(col0:col0+col-1,row0:row0+row-1),bas,basinfo,atoms,xyz,u,v,col,row)
         row0 = row0 + row
       END DO
       col0 = col0 + col
@@ -171,20 +180,25 @@ PROGRAM int1e
     OPEN(unit=1,file='Suv',status='replace',access='sequential')
       WRITE(1,*) S(:,:)    
     CLOSE(unit=1)
+ 
+    OPEN(unit=1,file='Fuv',status='replace',access='sequential')
+      WRITE(1,*) F(:,:)
+    CLOSE(unit=1)
 
     CALL CPU_TIME(timeF)
     WRITE(*,*) "overlap matrix constructed in (s) :", (timeF-timeS)
 
-  END SUBROUTINE overlap
+  END SUBROUTINE SaT
 
 !~~~~~
   ! calculate block of overlap matrix 
-  SUBROUTINE Sblock(Sb,bas,basinfo,atoms,xyz,u,v,na,nb)
+  SUBROUTINE block(Sb,Fb,bas,basinfo,atoms,xyz,u,v,na,nb)
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
 
     ! Values
     ! Sb	: 2D dp, subblock of overlap matrix
+    ! Fb	: 2D dp, subblock of Fock matrix
     ! xyz	: 2D dp, array of nuclear positions
     ! atoms	: 1D int, array of which atom is which
     ! bas	: 3D dp, basis for each atom: atom : orbital : [d,a]
@@ -197,9 +211,10 @@ PROGRAM int1e
     ! val 	: dp, current evaluation of integral
     ! p		: dp, addition of two coeffiecients
     ! aa,bb	: dp, coefficients of Guassians for atoms a and b
+    ! na,nb	: 1D int, angular qunatum number of orbital in atom A,B (x,y,z)
 
     !Inout
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Sb 
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Sb, Fb 
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
     INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
@@ -209,8 +224,8 @@ PROGRAM int1e
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:) :: coef
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
-    INTEGER, DIMENSION(0:2) :: amax, bmax
-    REAL(KIND=8) :: EIJ, val, p, m, aa, bb, temp
+    INTEGER, DIMENSION(0:2) :: la,lb,amax, bmax
+    REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     INTEGER :: i,j,k,s,t,a,b,ori
     
     WRITE(*,*) "u,v",u,v
@@ -218,7 +233,8 @@ PROGRAM int1e
     DO a=0,na-1 !iterate through orbitals of atom A
       DO b=0,nb-1 !iterate through orbitals of atom B
         WRITE(*,*) "a,b",a,b
-        val = 0.0D0
+        valSb = 0.0D0
+        valFb = 0.0D0
         DO s=0,basinfo(u,4*(a+1)+3)-1 !iterate through primatives of orbital a 
           DO t=0,basinfo(v,4*(b+1)+3)-1 !iterate thorugh primatives of orbital b
 
@@ -246,46 +262,48 @@ PROGRAM int1e
             ori = basinfo(u,4*(a+1)+2)
             WRITE(*,*) basinfo(u,4*(a+1)+1)
             IF (ori .EQ. -1) THEN  ! s type orbital
-              amax = [basinfo(u,4*(a+1)+1), basinfo(u,4*(a+1)+1), basinfo(u,4*(a+1)+1)] 
+              la = [basinfo(u,4*(a+1)+1),basinfo(u,4*(a+1)+1),basinfo(u,4*(a+1)+1)]
+              amax = la 
             ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN !p type orbital 
-              amax = [0, 0, 0]
-              amax(ori) = basinfo(u,4*(a+1)+1)
+              la = [0, 0, 0]
+              la(ori) = basinfo(u,4*(a+1)+1)
+              amax = la
             END IF
+
             ! orientation for B
             ori = basinfo(v,4*(b+1)+2)
             IF (ori .EQ. -1) THEN  ! s type orbital
-              bmax = [basinfo(v,4*(b+1)+1), basinfo(v,4*(b+1)+1), basinfo(v,4*(b+1)+1)] 
+              lb = [basinfo(v,4*(b+1)+1),basinfo(v,4*(b+1)+1),basinfo(v,4*(b+1)+1)]
+              bmax = [lb(0)+2, lb(1)+2, lb(2)+2] !+2 due to kinetic term 
             ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN !p type orbital 
-              bmax = [0, 0, 0]
-              bmax(ori) = basinfo(v,4*(b+1)+1)
+              lb = [0,0,0]
+              lb(ori) = basinfo(v,4*(b+1)+1)
+              bmax = [lb(0)+2, lb(1)+2, lb(2)+2]
             END IF
+
             ! getcoef(M,PA,PB,aa,bb,amax,bmax)
             CALL getcoef(coef,PA,PB,aa,bb,amax,bmax)
 
-            ! 3) add everything together for overlap matrix
+            ! 3) add everything together for overlap/kinetic matrix elements
             
-     ! all wrong here, fixup later
-            ! precalculated constants
-            temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
-            ! integral coefficients
-            temp = temp*coef(0,0,amax(0),bmax(0))*coef(1,0,amax(1),bmax(1))*coef(2,0,amax(2),bmax(2))
-            ! basis set coefficients 
-            temp = temp*gtoD(basinfo(u,4*(a+1)+1),aa)
-            temp = temp*gtoD(basinfo(v,4*(b+1)+1),bb)
+            tempSb =  overlap(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ) 
+            tempFb = 0.0D0
            
-            val = val + temp
+            valSb = valSb + tempSb
+            valFb = valFb + tempFb
             DEALLOCATE(coef)
 
           END DO !end t
         END DO !end s
-        Sb(a,b) = val
+        Sb(a,b) = valSb
+        Fb(a,b) = valFb
         WRITE(*,*) "~~~~~~~~~~"
       END DO !end b
     END DO !end a
 
    WRITE(*,*) "~~~~~~~~~~~~~~"
    WRITE(*,*) "~~~~~~~~~~~~~~"
-  END SUBROUTINE Sblock
+  END SUBROUTINE block
 
 !~~~~~
   !Subroutine to calculate coefficient matrix 
@@ -341,13 +359,13 @@ PROGRAM int1e
     WRITE(*,*) "z : nmax, amax, bmax", nmax(2), amax(2), bmax(2)
     WRITE(*,*) "PAz, PBz", PA(2), PB(2) 
     !Need to use MAX function in allocation?
-    ALLOCATE(M(0:2,-1:MAXVAL(amax)+MAXVAL(bmax),-1:MAXVAL(amax)+1,-1:MAXVAL(bmax)+1)) 
-    ALLOCATE(fmat(0:2,-1:MAXVAL(amax)+MAXVAL(bmax),-1:MAXVAL(amax)+1,-1:MAXVAL(bmax)+1))
+    ALLOCATE(M(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2)) 
+    ALLOCATE(fmat(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
     !initialize fmat
     DO l=0,2
-      DO i=-1,MAXVAL(amax)+MAXVAL(bmax)
-        DO j=-1,MAXVAL(amax)+1
-          DO k=-1,MAXVAL(bmax)+1
+      DO i=-2,MAXVAL(amax)+MAXVAL(bmax)
+        DO j=-2,MAXVAL(amax)+2
+          DO k=-2,MAXVAL(bmax)+2
             M(l,i,j,k) = 0.0D0
             fmat(l,i,j,k) = .FALSE.
           END DO
@@ -364,23 +382,24 @@ PROGRAM int1e
     END DO
     
     WRITE(*,*) "===================="
-    WRITE(*,*) "z"
+    WRITE(*,*) "z N = 0"
     WRITE(*,*) "0,0,0", M(2,0,0,0) 
+    WRITE(*,*) "Z N = 1"
     WRITE(*,*) "0,0,1", M(2,0,0,1) 
     WRITE(*,*) "0,1,0", M(2,0,1,0) 
+    WRITE(*,*) "Z N = 2"
     WRITE(*,*) "0,1,1", M(2,0,1,1)
-    WRITE(*,*) "..."
-    WRITE(*,*) "x"
-    WRITE(*,*) "0,0,0", M(0,0,0,0) 
-    WRITE(*,*) "0,0,1", M(0,0,0,1) 
-    WRITE(*,*) "0,1,0", M(0,0,1,0) 
-    WRITE(*,*) "0,1,1", M(0,0,1,1)
-    WRITE(*,*) "..."
-    WRITE(*,*) "y"
-    WRITE(*,*) "0,0,0", M(1,0,0,0) 
-    WRITE(*,*) "0,0,1", M(1,0,0,1) 
-    WRITE(*,*) "0,1,0", M(1,0,1,0) 
-    WRITE(*,*) "0,1,1", M(1,0,1,1)
+    WRITE(*,*) "0,0,2", M(2,0,0,2)
+    WRITE(*,*) "0,2,0", M(2,0,2,0)
+    WRITE(*,*) "Z N = 3"
+    WRITE(*,*) "0,1,2", M(2,0,1,2)
+    WRITE(*,*) "0,2,1", M(2,0,2,1)
+    WRITE(*,*) "0,0,3", M(2,0,0,3)
+    !WRITE(*,*) "0,3,0", M(2,0,3,0)
+    !WRITE(*,*) "Z N = 4"
+    !WRITE(*,*) "0,2,2", M(2,0,2,2)
+    !WRITE(*,*) "0,1,3", M(2,0,1,3)
+    !WRITE(*,*) "0,3,1", M(2,0,3,1)
     WRITE(*,*) "===================="
 
     DEALLOCATE (fmat)
@@ -399,8 +418,8 @@ PROGRAM int1e
     ! pp	: dp, value of sum of coefficients
 
     ! INOUT
-    REAL(KIND=8), DIMENSION(0:,-1:,-1:,-1:), INTENT(INOUT) :: M
-    LOGICAL, DIMENSION(0:,-1:,-1:,-1:),INTENT(INOUT) :: fmat
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: M
+    LOGICAL, DIMENSION(0:,-2:,-2:,-2:),INTENT(INOUT) :: fmat
     REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
     REAL(KIND=8), INTENT(IN) :: pp
     INTEGER, INTENT(IN) :: i,j,k,l
@@ -472,7 +491,6 @@ PROGRAM int1e
       WRITE(*,*) "Somehow you broke this at:", i,j,k
       STOP
     END IF
-
  
   END SUBROUTINE lrec
 !~~~~~
@@ -488,8 +506,8 @@ PROGRAM int1e
     ! pp		: dp, value of sum of coefficients
 
     ! INOUT
-    REAL(KIND=8), DIMENSION(0:,-1:,-1:,-1:), INTENT(INOUT) :: M
-    LOGICAL, DIMENSION(0:,-1:,-1:,-1:), INTENT(INOUT) :: fmat
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: M
+    LOGICAL, DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: fmat
     REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
     REAL(KIND=8), INTENT(IN) :: pp
     INTEGER, INTENT(IN) :: i,j,k,l
@@ -623,10 +641,35 @@ PROGRAM int1e
       END DO 
     END DO 
 
-    !write for testing
-    WRITE(*,*) S(:,:)
-
   END SUBROUTINE
+
+!~~~~~
+  !overlap to calculate matrix element of overlap matrix
+  REAL(KIND=8) FUNCTION overlap(u,v,a,b,s,t,p,bas,basinfo,coef,nb,na,aa,bb,EIJ)
+    IMPLICIT NONE
+
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb
+    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
+    INTEGER, INTENT(IN) :: u, v, s, t, a, b
+
+    REAL(KIND=8) :: temp
+
+    ! precalculated constants
+    temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
+    ! integral coefficients
+    temp = temp*coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
+    ! basis set coefficients 
+    temp = temp*gtoD(basinfo(u,4*(a+1)+1),aa)
+    temp = temp*gtoD(basinfo(v,4*(b+1)+1),bb)
+
+    overlap = temp
+
+  END FUNCTION overlap
 
 !~~~~~
 END PROGRAM int1e
