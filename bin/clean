@@ -1,0 +1,3 @@
+#!/bin/bash
+rm fmem envdat nucpos radii error basinfo Suv 2> /dev/null
+

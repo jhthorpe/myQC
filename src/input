@@ -1,0 +1,16 @@
+DIATOMIC
+H
+C
+
+0.5
+
+CAlC= SCF
+BASIS= STO-3G
+REF= RHF
+PAR= none
+NODES= 1
+MEM= 500
+VERB= 1
+
+
+
