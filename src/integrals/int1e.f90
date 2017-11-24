@@ -286,8 +286,8 @@ PROGRAM int1e
 
             ! 3) add everything together for overlap/kinetic matrix elements
             
-            tempSb =  overlap(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ) 
-            tempFb = 0.0D0
+            tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ) 
+            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ)
            
             valSb = valSb + tempSb
             valFb = valFb + tempFb
@@ -342,15 +342,6 @@ PROGRAM int1e
     ! 1) construct initial stuff
     pp = aa+bb
     nmax = [amax(0)+bmax(0),amax(1)+bmax(1),amax(2)+bmax(2)] 
-
-    DO j=0,2
-      nn(j) = 0
-      DO i=0,nmax(j)
-        nn(j) = nn(j) + (i+1) 
-      END DO
-    END DO
-    
-    WRITE(*,*) "Number of coefficients (xyz), ", nn(:)
     WRITE(*,*) "Coefficients are...", aa, bb
     WRITE(*,*) "x : nmax, amax, bmax", nmax(0), amax(0), bmax(0)
     WRITE(*,*) "PAx, PBz", PA(0), PB(0)
@@ -358,7 +349,6 @@ PROGRAM int1e
     WRITE(*,*) "PAy, PBy", PA(1), PB(1)
     WRITE(*,*) "z : nmax, amax, bmax", nmax(2), amax(2), bmax(2)
     WRITE(*,*) "PAz, PBz", PA(2), PB(2) 
-    !Need to use MAX function in allocation?
     ALLOCATE(M(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2)) 
     ALLOCATE(fmat(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
     !initialize fmat
@@ -376,31 +366,31 @@ PROGRAM int1e
     ! 2) call recursive function on top
     ! call the recursion for overlap matrix
     DO l=0,2
-      WRITE(*,*) "~~~~~~~~~~~working on l = ", l
+    !  WRITE(*,*) "~~~~~~~~~~~working on l = ", l
       CALL lrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
       CALL rrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
     END DO
-    
-    WRITE(*,*) "===================="
-    WRITE(*,*) "z N = 0"
-    WRITE(*,*) "0,0,0", M(2,0,0,0) 
-    WRITE(*,*) "Z N = 1"
-    WRITE(*,*) "0,0,1", M(2,0,0,1) 
-    WRITE(*,*) "0,1,0", M(2,0,1,0) 
-    WRITE(*,*) "Z N = 2"
-    WRITE(*,*) "0,1,1", M(2,0,1,1)
-    WRITE(*,*) "0,0,2", M(2,0,0,2)
-    WRITE(*,*) "0,2,0", M(2,0,2,0)
-    WRITE(*,*) "Z N = 3"
-    WRITE(*,*) "0,1,2", M(2,0,1,2)
-    WRITE(*,*) "0,2,1", M(2,0,2,1)
-    WRITE(*,*) "0,0,3", M(2,0,0,3)
+        
+    !WRITE(*,*) "===================="
+    !WRITE(*,*) "z N = 0"
+    !WRITE(*,*) "0,0,0", M(2,0,0,0) 
+    !WRITE(*,*) "Z N = 1"
+    !WRITE(*,*) "0,0,1", M(2,0,0,1) 
+    !WRITE(*,*) "0,1,0", M(2,0,1,0) 
+    !WRITE(*,*) "Z N = 2"
+    !WRITE(*,*) "0,1,1", M(2,0,1,1)
+    !WRITE(*,*) "0,0,2", M(2,0,0,2)
+    !WRITE(*,*) "0,2,0", M(2,0,2,0)
+    !WRITE(*,*) "Z N = 3"
+    !WRITE(*,*) "0,1,2", M(2,0,1,2)
+    !WRITE(*,*) "0,2,1", M(2,0,2,1)
+    !WRITE(*,*) "0,0,3", M(2,0,0,3)
     !WRITE(*,*) "0,3,0", M(2,0,3,0)
     !WRITE(*,*) "Z N = 4"
     !WRITE(*,*) "0,2,2", M(2,0,2,2)
     !WRITE(*,*) "0,1,3", M(2,0,1,3)
     !WRITE(*,*) "0,3,1", M(2,0,3,1)
-    WRITE(*,*) "===================="
+    !WRITE(*,*) "===================="
 
     DEALLOCATE (fmat)
 
@@ -424,72 +414,72 @@ PROGRAM int1e
     REAL(KIND=8), INTENT(IN) :: pp
     INTEGER, INTENT(IN) :: i,j,k,l
 
-    WRITE(*,*) "lrec called with (l,i,j,k)", l,i,j,k
+    !WRITE(*,*) "lrec called with (l,i,j,k)", l,i,j,k
     
     ! 1) base cases
     ! if we've already seen this point
     ! if not, check that it isn't automatically zero
     IF (fmat(l,i,j,k)) THEN
-      WRITE(*,*) "i,j,k  already seen"
+    !  WRITE(*,*) "i,j,k  already seen"
       RETURN
     END IF
     IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
       M(l,i,j,k) = 0.0D0
       fmat(l,i,j,k) = .TRUE.
-      WRITE(*,*) "i,j,k is 0"
+    !  WRITE(*,*) "i,j,k is 0"
       RETURN
     ! check for d000 base case
     ELSE IF (i .EQ. 0 .AND. j .EQ. 0 .AND. k .EQ. 0) THEN
       M(l,i,j,k) = 1.0D0
       fmat(l,i,j,k) = .TRUE.
-      WRITE(*,*) "hit d000"
+     ! WRITE(*,*) "hit d000"
       RETURN 
     END IF
 
-    WRITE(*,*) "non-base case" 
+    !WRITE(*,*) "non-base case" 
     
     ! 2) recursion algorithm 
     ! if i is zero, we will need this in overlap
     IF (j .EQ. k) THEN 
-      WRITE(*,*) "going l and r"
+    !  WRITE(*,*) "going l and r"
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
-      WRITE(*,*) "checking lrec=rrec, below", i,j,k, M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)
+    !  WRITE(*,*) "checking lrec=rrec, below", i,j,k, M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
       M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
       fmat(l,i,j,k) = .TRUE. 
-      WRITE(*,*) "lvec-here0", i,j,k
-      WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
+    !  WRITE(*,*) "lvec-here0", i,j,k
+    !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       RETURN
     ! get the rest of what we need
     ! if k is bigger, lower it
     ELSE IF (j .LT. k) THEN
-      WRITE(*,*) "going r"
+    !  WRITE(*,*) "going r"
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
       fmat(l,i,j,k) = .TRUE. 
-      WRITE(*,*) "lvec-here1"
-      WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
+    !  WRITE(*,*) "lvec-here1"
+    !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       RETURN
     ! otherwise, lower j (doesn't really matter which way you do it)
     ELSE IF (j .GE. k) THEN
-      WRITE(*,*) "going l"
+    !  WRITE(*,*) "going l"
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
       fmat(l,i,j,k) = .TRUE. 
-      WRITE(*,*) "lvec-here2"
-      WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
+    !  WRITE(*,*) "lvec-here2"
+    !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       RETURN
     ELSE 
       WRITE(*,*) "Somehow you broke this at:", i,j,k
-      STOP
+      STOP "error in lrec"
     END IF
  
   END SUBROUTINE lrec
@@ -512,73 +502,72 @@ PROGRAM int1e
     REAL(KIND=8), INTENT(IN) :: pp
     INTEGER, INTENT(IN) :: i,j,k,l
 
-    WRITE(*,*) "rrec called with (l,i,j,k)", l,i,j,k
+    !WRITE(*,*) "rrec called with (l,i,j,k)", l,i,j,k
     
     ! 1) base cases
     ! if we've already seen this point
     ! if not, check that it isn't automatically zero
     IF (fmat(l,i,j,k)) THEN
-      WRITE(*,*) "i,j,k  already seen"
+    !  WRITE(*,*) "i,j,k  already seen"
       RETURN
     END IF
     IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
       M(l,i,j,k) = 0.0D0
       fmat(l,i,j,k) = .TRUE.
-    ! here
-      WRITE(*,*) "i,j,k is 0"
+    !  WRITE(*,*) "i,j,k is 0"
       RETURN
     ! check for d000 base case
     ELSE IF (i .EQ. 0 .AND. j .EQ. 0 .AND. k .EQ. 0) THEN
       M(l,i,j,k) = 1.0D0
       fmat(l,i,j,k) = .TRUE.
-      WRITE(*,*) "hit d000"
+    !  WRITE(*,*) "hit d000"
       RETURN 
     END IF
     
-    WRITE(*,*) "non-base case" 
+    !WRITE(*,*) "non-base case" 
 
     ! 2) recursion algorithm 
     ! if i is zero, we will need this in overlap
     IF (j .EQ. k) THEN 
-      WRITE(*,*) "going l and r"
+    !  WRITE(*,*) "going l and r"
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
-      fmat(l,i,j,k) = .TRUE. 
-      WRITE(*,*) "rvec-here0", i,j,k
-      WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
+    !  WRITE(*,*) "rvec-here0", i,j,k
+    !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
-      WRITE(*,*) "checking (i,j,k) above",  M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)
+      fmat(l,i,j,k) = .TRUE. 
+    !  WRITE(*,*) "checking (i,j,k) above",  M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)
       RETURN
     ! get the rest of what we need
     ! if k is bigger, lower it
     ELSE IF (j .LT. k) THEN
-      WRITE(*,*) "going r"
+    !  WRITE(*,*) "going r"
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
       fmat(l,i,j,k) = .TRUE. 
-      WRITE(*,*) "rvec-here1"
-      WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
+    !  WRITE(*,*) "rvec-here1"
+    !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       RETURN
     ! otherwise, lower j (doesn't really matter which way you do it)
     ELSE IF (j .GT. k) THEN
-      WRITE(*,*) "going l"
+    !  WRITE(*,*) "going l"
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
       fmat(l,i,j,k) = .TRUE. 
-      WRITE(*,*) "rvec-here2"
-      WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
+    !  WRITE(*,*) "rvec-here2"
+    !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       RETURN
     ELSE 
       WRITE(*,*) "Somehow you broke this at:", i,j,k
-      STOP
+      STOP "error in rrec"
     END IF
 
   END SUBROUTINE rrec
@@ -661,15 +650,70 @@ PROGRAM int1e
 
     ! precalculated constants
     temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
+    temp = temp*gtoD(basinfo(u,4*(a+1)+1),aa) !basis set coefficients
+    temp = temp*gtoD(basinfo(v,4*(b+1)+1),bb) !basis set coefficeints
     ! integral coefficients
     temp = temp*coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
-    ! basis set coefficients 
-    temp = temp*gtoD(basinfo(u,4*(a+1)+1),aa)
-    temp = temp*gtoD(basinfo(v,4*(b+1)+1),bb)
 
     overlap = temp
 
   END FUNCTION overlap
+
+!~~~~~
+  !function that calculates kinetic energy of a pair of orbitals
+  REAL(KIND=8) FUNCTION kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,nb,na,aa,bb,EIJ)
+    IMPLICIT NONE
+
+    ! inout
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb
+    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
+    INTEGER, INTENT(IN) :: u, v, s, t, a, b
+    
+    !internal
+    REAL(KIND=8) :: temp,val
+
+    temp = 0.0D0
+    val = 0.0D0
+
+    !xpart
+    temp = nb(0)*(nb(0)-1)*coef(0,0,na(0),nb(0)-2)
+    temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
+    temp = temp - 2.0D0*bb*(nb(0)+1)*coef(0,0,na(0),nb(0))
+    temp = temp + 4.0D0*bb**2.0D0*coef(0,0,na(0),nb(0)+2)
+    temp = temp * coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2)) 
+    val = val + temp
+    !ypart
+    temp = nb(1)*(nb(1)-1)*coef(1,0,na(1),nb(1)-2)
+    temp = temp - 2.0D0*bb*nb(1)*coef(1,0,na(1),nb(1)) 
+    temp = temp - 2.0D0*bb*(nb(1)+1)*coef(1,0,na(1),nb(1))
+    temp = temp + 4.0D0*bb**2.0D0*coef(1,0,na(1),nb(1)+2)
+    temp = temp * coef(0,0,na(0),nb(0))*coef(2,0,na(2),nb(2)) 
+    val = val + temp
+    !zpart
+    temp = nb(2)*(nb(2)-1)*coef(2,0,na(2),nb(2)-2)
+    temp = temp - 2.0D0*bb*nb(2)*coef(2,0,na(2),nb(2)) 
+    temp = temp - 2.0D0*bb*(nb(2)+1)*coef(2,0,na(2),nb(2))
+    temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
+    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
+    val = val + temp
+    WRITE(*,*) "zcoef...", coef(2,0,na(2),nb(2)-2), coef(2,0,na(2),nb(2)), coef(2,0,na(2),nb(2)+2)
+    WRITE(*,*) "x,ycoef...", coef(0,0,na(0),nb(0)), coef(1,0,na(1),nb(1)) 
+    WRITE(*,*) "zpart is...", temp
+    !leading coefficients
+    val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
+    val = val * bas(u,a,s*2)*bas(v,b,t*2)     !basis set weights
+    val = val * gtoD(basinfo(u,4*(a+1)+1),aa) !primative constants 
+    val = val * gtoD(basinfo(v,4*(b+1)+1),bb) !primative constants 
+
+    WRITE(*,*) "kinetic energy = ", val
+   
+    kinetic = val
+  
+  END FUNCTION kinetic
 
 !~~~~~
 END PROGRAM int1e

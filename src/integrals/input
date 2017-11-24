@@ -1,8 +1,8 @@
 ATOM
-C
+He
 
 CALC= SCF
-BASIS= STO-3G 
+BASIS= tester2
 REF= RHF
 PAR= none
 NODE= 1
