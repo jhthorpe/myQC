@@ -1,8 +1,11 @@
-ATOM
-He
+DIATOMIC
+C
+C
+
+1.0D0
 
 CALC= SCF
-BASIS= tester2
+BASIS= STO-3G
 REF= RHF
 PAR= none
 NODE= 1

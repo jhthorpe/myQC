@@ -12,6 +12,7 @@
 PROGRAM int1e
   USE env
   USE basis
+  USE aux
   IMPLICIT NONE
 
   ! Values
@@ -93,9 +94,11 @@ PROGRAM int1e
   ALLOCATE(MOc(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
+  WRITE(*,*)
   CALL nmem(fmem)
 
   !Temporary initial MO
+  ! WORK NOTE : should be initialized with noncoulombic Hamiltonian
   WRITE(*,*) "temporarily taking all MO coefficients as one"
   DO i=0,norb-1
     MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
@@ -104,23 +107,31 @@ PROGRAM int1e
   INQUIRE(file='Suv',EXIST=flag1)
   INQUIRE(file='Fuv',EXIST=flag2)
   flag = flag1 .AND. flag2
+  WRITE(*,*)
   IF (.NOT. flag) THEN
+    !1) If not there, calculated overlap and kinetic energy integrals
     CALL SaT(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     WRITE(*,*) "Overlap written to Suv"
     WRITE(*,*) "Kinetic energy written to Fuv"
+    WRITE(*,*)
+    !2) calculate 1 electron coulomb integrals
+    CALL coulomb(F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     CALL normS(S,MOc,norb,0)
   ELSE
+    CALL EXECUTE_COMMAND_LINE('touch Sold')
+    CALL EXECUTE_COMMAND_LINE('touch Fold')    
     OPEN(unit=1,file='Suv',status='old',access='sequential')
     OPEN(unit=2,file='Fuv',status='old',access='sequential')
     WRITE(*,*) "Reading overlap matrix from file"
     READ(1,*) S(:,:)
-    WRITE(*,*) "Reading kinetic Fock from file"
+    WRITE(*,*) "Reading Fock matrix from file"
     READ(2,*) F(:,:)
-    CLOSE(unit=1)
     CLOSE(unit=2)
+    CLOSE(unit=1)
   END IF
 
-! 2) calculate coulombic integrals 
+  DEALLOCATE(F)
+  DEALLOCATE(S)
 
 ! output
   CALL setenv(atoms,xyz,fmem,options)
@@ -232,13 +243,13 @@ PROGRAM int1e
     
     DO a=0,na-1 !iterate through orbitals of atom A
       DO b=0,nb-1 !iterate through orbitals of atom B
-        WRITE(*,*) "a,b",a,b
+       ! WRITE(*,*) "a,b",a,b
         valSb = 0.0D0
         valFb = 0.0D0
         DO s=0,basinfo(u,4*(a+1)+3)-1 !iterate through primatives of orbital a 
           DO t=0,basinfo(v,4*(b+1)+3)-1 !iterate thorugh primatives of orbital b
 
-            WRITE(*,*) "s,t", s,t 
+       !     WRITE(*,*) "s,t", s,t 
             ! 1) get overlap location
             aa = bas(u,a,s*2+1)! WORK NOTE hardcoded to 2nd value in bas of correct u and a 
             bb = bas(v,b,t*2+1)
@@ -260,7 +271,7 @@ PROGRAM int1e
             
             !get orientation for A 
             ori = basinfo(u,4*(a+1)+2)
-            WRITE(*,*) basinfo(u,4*(a+1)+1)
+       !     WRITE(*,*) basinfo(u,4*(a+1)+1)
             IF (ori .EQ. -1) THEN  ! s type orbital
               la = [basinfo(u,4*(a+1)+1),basinfo(u,4*(a+1)+1),basinfo(u,4*(a+1)+1)]
               amax = la 
@@ -297,12 +308,12 @@ PROGRAM int1e
         END DO !end s
         Sb(a,b) = valSb
         Fb(a,b) = valFb
-        WRITE(*,*) "~~~~~~~~~~"
+        !WRITE(*,*) "~~~~~~~~~~"
       END DO !end b
     END DO !end a
 
-   WRITE(*,*) "~~~~~~~~~~~~~~"
-   WRITE(*,*) "~~~~~~~~~~~~~~"
+   !WRITE(*,*) "~~~~~~~~~~~~~~"
+   !WRITE(*,*) "~~~~~~~~~~~~~~"
   END SUBROUTINE block
 
 !~~~~~
@@ -342,13 +353,13 @@ PROGRAM int1e
     ! 1) construct initial stuff
     pp = aa+bb
     nmax = [amax(0)+bmax(0),amax(1)+bmax(1),amax(2)+bmax(2)] 
-    WRITE(*,*) "Coefficients are...", aa, bb
-    WRITE(*,*) "x : nmax, amax, bmax", nmax(0), amax(0), bmax(0)
-    WRITE(*,*) "PAx, PBz", PA(0), PB(0)
-    WRITE(*,*) "y : nmax, amax, bmax", nmax(1), amax(1), bmax(1)
-    WRITE(*,*) "PAy, PBy", PA(1), PB(1)
-    WRITE(*,*) "z : nmax, amax, bmax", nmax(2), amax(2), bmax(2)
-    WRITE(*,*) "PAz, PBz", PA(2), PB(2) 
+   ! WRITE(*,*) "Coefficients are...", aa, bb
+   ! WRITE(*,*) "x : nmax, amax, bmax", nmax(0), amax(0), bmax(0)
+   ! WRITE(*,*) "PAx, PBz", PA(0), PB(0)
+   ! WRITE(*,*) "y : nmax, amax, bmax", nmax(1), amax(1), bmax(1)
+   ! WRITE(*,*) "PAy, PBy", PA(1), PB(1)
+   ! WRITE(*,*) "z : nmax, amax, bmax", nmax(2), amax(2), bmax(2)
+   ! WRITE(*,*) "PAz, PBz", PA(2), PB(2) 
     ALLOCATE(M(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2)) 
     ALLOCATE(fmat(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
     !initialize fmat
@@ -700,20 +711,48 @@ PROGRAM int1e
     temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
     temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
     val = val + temp
-    WRITE(*,*) "zcoef...", coef(2,0,na(2),nb(2)-2), coef(2,0,na(2),nb(2)), coef(2,0,na(2),nb(2)+2)
-    WRITE(*,*) "x,ycoef...", coef(0,0,na(0),nb(0)), coef(1,0,na(1),nb(1)) 
-    WRITE(*,*) "zpart is...", temp
+ !   WRITE(*,*) "zcoef...", coef(2,0,na(2),nb(2)-2), coef(2,0,na(2),nb(2)), coef(2,0,na(2),nb(2)+2)
+ !   WRITE(*,*) "x,ycoef...", coef(0,0,na(0),nb(0)), coef(1,0,na(1),nb(1)) 
+ !   WRITE(*,*) "zpart is...", temp
     !leading coefficients
     val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
     val = val * bas(u,a,s*2)*bas(v,b,t*2)     !basis set weights
     val = val * gtoD(basinfo(u,4*(a+1)+1),aa) !primative constants 
     val = val * gtoD(basinfo(v,4*(b+1)+1),bb) !primative constants 
 
-    WRITE(*,*) "kinetic energy = ", val
+ !   WRITE(*,*) "kinetic energy = ", val
    
     kinetic = val
   
   END FUNCTION kinetic
 
+!~~~~~
+! subroutine to calculate coulombic integrals between orbitals
+  SUBROUTINE coulomb(F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+    IMPLICIT NONE
+    ! Values
+    ! F		: 2D dp, Fock matrix
+    ! xyz	: 2D dp, array of nuclear positions
+    ! atoms	: 1D int, array of which atom is which
+    ! fmem	: dp, free memory left in MB
+    ! nnuc	: int, number of nuclii
+    ! norb	: int, number of orbitals in molecule
+    ! bas	: 2D dp, basis for each atom: atom : orbital : [d,a]
+    ! basinfo	: 2D int, array of basis information
+    ! options	: 1D int, array of options
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: F 
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options, atoms
+    REAL(KIND=8), INTENT(IN) :: fmem
+    INTEGER, INTENT(IN) :: norb,nnuc
+
+    WRITE(*,*) "starting coulombic integral calculations" 
+    !CALL Boys(1,1)
+
+  END SUBROUTINE coulomb
 !~~~~~
 END PROGRAM int1e
