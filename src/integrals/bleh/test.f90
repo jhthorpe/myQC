@@ -11,20 +11,9 @@ REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
     Fj(i) = 0.0D0
   END DO
 
-!  WRITE(*,*) "Testing factorial of 6, 16, 20"
-!  WRITE(*,*) factR8(6), factR8(16), factR8(20), factR8(21)
- 
-  val = 21.0D0
-  DO i=20,2,-1
-    val = val*i
+  DO i=0,120
+    CALL Boys(Fj,1,(i+0.3)/10.0D0)
+    WRITE(*,*) (i+0.3)/10.0D0, Fj(0)
   END DO
-  WRITE(*,*) val
-  val = SQRT(2*Pi*21)*(21/EXP(1.0D0))**21
-!  WRITE(*,*) val
-  
-  WRITE(*,*) "Testing Boys with T = 6"
-  CALL Boys(Fj,5,6.0D0)
-  WRITE(*,*) Fj
-  WRITE(*,*) 
 
 END PROGRAM test

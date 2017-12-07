@@ -44,15 +44,12 @@ MODULE aux
     ! Case 1
     ! if 0 < T < 12 and 0 <= j <= J, use 7 term Taylor expansion
     IF (T .GT. 0 .AND. T .LT. 12) THEN
-      WRITE(*,*) "case1"
       CALL Boys1(Fj,Q,T)
     ! for 12 < T < 2*J+36, use  
     ELSE IF (T .GE. 12 .AND. T .LT. 2*Q+36) THEN
-      WRITE(*,*) "case2"
       CALL Boys2(Fj,Q,T)
     ! for T < 2*J+36
     ELSE IF (T .GE. 2*Q+36) THEN
-      WRITE(*,*) "case3"
       CALL Boys3(Fj,Q,T)
     ELSE 
       WRITE(*,*) "in auxilary.f90, Boys subroutine, bad logic"
@@ -80,20 +77,18 @@ MODULE aux
     READ(1,*) Ftab
     CLOSE(unit=1)
 
-    WRITE(*,*) Ftab(0,1)
-    WRITE(*,*) Ftab(1,1)
-    WRITE(*,*) Ftab(2,1)
-    WRITE(*,*) Ftab(119,1)
-    WRITE(*,*) Ftab(120,1)
-    WRITE(*,*) Ftab(0,22)
-    WRITE(*,*) Ftab(120,22)
-    WRITE(*,*)
+    Fj = (/ (0.0D0, j=0,SIZE(Fj)-1) /)
 
     ! Get FJ
-!    Tk = NINT(T*10)
-!    DO k=0,6
-!      Fj(Q) = Fj(Q) + Ftab(Q+k,Tk)*(tk/10.0D0 - T)**k/factR8(k) 
-!    END DO
+    Tk = NINT(T*10)
+    DO k=0,6
+      Fj(Q) = Fj(Q) + Ftab(Tk,Q+k)*(Tk/10.0D0 - T)**k/factR8(k) 
+    END DO
+
+    ! Downwards Recursion
+    DO j=Q-1,0,-1
+      Fj(j) = (2*T*Fj(j+1) + EXP(-T))/(2.0D0*j+1.0D0)
+    END DO
 
   END SUBROUTINE Boys1
 !----------
@@ -115,7 +110,7 @@ MODULE aux
     g = BoysG(T)
     Fj(0) = 0.5D0*Pi**(0.5D0)*T**(-0.5D0) - EXP(-T)*g/T
 
-    ! Recursive form 
+    ! Upwards recursion
     DO j=1,Q
       Fj(j) = (2.0D0*T)**(-1.0D0)*((2.0D0*j + 1)*Fj(j-1) - EXP(-T))
     END DO
@@ -184,8 +179,8 @@ MODULE aux
 
     ! Standard factorial
     !IF (n .LT. 21) THEN
-    val = n
-    DO i=n-1,2,-1
+    val = 1.0D0
+    DO i=n,2,-1
       val = val*i
     END DO
     ! Sterling for larger factorials 
