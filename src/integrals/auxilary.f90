@@ -35,8 +35,6 @@ MODULE aux
     REAL(KIND=8), INTENT(IN) :: a,b,c,al
     INTEGER, INTENT(IN) :: N,L,M,j
 
-    WRITE(*,*) "at N,L,M,J", N,L,M,j
-
     ! 1) base cases
     ! If we've seen this before
     IF (Rbol(N,L,M,j)) THEN
@@ -106,7 +104,7 @@ MODULE aux
 
     ! Case 1
     ! if 0 < T < 12 and 0 <= j <= J, use 7 term Taylor expansion
-    IF (T .GT. 0 .AND. T .LT. 12) THEN
+    IF (T .GE. 0 .AND. T .LT. 12) THEN
       CALL Boys1(Fj,Q,T)
     ! for 12 < T < 2*J+36, use  
     ELSE IF (T .GE. 12 .AND. T .LT. 2*Q+36) THEN
@@ -115,7 +113,8 @@ MODULE aux
     ELSE IF (T .GE. 2*Q+36) THEN
       CALL Boys3(Fj,Q,T)
     ELSE 
-      WRITE(*,*) "in auxilary.f90, Boys subroutine, bad logic"
+      WRITE(*,*) "in auxilary.f90, T= ", T
+      STOP "Bad logic in auxilary:Boys"
     END IF 
    
   END SUBROUTINE Boys 

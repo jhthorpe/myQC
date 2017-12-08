@@ -35,8 +35,6 @@ MODULE aux
     REAL(KIND=8), INTENT(IN) :: a,b,c,al
     INTEGER, INTENT(IN) :: N,L,M,j
 
-    WRITE(*,*) "at N,L,M,J", N,L,M,j
-
     ! 1) base cases
     ! If we've seen this before
     IF (Rbol(N,L,M,j)) THEN
@@ -115,7 +113,8 @@ MODULE aux
     ELSE IF (T .GE. 2*Q+36) THEN
       CALL Boys3(Fj,Q,T)
     ELSE 
-      WRITE(*,*) "in auxilary.f90, Boys subroutine, bad logic"
+      WRITE(*,*) "in auxilary.f90, T= ", T
+      STOP "Bad logic in auxilary:Boys"
     END IF 
    
   END SUBROUTINE Boys 

@@ -109,13 +109,14 @@ PROGRAM int1e
   flag = flag1 .AND. flag2
   WRITE(*,*)
   IF (.NOT. flag) THEN
-    !1) If not there, calculated overlap and kinetic energy integrals
-    CALL SaT(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+    !1) If not there, calculated Overlap and Fock 
+    CALL proc1e(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     WRITE(*,*) "Overlap written to Suv"
-    WRITE(*,*) "Kinetic energy written to Fuv"
+    WRITE(*,*) "One electron energy written to Fuv"
+    WRITE(*,*) "WARNING WARNING WARNING"
+    WRITE(*,*) "Kinetic energy not evaluated in block"
+    WRITE(*,*) "WARNING WARNING WARNING"
     WRITE(*,*)
-    !2) calculate 1 electron coulomb integrals
-    CALL coulomb(F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     CALL normS(S,MOc,norb,0)
   ELSE
     CALL EXECUTE_COMMAND_LINE('touch Sold')
@@ -141,8 +142,8 @@ PROGRAM int1e
   CONTAINS 
 
 !~~~~~
-  ! calculate overlap matrix and kinetic energy terms of fock matrix
-  SUBROUTINE SaT(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+  ! calculate overlap and one electron energy 
+  SUBROUTINE proc1e(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     IMPLICIT NONE
     ! Values
     ! S		: 2D dp, overlap matrix
@@ -170,7 +171,7 @@ PROGRAM int1e
     INTEGER :: u,v,col,row,col0,row0
 
     CALL CPU_TIME(timeS)
-    WRITE(*,*) "constructing overlap matrix"
+    WRITE(*,*) "constructing Overlap and Fock matrix"
 
     !Matrix blocked by atoms
     col0 = 0
@@ -197,12 +198,12 @@ PROGRAM int1e
     CLOSE(unit=1)
 
     CALL CPU_TIME(timeF)
-    WRITE(*,*) "overlap matrix constructed in (s) :", (timeF-timeS)
+    WRITE(*,*) "Overlap and Fock constructed in (s) :", (timeF-timeS)
 
-  END SUBROUTINE SaT
+  END SUBROUTINE proc1e
 
 !~~~~~
-  ! calculate block of overlap matrix 
+  ! calculate block of Overlap and Fock matrix 
   SUBROUTINE block(Sb,Fb,bas,basinfo,atoms,xyz,u,v,na,nb)
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -217,7 +218,7 @@ PROGRAM int1e
     ! u,v	: int, block index of S (col,row) (atom A, atom B)
     ! na, nb	: int, number of orbitals in atom a,b
     ! coef	: 3D dp, array of coefficients for overlap, (xyz, j,k)
-    ! PA, PB	: 1D dp, array of molecular locations
+    ! PA,PB,PP	: 1D dp, array of distances to overlap, PP = overlap
     ! EIJ	: dp, gaussian at molecular center
     ! val 	: dp, current evaluation of integral
     ! p		: dp, addition of two coeffiecients
@@ -264,8 +265,6 @@ PROGRAM int1e
             END DO 
             EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p) 
 
-
-! WORK NOTE - at call getcoef 
             ! 2) get coefficients for these primatives
             !WRITE(*,*) "Sending PA, PB, aa, ab", PA(2),PB(2), aa,bb
             
@@ -299,6 +298,7 @@ PROGRAM int1e
             
             tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ) 
             tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ)
+            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,lb,la,aa,bb,atoms)
            
             valSb = valSb + tempSb
             valFb = valFb + tempFb
@@ -727,32 +727,96 @@ PROGRAM int1e
   END FUNCTION kinetic
 
 !~~~~~
-! subroutine to calculate coulombic integrals between orbitals
-  SUBROUTINE coulomb(F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
+  ! Calculate the coulomb potential of a gaussian of two orbitals
+  REAL(KIND=8) FUNCTION coulomb(u,v,a,b,s,t,ap,bas,basinfo,PP,nb,na,aa,bb,atoms)
     IMPLICIT NONE
     ! Values
-    ! F		: 2D dp, Fock matrix
-    ! xyz	: 2D dp, array of nuclear positions
-    ! atoms	: 1D int, array of which atom is which
-    ! fmem	: dp, free memory left in MB
-    ! nnuc	: int, number of nuclii
-    ! norb	: int, number of orbitals in molecule
-    ! bas	: 2D dp, basis for each atom: atom : orbital : [d,a]
-    ! basinfo	: 2D int, array of basis information
-    ! options	: 1D int, array of options
+    ! T		: dp, input to RNLMj
+    ! ap	: dp, alpha of overlap gausian
+    ! Rtab	: 4D dp, table of RNLM values
+    ! Rbol	: 4D dp, table input to RNLMj
+    ! nb,na	: 1D int, {n,l,m} for b and a
+    ! nucpos	: 2D dp, list of nuclear positions
+    ! PP	: 1D dp, list of overlap x,y,z
+    ! Fj	: 1D dp, table of Boys integral 
 
-    !Inout
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: F 
+    ! inout
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP
     INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: options, atoms
-    REAL(KIND=8), INTENT(IN) :: fmem
-    INTEGER, INTENT(IN) :: norb,nnuc
+    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb, atoms
+    REAL(KIND=8), INTENT(IN) :: aa, bb, ap
+    INTEGER, INTENT(IN) :: u, v, s, t, a, b
+    
+    !internal
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
+    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: Rbol
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: nucpos
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj
+    REAL(KIND=8) :: temp,val,TT
+    INTEGER :: c,p,i,j,k,N,L,M,nnuc,dummy
 
-    WRITE(*,*) "starting coulombic integral calculations" 
-    !CALL Boys(1,1)
+    val = 0.0D0
+    nnuc = SIZE(atoms)
 
-  END SUBROUTINE coulomb
+    ! combined quantum numbers
+    N = na(0) + nb(0)
+    L = na(1) + nb(1)
+    M = na(2) + nb(2)
+
+    ALLOCATE(Fj(0:N+L+M))
+    ALLOCATE(Rtab(-2:N,-2:L,-2:M,0:N+L+M))
+    ALLOCATE(Rbol(-2:N,-2:L,-2:M,0:N+L+M))
+    ALLOCATE(nucpos(0:nnuc-1,0:2))
+
+    ! get nuclear positions
+    OPEN(unit=1,file='nucpos',status='old',access='sequential')
+    DO c=0,nnuc-1
+      READ(1,*) dummy, nucpos(c,:) 
+    END DO 
+    CLOSE(unit=1)
+
+    ! loop through atoms
+    DO c=0,nnuc-1
+      !construct PC
+      TT = ap*((nucpos(c,0)-PP(0))**2.0D0 + (nucpos(c,1)-PP(1))**2.0D0 + (nucpos(c,2)-PP(2))**2.0D0)
+      
+      !get Boys table
+      CALL Boys(Fj,N+L+M,TT)
+
+      !setup recursion tables
+       DO i=-1,N
+         DO j=-1,L
+           DO k=-1,M
+             DO p=0,N+L+M
+               Rtab(i,j,k,p) = 0.0D0
+               Rbol(i,j,k,p) = .FALSE.
+             END DO
+           END DO
+         END DO
+       END DO
+      
+      ! get RNLM0
+      CALL RNLMj(PP(0),PP(1),PP(2),N,L,M,0,ap,Fj,Rtab,Rbol)
+
+      ! add to coulombic integral
+      temp = (2.0D0*Pi/ap)*Rtab(N,L,M,0)           !basic integral
+      temp = temp * bas(u,a,s*2)*bas(v,b,t*2)      !basis set weights
+      temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)  !primative constants
+      temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)  !primative constants
+      temp = temp * atoms(c)!*EIJ                   !nuclear weight and negative sign
+      val = val - temp                             !negative sign for coulombic attraction
+
+    END DO
+
+    coulomb = val
+
+    DEALLOCATE(Fj)
+    DEALLOCATE(Rtab)
+    DEALLOCATE(Rbol)
+    DEALLOCATE(nucpos)
+
+  END FUNCTION coulomb
 !~~~~~
 END PROGRAM int1e

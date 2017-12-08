@@ -11,11 +11,11 @@ PROGRAM test
 
   al = 0.75
   N = 2
-  L = 1
-  M = 1
+  L = 0
+  M = 0
   a = 0.5
-  b = 0.5
-  c = 0.5
+  b = 0.6
+  c = 0.7
   T = al*(a**2+b**2+c**2)
 
   ALLOCATE(Fj(0:N+L+M))
@@ -37,14 +37,12 @@ PROGRAM test
   
   CALL Boys(Fj,N+L+M,T)
 
-  !WRITE(*,*) (-2*al)**0*Fj(0)
-  !WRITE(*,*) c*(-2*al)**1*Fj(1)
-  !WRITE(*,*) b*(c*(-2*al)**1*Fj(1))
-  
-  CALL RNLMj(a,b,c,N,L,M,0,al,Fj,Rtab,Rbol)
-  !CALL RNLMj(a,b,c,0,0,0,0,al,Fj,Rtab,Rbol)
+  WRITE(*,*) "j,Fj:", N+L+M,Fj(N+L+M)
+  WRITE(*,*) "j,Fj:", 1,Fj(1)
 
-  WRITE(*,*) Rtab(2,1,1,0)
+  CALL RNLMj(a,b,c,N,L,M,0,al,Fj,Rtab,Rbol)
+
+  WRITE(*,*) "RNLM0:",Rtab(N,L,M,0)
   
 
 END PROGRAM test
