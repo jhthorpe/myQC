@@ -17,6 +17,69 @@ MODULE aux
 !			SUBROUTINES
 
 !----------
+  ! Recursive subroutine that returns the table of auxilary functions, RNLMj 
+  RECURSIVE SUBROUTINE RNLMj(a,b,c,N,L,M,j,al,Fj,Rtab,Rbol)
+    IMPLICIT NONE
+    ! Values
+    ! a,b,c	: x,y,z positions
+    ! N,L,M	: x,y,z angular momentum numbers
+    ! al	: dp, alpha
+    ! Fj	: 1d dp table of Fj values
+    ! Rtab	: 4d dp table of R matrix values
+    ! Rbol	: 4d bool table of if RNLMj has been seen or not
+
+    !Inout
+    REAL(KIND=8), DIMENSION(-2:,-2:,-2:,0:), INTENT(INOUT) :: Rtab
+    LOGICAL, DIMENSION(-2:,-2:,-2:,0:), INTENT(INOUT) :: Rbol
+    REAL(KIND=8), DIMENSION(0:) :: Fj
+    REAL(KIND=8), INTENT(IN) :: a,b,c,al
+    INTEGER, INTENT(IN) :: N,L,M,j
+
+    WRITE(*,*) "at N,L,M,J", N,L,M,j
+
+    ! 1) base cases
+    ! If we've seen this before
+    IF (Rbol(N,L,M,j)) THEN
+      RETURN
+    END IF
+    ! check for "bad" point
+    IF (N .LT. 0 .OR. L .LT. 0 .OR. M .LT. 0) THEN
+      Rtab(N,L,M,j) = 0.0D0
+      Rbol(N,L,M,j) = .TRUE.
+      RETURN
+    ! base case
+    ELSE IF (N .EQ. 0 .AND. L .EQ. 0 .AND. M .EQ. 0) THEN
+      Rtab(N,L,M,j) = (-2.0D0*al)**j*Fj(j)  
+      Rbol(N,L,M,j) = .TRUE.
+      RETURN
+    END IF
+
+    ! 2) non-base case    
+    IF (N .NE. 0) THEN
+      CALL RNLMj(a,b,c,N-1,L,M,j+1,al,Fj,Rtab,Rbol) 
+      CALL RNLMj(a,b,c,N-2,L,M,j+1,al,Fj,Rtab,Rbol)
+      Rtab(N,L,M,j) = a*Rtab(N-1,L,M,j+1) + (N-1)*Rtab(N-2,L,M,j+1)
+      Rbol(N,L,M,j) = .TRUE.
+      RETURN
+    ELSE IF (L .NE. 0) THEN
+      CALL RNLMj(a,b,c,0,L-1,M,j+1,al,Fj,Rtab,Rbol) 
+      CALL RNLMj(a,b,c,0,L-2,M,j+1,al,Fj,Rtab,Rbol)
+      Rtab(0,L,M,j) = b*Rtab(0,L-1,M,j+1) + (L-1)*Rtab(0,L-2,M,j+1)
+      Rbol(0,L,M,j) = .TRUE.
+      RETURN
+    ELSE IF (M .NE. 0) THEN
+      CALL RNLMj(a,b,c,0,0,M-1,j+1,al,Fj,Rtab,Rbol) 
+      CALL RNLMj(a,b,c,0,0,M-2,j+1,al,Fj,Rtab,Rbol)
+      Rtab(0,0,M,j) = c*Rtab(0,0,M-1,j+1) + (M-1)*Rtab(0,0,M-2,j+1)
+      Rbol(0,0,M,j) = .TRUE.
+      RETURN
+    ELSE 
+      WRITE(*,*) "Somehow you broke RNLMj recursion in auxilary.f90. N,L,M,j =", N,L,M,j
+      STOP "Bad value auxilary:RNLMj"
+    END IF
+
+  END SUBROUTINE RNLMj
+!----------
 ! Boys control scheme for integrals
   SUBROUTINE Boys(Fj,Q,T)
     IMPLICIT NONE
@@ -144,6 +207,46 @@ MODULE aux
 !===================================================================
 !			FUNCTIONS
 !----------
+  ! Function that return the explicit version of RNLM
+  REAL(KIND=8) FUNCTION RNLM(a,b,c,T,N,L,M)
+    IMPLICIT NONE
+    ! a,b,c	: dp, x,y,z coordinates of center
+    ! N,L,M	: int, x,y,z angular quantum numbers
+    
+    ! Inout
+    REAL(KIND=8), INTENT(IN) :: a,b,c,T
+    INTEGER, INTENT(IN) :: N,L,M
+    ! Internal
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj
+    REAL(KIND=8) :: val,temp
+    INTEGER :: i,j,k
+
+    STOP "RNLM has not been checked yet, possibly using wrong F"
+    ALLOCATE(Fj(0:(N+L+M)))
+
+    val = 0.0D0
+
+    CALL Boys(Fj,N+L+M,T)
+
+    DO i=0,FLOOR(N/2.0D0)
+      DO j=0,FLOOR(L/2.0D0)
+        DO k=0,FLOOR(M/2.0D0)
+          temp = a**(N-2*i)*b**(L-2*j)*c**(M-2*k)
+          temp = temp * factR8(N)/(dfactR8(2*i)*factR8(N-2*i)) 
+          temp = temp * factR8(L)/(dfactR8(2*j)*factR8(L-2*j))
+          temp = temp * factR8(M)/(dfactR8(2*k)*factR8(M-2*k))
+          temp = temp * Fj(N+L+M-i-j-k)
+          val = val + temp 
+        END DO
+      END DO
+    END DO
+    
+    RNLM = val 
+
+    DEALLOCATE(Fj)
+
+  END FUNCTION RNLM
+!----------
   ! Function that returns the proper g value for Boys integrals
   REAL(KIND=8) FUNCTION BoysG(T)
     IMPLICIT NONE
@@ -192,4 +295,35 @@ MODULE aux
 
   END FUNCTION factR8
 !-----------
+  ! Function that return real(kind=8) double factorial
+  REAL(KIND=8) FUNCTION dfactR8(n)
+    IMPLICIT NONE
+    !inout
+    INTEGER, INTENT(IN) :: n
+    !internal
+    REAL(KIND=8) :: val
+    INTEGER :: i
+  
+    val = 1.0D0
+ 
+    IF (n .EQ. 0 .OR. n .EQ. -1) THEN
+      val = 1.0D0
+    ELSE IF (MOD(n,2) .EQ. 0) THEN
+      DO i=n,2,-2
+        val = val * i
+      END DO
+    ELSE IF (MOD(n,2) .NE. 0) THEN 
+      DO i=n,3,-2
+        val = val * i
+      END DO
+    ELSE
+      WRITE(*,*) "Somehow you broke the double factorial, n=", n
+      STOP "bad n!! in auxilary:dfactR8"
+    END IF
+
+    dfactR8 = val
+
+  END FUNCTION dfactR8
+!-----------
+
 END MODULE aux
