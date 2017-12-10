@@ -1,0 +1,3 @@
+#!/bin/bash
+rm fmem envdat nucpos radii error basinfo Suv Fuv Sold Fold 2> /dev/null
+

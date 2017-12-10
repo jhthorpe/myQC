@@ -104,7 +104,7 @@ MODULE aux
 
     ! Case 1
     ! if 0 < T < 12 and 0 <= j <= J, use 7 term Taylor expansion
-    IF (T .GT. 0 .AND. T .LT. 12) THEN
+    IF (T .GE. 0 .AND. T .LT. 12) THEN
       CALL Boys1(Fj,Q,T)
     ! for 12 < T < 2*J+36, use  
     ELSE IF (T .GE. 12 .AND. T .LT. 2*Q+36) THEN
@@ -174,7 +174,7 @@ MODULE aux
 
     ! Upwards recursion
     DO j=1,Q
-      Fj(j) = (2.0D0*T)**(-1.0D0)*((2.0D0*j + 1)*Fj(j-1) - EXP(-T))
+      Fj(j) = (2.0D0*T)**(-1.0D0)*((2.0D0*(j-1) + 1)*Fj(j-1) - EXP(-T))
     END DO
 
   END SUBROUTINE Boys2
@@ -192,12 +192,13 @@ MODULE aux
     ! internal
     INTEGER :: j
 
+
     ! no g in this form
     Fj(0) = 0.5D0*Pi**(0.5D0)*T**(-0.5D0)
 
     !simplified recursive form
     DO j=1,Q
-      Fj(j) = (2.0D0*T)**(-1.0D0)*(2.0D0*j+1.0D0)*Fj(j-1) 
+      Fj(j) = (2.0D0*T)**(-1.0D0)*(2.0D0*(j-1)+1.0D0)*Fj(j-1) 
     END DO
 
   END SUBROUTINE Boys3

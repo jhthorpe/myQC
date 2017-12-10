@@ -97,13 +97,6 @@ PROGRAM int1e
   WRITE(*,*)
   CALL nmem(fmem)
 
-  !Temporary initial MO
-  ! WORK NOTE : should be initialized with noncoulombic Hamiltonian
-  WRITE(*,*) "temporarily taking all MO coefficients as one"
-  DO i=0,norb-1
-    MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
-  END DO
-
   INQUIRE(file='Suv',EXIST=flag1)
   INQUIRE(file='Fuv',EXIST=flag2)
   flag = flag1 .AND. flag2
@@ -113,11 +106,8 @@ PROGRAM int1e
     CALL proc1e(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
     WRITE(*,*) "Overlap written to Suv"
     WRITE(*,*) "One electron energy written to Fuv"
-    WRITE(*,*) "WARNING WARNING WARNING"
-    WRITE(*,*) "Kinetic energy not evaluated in block"
-    WRITE(*,*) "WARNING WARNING WARNING"
+!    CALL normS(S,MOc,norb,0)
     WRITE(*,*)
-    CALL normS(S,MOc,norb,0)
   ELSE
     CALL EXECUTE_COMMAND_LINE('touch Sold')
     CALL EXECUTE_COMMAND_LINE('touch Fold')    
@@ -130,6 +120,13 @@ PROGRAM int1e
     CLOSE(unit=2)
     CLOSE(unit=1)
   END IF
+
+  !Temporary initial MO
+  ! WORK NOTE : should be initialized with 1 electron Hamiltonian?
+  WRITE(*,*) "temporarily taking all MO coefficients as one"
+  DO i=0,norb-1
+    MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
+  END DO
 
   DEALLOCATE(F)
   DEALLOCATE(S)
@@ -217,7 +214,7 @@ PROGRAM int1e
     ! basinfo	: 2D int, array of basis information
     ! u,v	: int, block index of S (col,row) (atom A, atom B)
     ! na, nb	: int, number of orbitals in atom a,b
-    ! coef	: 3D dp, array of coefficients for overlap, (xyz, j,k)
+    ! coef	: 3D dp, array of coefficients for overlap, (xyz,i,j,k)
     ! PA,PB,PP	: 1D dp, array of distances to overlap, PP = overlap
     ! EIJ	: dp, gaussian at molecular center
     ! val 	: dp, current evaluation of integral
@@ -240,8 +237,6 @@ PROGRAM int1e
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     INTEGER :: i,j,k,s,t,a,b,ori
     
-    WRITE(*,*) "u,v",u,v
-    
     DO a=0,na-1 !iterate through orbitals of atom A
       DO b=0,nb-1 !iterate through orbitals of atom B
        ! WRITE(*,*) "a,b",a,b
@@ -254,6 +249,7 @@ PROGRAM int1e
             ! 1) get overlap location
             aa = bas(u,a,s*2+1)! WORK NOTE hardcoded to 2nd value in bas of correct u and a 
             bb = bas(v,b,t*2+1)
+            
             !WRITE(*,*) "aa,bb", aa, bb
             p = aa + bb 
             m = aa * bb
@@ -290,15 +286,33 @@ PROGRAM int1e
               lb(ori) = basinfo(v,4*(b+1)+1)
               bmax = [lb(0)+2, lb(1)+2, lb(2)+2]
             END IF
+   
 
             ! getcoef(M,PA,PB,aa,bb,amax,bmax)
             CALL getcoef(coef,PA,PB,aa,bb,amax,bmax)
 
             ! 3) add everything together for overlap/kinetic matrix elements
             
-            tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ) 
-            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,lb,la,aa,bb,EIJ)
-            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,lb,la,aa,bb,atoms)
+            tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ) 
+!            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ)
+!            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
+            tempFb = coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
+   
+! mark
+!            IF (u.EQ.0.AND.v.EQ.1.AND. a .EQ. 0 .AND. b .EQ. 4) THEN 
+!              WRITE(*,*)
+!              WRITE(*,*) "u,v,a,b,s,t", u,v,a,b,s,t
+!              WRITE(*,*) "la,lb", la(:), "|", lb(:) 
+!              WRITE(*,*) "z coefficients"
+!              WRITE(*,*) "d001", coef(2,0,0,1) 
+!              WRITE(*,*) "d010", coef(2,0,1,0) 
+!              WRITE(*,*) "d011", coef(2,0,1,1) 
+!              WRITE(*,*) "basis set constants"
+!              WRITE(*,*) bas(u,a,s*2)
+!              WRITE(*,*) bas(v,b,t*2) 
+!              WRITE(*,*) "integral", tempFb
+!              WRITE(*,*) "=========="
+!            END IF
            
             valSb = valSb + tempSb
             valFb = valFb + tempFb
@@ -308,7 +322,6 @@ PROGRAM int1e
         END DO !end s
         Sb(a,b) = valSb
         Fb(a,b) = valFb
-        !WRITE(*,*) "~~~~~~~~~~"
       END DO !end b
     END DO !end a
 
@@ -336,7 +349,7 @@ PROGRAM int1e
     ! amax	: 1D int, max angular quantum number of B needed
     ! nmax	: int, max total quantum number needed
     ! nn	: int, total number of elements
-    ! fmat	: 3D dp, boolean array, marks what has been calculated 
+    ! fmat	: 3D dp, boolean array, tracks what has been calculated 
 
     ! Inout
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:), INTENT(INOUT) :: M
@@ -478,7 +491,7 @@ PROGRAM int1e
     !  WRITE(*,*) "i,j,k val + ", i,j,k,M(l,i,j,k)
       RETURN
     ! otherwise, lower j (doesn't really matter which way you do it)
-    ELSE IF (j .GE. k) THEN
+    ELSE IF (j .GT. k) THEN
     !  WRITE(*,*) "going l"
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
@@ -600,7 +613,7 @@ PROGRAM int1e
     ELSE IF (l .EQ. 1) THEN
       gtoD = (128.0D0*(a**5.0D0)/(Pi**3.0D0))**(1.0D0/4.0D0)
     ELSE IF (l .EQ. 2) THEN
-      gtoD = (2048.0D0*(a**7.0D0)/(9.0D0*Pi**(3.0D0)))**(6.0D0/4.0D0)
+      gtoD = (2048.0D0*(a**7.0D0)/(9.0D0*Pi**(3.0D0)))**(1.0D0/4.0D0)
     ELSE IF (l .GT. 2) THEN
       WRITE(*,*) "this angular momentum not implimented yet"
       STOP
@@ -645,7 +658,7 @@ PROGRAM int1e
 
 !~~~~~
   !overlap to calculate matrix element of overlap matrix
-  REAL(KIND=8) FUNCTION overlap(u,v,a,b,s,t,p,bas,basinfo,coef,nb,na,aa,bb,EIJ)
+  REAL(KIND=8) FUNCTION overlap(u,v,a,b,s,t,p,bas,basinfo,coef,na,nb,aa,bb,EIJ)
     IMPLICIT NONE
 
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -661,10 +674,10 @@ PROGRAM int1e
 
     ! precalculated constants
     temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
-    temp = temp*gtoD(basinfo(u,4*(a+1)+1),aa) !basis set coefficients
-    temp = temp*gtoD(basinfo(v,4*(b+1)+1),bb) !basis set coefficeints
+    temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa) !basis set coefficients
+    temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb) !basis set coefficeints
     ! integral coefficients
-    temp = temp*coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
+    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
 
     overlap = temp
 
@@ -672,7 +685,7 @@ PROGRAM int1e
 
 !~~~~~
   !function that calculates kinetic energy of a pair of orbitals
-  REAL(KIND=8) FUNCTION kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,nb,na,aa,bb,EIJ)
+  REAL(KIND=8) FUNCTION kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,na,nb,aa,bb,EIJ)
     IMPLICIT NONE
 
     ! inout
@@ -695,6 +708,10 @@ PROGRAM int1e
     temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
     temp = temp - 2.0D0*bb*(nb(0)+1)*coef(0,0,na(0),nb(0))
     temp = temp + 4.0D0*bb**2.0D0*coef(0,0,na(0),nb(0)+2)
+!    temp = na(0)*nb(0)*coef(0,0,na(0)-1,nb(0)-1)
+!    temp = temp - 2.0D0*bb*na(0)*coef(0,0,na(0)-1,nb(0)+1) 
+!    temp = temp - 2.0D0*aa*nb(0)*coef(0,0,na(0)+1,nb(0)-1)
+!    temp = temp + 4.0D0*bb*aa**coef(0,0,na(0)+1,nb(0)+1)
     temp = temp * coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2)) 
     val = val + temp
     !ypart
@@ -702,6 +719,10 @@ PROGRAM int1e
     temp = temp - 2.0D0*bb*nb(1)*coef(1,0,na(1),nb(1)) 
     temp = temp - 2.0D0*bb*(nb(1)+1)*coef(1,0,na(1),nb(1))
     temp = temp + 4.0D0*bb**2.0D0*coef(1,0,na(1),nb(1)+2)
+!    temp = na(1)*nb(1)*coef(1,0,na(1)-1,nb(1)-1)
+!    temp = temp - 2.0D0*bb*na(1)*coef(1,0,na(1)-1,nb(1)+1) 
+!    temp = temp - 2.0D0*aa*nb(1)*coef(1,0,na(1)+1,nb(1)-1)
+!    temp = temp + 4.0D0*aa*bb*coef(1,0,na(1)+1,nb(1)+1)
     temp = temp * coef(0,0,na(0),nb(0))*coef(2,0,na(2),nb(2)) 
     val = val + temp
     !zpart
@@ -709,6 +730,10 @@ PROGRAM int1e
     temp = temp - 2.0D0*bb*nb(2)*coef(2,0,na(2),nb(2)) 
     temp = temp - 2.0D0*bb*(nb(2)+1)*coef(2,0,na(2),nb(2))
     temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
+!    temp = na(2)*nb(2)*coef(2,0,na(2)-1,nb(2)-1)
+!    temp = temp - 2.0D0*bb*na(2)*coef(2,0,na(2)-1,nb(2)+1) 
+!    temp = temp - 2.0D0*aa*nb(2)*coef(2,0,na(2)+1,nb(2)-1)
+!    temp = temp + 4.0D0*aa*bb**coef(2,0,na(2)+1,nb(2)+1)
     temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
     val = val + temp
  !   WRITE(*,*) "zcoef...", coef(2,0,na(2),nb(2)-2), coef(2,0,na(2),nb(2)), coef(2,0,na(2),nb(2)+2)
@@ -728,33 +753,37 @@ PROGRAM int1e
 
 !~~~~~
   ! Calculate the coulomb potential of a gaussian of two orbitals
-  REAL(KIND=8) FUNCTION coulomb(u,v,a,b,s,t,ap,bas,basinfo,PP,nb,na,aa,bb,atoms)
+  REAL(KIND=8) FUNCTION coulomb(u,v,a,b,s,t,ap,bas,basinfo,PP,na,nb,aa,bb,atoms,EIJ,coef)
     IMPLICIT NONE
     ! Values
     ! T		: dp, input to RNLMj
     ! ap	: dp, alpha of overlap gausian
     ! Rtab	: 4D dp, table of RNLM values
     ! Rbol	: 4D dp, table input to RNLMj
-    ! nb,na	: 1D int, {n,l,m} for b and a
+    ! nb,na	: 1D int, angular momentum values for b and a, {n,l,m} 
     ! nucpos	: 2D dp, list of nuclear positions
     ! PP	: 1D dp, list of overlap x,y,z
+    ! CP 	: 1D dp, line segment between nucleus C and overlap PP
     ! Fj	: 1D dp, table of Boys integral 
+    ! EIJ	: dp, correction of combining two gaussians
+    ! coef	: 4D dp, table of guassian coefficients from overlap 
 
     ! inout
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP
     INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
     INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb, atoms
-    REAL(KIND=8), INTENT(IN) :: aa, bb, ap
+    REAL(KIND=8), INTENT(IN) :: aa, bb, ap, EIJ
     INTEGER, INTENT(IN) :: u, v, s, t, a, b
     
     !internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
     LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: Rbol
     REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: nucpos
-    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj
-    REAL(KIND=8) :: temp,val,TT
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj,CP
+    REAL(KIND=8) :: temp,val,TT,hmm
     INTEGER :: c,p,i,j,k,N,L,M,nnuc,dummy
 
     val = 0.0D0
@@ -765,7 +794,12 @@ PROGRAM int1e
     L = na(1) + nb(1)
     M = na(2) + nb(2)
 
+!    WRITE(*,*) "n,nbar,N", na(0), nb(0), N
+!    WRITE(*,*) "l,lbar,L", na(1), nb(1), L
+!    WRITE(*,*) "m,mbar,M", na(2), nb(2), M
+
     ALLOCATE(Fj(0:N+L+M))
+    ALLOCATE(CP(0:2))
     ALLOCATE(Rtab(-2:N,-2:L,-2:M,0:N+L+M))
     ALLOCATE(Rbol(-2:N,-2:L,-2:M,0:N+L+M))
     ALLOCATE(nucpos(0:nnuc-1,0:2))
@@ -773,22 +807,29 @@ PROGRAM int1e
     ! get nuclear positions
     OPEN(unit=1,file='nucpos',status='old',access='sequential')
     DO c=0,nnuc-1
-      READ(1,*) dummy, nucpos(c,:) 
+      READ(1,*) dummy, nucpos(c,0:2) 
     END DO 
     CLOSE(unit=1)
 
     ! loop through atoms
     DO c=0,nnuc-1
       !construct PC
-      TT = ap*((nucpos(c,0)-PP(0))**2.0D0 + (nucpos(c,1)-PP(1))**2.0D0 + (nucpos(c,2)-PP(2))**2.0D0)
-      
+      DO i=0,2
+        CP(i) = nucpos(c,i) - PP(i)
+      END DO
+      TT = ap*(CP(0)**2.0D0 + CP(1)**2.0D0 + CP(2)**2.0D0)
+!      WRITE(*,*) "c,atom(c),CP", c, atoms(c), CP(:)
+
       !get Boys table
+      DO i=0,N+L+M
+        Fj(i) = 0.0D0 
+      END DO
       CALL Boys(Fj,N+L+M,TT)
 
       !setup recursion tables
-       DO i=-1,N
-         DO j=-1,L
-           DO k=-1,M
+       DO i=-2,N
+         DO j=-2,L
+           DO k=-2,M
              DO p=0,N+L+M
                Rtab(i,j,k,p) = 0.0D0
                Rbol(i,j,k,p) = .FALSE.
@@ -798,21 +839,62 @@ PROGRAM int1e
        END DO
       
       ! get RNLM0
-      CALL RNLMj(PP(0),PP(1),PP(2),N,L,M,0,ap,Fj,Rtab,Rbol)
+      CALL RNLMj(CP(0),CP(1),CP(2),N,L,M,0,ap,Fj,Rtab,Rbol)
+!      CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),N,L,M,0,ap,Fj,Rtab,Rbol)
+
+      temp = 0.0D0
+ 
+      ! skip cycle if coef is 0
+      ! Sum RNLM over all N,L,M 
+      DO i=0,N ! loop over N
+        IF (ABS(coef(0,i,na(0),nb(0))) .LT. 1.0D-14) CYCLE
+        DO j=0,L !loop over L
+          IF (ABS(coef(1,j,na(1),nb(1))) .LT. 1.0D-14) CYCLE 
+          DO k=0,M !loop over M
+            IF (ABS(coef(2,k,na(2),nb(2))) .LT. 1.0D-14) CYCLE
+            !hmm = (-ap**0.5D0)**((i+j+k)*1.0D0)
+!            temp = temp + hmm*coef(0,i,na(0),nb(0))*coef(1,j,na(1),nb(1))*coef(2,k,na(2),nb(2))*Rtab(i,j,k,0)      
+            temp = temp + coef(0,i,na(0),nb(0))*coef(1,j,na(1),nb(1))*coef(2,k,na(2),nb(2))*Rtab(i,j,k,0)      
+          END DO
+        END DO
+      END DO
 
       ! add to coulombic integral
-      temp = (2.0D0*Pi/ap)*Rtab(N,L,M,0)           !basic integral
+      temp = temp * (2.0D0*Pi/ap)                  !from Boys
       temp = temp * bas(u,a,s*2)*bas(v,b,t*2)      !basis set weights
       temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)  !primative constants
       temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)  !primative constants
-      temp = temp * atoms(c)!*EIJ                   !nuclear weight and negative sign
+      temp = temp * atoms(c)*EIJ                   !proton number and overlap coefficient
       val = val - temp                             !negative sign for coulombic attraction
+!      val = val + temp                             !negative sign for coulombic attraction
+
+      IF (u .EQ. 0 .AND. v .EQ. 0 .AND. a .EQ. 0 .AND. b .EQ. 4) THEN
+        WRITE(*,*) "======="
+        WRITE(*,*) "s,t,c",s,t,c
+        WRITE(*,*) "N,L,M", N,L,M
+        WRITE(*,*) "CP", CP(:)
+        WRITE(*,*) "ap,T", ap,TT
+        DO i=-2,N
+          DO j=-2,L
+            DO k=-2,M
+              DO p=0,N+L+M
+                IF (Rbol(i,j,k,p)) THEN 
+                  WRITE(*,*) "N,L,M,j,Rtab", i,j,k,p,Rtab(i,j,k,p) 
+                  WRITE(*,*) "p,Fj(p)",p,Fj(p)
+                END IF
+              END DO
+            END DO
+          END DO
+        END DO
+
+      END IF 
 
     END DO
-
+ 
     coulomb = val
 
     DEALLOCATE(Fj)
+    DEALLOCATE(CP)
     DEALLOCATE(Rtab)
     DEALLOCATE(Rbol)
     DEALLOCATE(nucpos)
