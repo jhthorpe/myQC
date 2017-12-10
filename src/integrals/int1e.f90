@@ -100,7 +100,6 @@ PROGRAM int1e
   INQUIRE(file='Suv',EXIST=flag1)
   INQUIRE(file='Fuv',EXIST=flag2)
   flag = flag1 .AND. flag2
-  WRITE(*,*)
   IF (.NOT. flag) THEN
     !1) If not there, calculated Overlap and Fock 
     CALL proc1e(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb)
@@ -294,9 +293,9 @@ PROGRAM int1e
             ! 3) add everything together for overlap/kinetic matrix elements
             
             tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ) 
-!            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ)
-!            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
-            tempFb = coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
+            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ)
+            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
+!            tempFb = coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
    
 ! mark
 !            IF (u.EQ.0.AND.v.EQ.1.AND. a .EQ. 0 .AND. b .EQ. 4) THEN 
@@ -813,12 +812,12 @@ PROGRAM int1e
 
     ! loop through atoms
     DO c=0,nnuc-1
+
       !construct PC
       DO i=0,2
         CP(i) = nucpos(c,i) - PP(i)
       END DO
       TT = ap*(CP(0)**2.0D0 + CP(1)**2.0D0 + CP(2)**2.0D0)
-!      WRITE(*,*) "c,atom(c),CP", c, atoms(c), CP(:)
 
       !get Boys table
       DO i=0,N+L+M
@@ -838,8 +837,6 @@ PROGRAM int1e
          END DO
        END DO
       
-      ! get RNLM0
-      CALL RNLMj(CP(0),CP(1),CP(2),N,L,M,0,ap,Fj,Rtab,Rbol)
 !      CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),N,L,M,0,ap,Fj,Rtab,Rbol)
 
       temp = 0.0D0
@@ -847,13 +844,17 @@ PROGRAM int1e
       ! skip cycle if coef is 0
       ! Sum RNLM over all N,L,M 
       DO i=0,N ! loop over N
-        IF (ABS(coef(0,i,na(0),nb(0))) .LT. 1.0D-14) CYCLE
+        !IF (ABS(coef(0,i,na(0),nb(0))) .LT. 1.0D-14) CYCLE
         DO j=0,L !loop over L
-          IF (ABS(coef(1,j,na(1),nb(1))) .LT. 1.0D-14) CYCLE 
+          !IF (ABS(coef(1,j,na(1),nb(1))) .LT. 1.0D-14) CYCLE 
           DO k=0,M !loop over M
-            IF (ABS(coef(2,k,na(2),nb(2))) .LT. 1.0D-14) CYCLE
-            !hmm = (-ap**0.5D0)**((i+j+k)*1.0D0)
-!            temp = temp + hmm*coef(0,i,na(0),nb(0))*coef(1,j,na(1),nb(1))*coef(2,k,na(2),nb(2))*Rtab(i,j,k,0)      
+            !IF (ABS(coef(2,k,na(2),nb(2))) .LT. 1.0D-14) CYCLE
+            CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            IF (.NOT. Rbol(i,j,k,0)) THEN
+!              WRITE(*,*) "here - bad Rijk", i,j,k
+!              STOP
+!            END IF 
             temp = temp + coef(0,i,na(0),nb(0))*coef(1,j,na(1),nb(1))*coef(2,k,na(2),nb(2))*Rtab(i,j,k,0)      
           END DO
         END DO
@@ -866,31 +867,9 @@ PROGRAM int1e
       temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)  !primative constants
       temp = temp * atoms(c)*EIJ                   !proton number and overlap coefficient
       val = val - temp                             !negative sign for coulombic attraction
-!      val = val + temp                             !negative sign for coulombic attraction
-
-      IF (u .EQ. 0 .AND. v .EQ. 0 .AND. a .EQ. 0 .AND. b .EQ. 4) THEN
-        WRITE(*,*) "======="
-        WRITE(*,*) "s,t,c",s,t,c
-        WRITE(*,*) "N,L,M", N,L,M
-        WRITE(*,*) "CP", CP(:)
-        WRITE(*,*) "ap,T", ap,TT
-        DO i=-2,N
-          DO j=-2,L
-            DO k=-2,M
-              DO p=0,N+L+M
-                IF (Rbol(i,j,k,p)) THEN 
-                  WRITE(*,*) "N,L,M,j,Rtab", i,j,k,p,Rtab(i,j,k,p) 
-                  WRITE(*,*) "p,Fj(p)",p,Fj(p)
-                END IF
-              END DO
-            END DO
-          END DO
-        END DO
-
-      END IF 
 
     END DO
- 
+    
     coulomb = val
 
     DEALLOCATE(Fj)
