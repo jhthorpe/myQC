@@ -1,8 +1,5 @@
-DIATOMIC
-C
-C
-
-1.0
+ATOM
+He
 
 CALC= SCF
 BASIS= STO-3G 

@@ -1,8 +1,5 @@
 test
-C
-C 1 R1
-
-R1 = 1.0
+He
 
 *CFOUR(CALC=SCF,BASIS=STO-3G
 SYM=OFF,PRINT=999)

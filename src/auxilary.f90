@@ -16,8 +16,9 @@ MODULE aux
 !===================================================================
 !			SUBROUTINES
 
-!----------
-  ! Recursive subroutine that returns the table of auxilary functions, RNLMj 
+!---------------------------------------------------------------------
+!	Generate table of auxilary functions, RNLMj 
+!---------------------------------------------------------------------
   RECURSIVE SUBROUTINE RNLMj(a,b,c,N,L,M,j,al,Fj,Rtab,Rbol)
     IMPLICIT NONE
     ! Values
@@ -77,8 +78,10 @@ MODULE aux
     END IF
 
   END SUBROUTINE RNLMj
-!----------
-! Boys control scheme for integrals
+
+!---------------------------------------------------------------------
+!	Control scheme for Boys integrals
+!---------------------------------------------------------------------
   SUBROUTINE Boys(Fj,Q,T)
     IMPLICIT NONE
     ! Values
@@ -118,8 +121,10 @@ MODULE aux
     END IF 
    
   END SUBROUTINE Boys 
-!----------
-  ! case 1 of boys function, uses downwards recursion scheme
+
+!---------------------------------------------------------------------
+!	Case 1 of Boys, uses downwards recursion scheme
+!---------------------------------------------------------------------
   SUBROUTINE Boys1(Fj,Q,T)
     IMPLICIT NONE
     !Values
@@ -153,8 +158,10 @@ MODULE aux
     END DO
 
   END SUBROUTINE Boys1
-!----------
-  ! case 2 of boys function, uses upwards recursion scheme
+
+!---------------------------------------------------------------------
+!	Case 2 of Boys, uses upwards recursion scheme
+!---------------------------------------------------------------------
   SUBROUTINE Boys2(Fj,Q,T)
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -178,8 +185,10 @@ MODULE aux
     END DO
 
   END SUBROUTINE Boys2
-!----------
-  ! case 3 of boys function, uses simplified upwards recursion scheme
+
+!---------------------------------------------------------------------
+!	Case 3 of Boys, uses simplified upwards recursion scheme
+!---------------------------------------------------------------------
   SUBROUTINE Boys3(Fj,Q,T)
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -202,12 +211,13 @@ MODULE aux
     END DO
 
   END SUBROUTINE Boys3
-!----------
 
 !===================================================================
 !			FUNCTIONS
-!----------
-  ! Function that return the explicit version of RNLM
+
+!---------------------------------------------------------------------
+!	Explicit version of RNLM, currently incorrect and outdated
+!---------------------------------------------------------------------
   REAL(KIND=8) FUNCTION RNLM(a,b,c,T,N,L,M)
     IMPLICIT NONE
     ! a,b,c	: dp, x,y,z coordinates of center
@@ -246,8 +256,10 @@ MODULE aux
     DEALLOCATE(Fj)
 
   END FUNCTION RNLM
-!----------
-  ! Function that returns the proper g value for Boys integrals
+
+!---------------------------------------------------------------------
+!		Calculate g value for Boys integrals
+!---------------------------------------------------------------------
   REAL(KIND=8) FUNCTION BoysG(T)
     IMPLICIT NONE
 
@@ -269,8 +281,10 @@ MODULE aux
     END IF 
 
   END FUNCTION BoysG
-!----------
-  ! Function that returns real(kind=8) factorial
+
+!---------------------------------------------------------------------
+!			Real(kind=8) factorial
+!---------------------------------------------------------------------
   REAL(KIND=8) FUNCTION factR8(n)
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -294,8 +308,10 @@ MODULE aux
     factR8 = val
 
   END FUNCTION factR8
-!-----------
-  ! Function that return real(kind=8) double factorial
+
+!---------------------------------------------------------------------
+!		Real(kind=8) double factorial
+!---------------------------------------------------------------------
   REAL(KIND=8) FUNCTION dfactR8(n)
     IMPLICIT NONE
     !inout
@@ -324,6 +340,7 @@ MODULE aux
     dfactR8 = val
 
   END FUNCTION dfactR8
-!-----------
+
+!---------------------------------------------------------------------
 
 END MODULE aux
