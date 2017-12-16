@@ -31,13 +31,11 @@ PROGRAM int1e
   ! S		: 2D dp, overlap matrix
   ! F		: 2D dp, Fock matrix
   ! MOc		: 2D dp, molecular coefficients (u or v, ith MO) 
-  ! set		: 2D dp, set of exponent coefficients on each nuclei
-  ! setinfo	: 2D int, array of set information
 
   ! Variables  
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: bas
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc,set
-  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo, setinfo
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc
+  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
   INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
@@ -53,7 +51,7 @@ PROGRAM int1e
 
 !the actual stuff
 ! construct the basis
-  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo)
+  CALL buildBasis(options(2),atoms,bas,basinfo)
   ! write out basis set for checking, include in verbosity later
   ! WORK NOTE - maybe add in memory of basis set here?
   WRITE(*,*)

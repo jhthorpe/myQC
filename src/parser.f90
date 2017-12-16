@@ -343,10 +343,15 @@ PROGRAM parser
 
     !WORK NOTE - hardcoded
     !write to enviroment file
-    WRITE(3,*) nnuc        !number of nuclii
+    WRITE(3,*) nnuc        !number of nuclei
     WRITE(3,*) SUM(atoms)  !number of electrons, currently assuming closed shell 
     WRITE(3,*) SIZE(options)
     WRITE(3,*) options
+    WRITE(3,*) 
+    WRITE(3,*) "#number of nuclei" 
+    WRITE(3,*) "#number of electrons"
+    WRITE(3,*) "#length of options array"
+    WRITE(3,*) "options array"
 
     !write to free memory file
     WRITE(4,*) options(6) 

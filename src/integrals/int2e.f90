@@ -30,11 +30,13 @@ PROGRAM int2e
   ! basinfo     : 2D int, array of basis information
   ! options     : 1D int, array of options
   ! F           : 2D dp, Fock matrix
+  ! set		: 2D dp, array of exponential coefficients of sets: atom,orbital numbs
+  ! setinfo	: 2D int, array of set information
 
   ! Variables  
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: bas
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,F
-  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,F,set
+  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo,setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options
   REAL(KIND=8) :: timeS, timeF, fmem
   INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
@@ -49,7 +51,7 @@ PROGRAM int2e
   IF (flag) STOP
 
   ! build the basis set
-  CALL buildBasis(options(2),atoms,bas,basinfo)
+  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo)
 
   ! check that Fock has been created 
   INQUIRE(file='Fuv',EXIST=flag2)
