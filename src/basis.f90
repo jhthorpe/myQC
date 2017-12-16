@@ -50,7 +50,8 @@ MODULE basis
     CHARACTER(LEN=8),DIMENSION(0:2) :: C 
     CHARACTER(LEN=8) :: line
     CHARACTER(LEN=2) :: Aname
-    INTEGER :: i,j,k,l,m,n,Anum,Smax,Cmax,func,coef,sec,ang,pri,orb,Omax,ori,nori,almax,nset,setn,setorbs,numorbs
+    INTEGER :: i,j,k,l,m,n,Anum,Smax,Cmax,func,coef,sec,ang,pri,orb
+    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,numorbs, lmax
 
     A = ['H ','He','Li','Be','B ','C ','N ','O ','F ','Ne']
     C = ['STO-3G ', 'tester1','tester2']
@@ -78,7 +79,7 @@ MODULE basis
         ALLOCATE(B(0:Anum-1,0:(Omax-1),0:(Cmax-1)))
         ALLOCATE(basinfo(0:Anum-1,0:4*Omax+3))
         ALLOCATE(set(0:Anum-1,0:almax-1))
-        ALLOCATE(setinfo(0:Anum-1,0:almax*(1+Omax)+2))
+        ALLOCATE(setinfo(0:Anum-1,0:almax*(2+Omax)+2))
         DO j=0,Anum-1
           ! zero bas
           DO k=0,Omax-1
@@ -88,7 +89,7 @@ MODULE basis
           END DO
           ! zero set and setinfo
           set(i,:) = (/ (0.0D0, k=0,almax-1) /)
-          setinfo(i,:) = (/ (0, k=0,almax*(1+Omax)+2) /)
+          setinfo(i,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
         END DO
       END IF
 
@@ -112,7 +113,7 @@ MODULE basis
       !update setinfo
       setinfo(i,0) = nset !number of sets
       setinfo(i,1) = orb  !number of orbitals
-      setinfo(i,2) = Omax+1 !length of each set, including empty values becauase I'm lazy
+      setinfo(i,2) = Omax+2 !length of each set, including empty values becauase I'm lazy
 
       numorbs = 0
 
@@ -133,19 +134,21 @@ MODULE basis
           !update set info
           setn = NINT(temp) 
           set(i,setn) = val(coef-1) !add coefficient to set 
-          setorbs = setinfo(i,setn*(Omax+1)+3)
+          setorbs = setinfo(i,2+setn*(Omax+2)+1) !get number of orbitals currently in set
 
           !deal with orientation for set
           IF (ori .EQ. -1) THEN !s-type
             setorbs = setorbs + 1 
-            setinfo(i,setn*(Omax+1)+3+setorbs) = numorbs !update where each orbital goes in set on atom
+            setinfo(i,2+setn*(Omax+2)+2+setorbs) = numorbs !update add orbital into set
             numorbs = numorbs + 1
           ELSE IF (ori .EQ. 2) THEN !p-type
             DO m=0,2   
               setorbs = setorbs + 1
-              setinfo(i,setn*(Omax+1)+3+setorbs) = numorbs
+              setinfo(i,2+setn*(Omax+2)+2+setorbs) = numorbs
               numorbs = numorbs + 1 
             END DO
+            !check if we need to update lmax
+            IF (setinfo(i,2+setn*(Omax+2)+2) .LT. 1) setinfo(i,2+setn*(Omax+2)+2) = 1
           ELSE 
             WRITE(*,*) "that angular qunatum number not implimented yet in basis.f90:getbasis."
             WRITE(*,*) "probably also need to re-write coefficient program so that it works with d-orbitals"
@@ -153,7 +156,7 @@ MODULE basis
           END IF
 
           ! update number of orbs in set
-          setinfo(i,setn*(Omax+1)+3) = setorbs
+          setinfo(i,setn*(Omax+2)+3) = setorbs
 
         END DO ! k loop (primatives)
         DEALLOCATE(val)

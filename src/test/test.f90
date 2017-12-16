@@ -23,7 +23,7 @@ program test
       WRITE(*,*) "orbs in set"
       setlen = setinfo(i,2)
       DO k=1,setinfo(i,3+j*setlen)
-        WRITE(*,*) setinfo(i,3+k + j*setlen) 
+        WRITE(*,*) setinfo(i,4+k + j*setlen) 
       END DO
     END DO 
     WRITE(*,*) "~~~~~~~~~~"
