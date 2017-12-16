@@ -14,6 +14,10 @@ My crummy implementation of Hartree Fock
 -) Current atoms: H,He,Li,Be,C 
 -) Current basis sets: STO-3G
 -) Current systems: Atoms, Diatomics, both closed shell.
--) You can get around the diatomic molecule restriction by editing the nucpos and envdat files after running 'parse' but before running 'int1e'
+-) You can get around the diatomic molecule restriction by editing the nucpos and envdat files after running 'parse' but before running 'int1e'.
+
+- IT HAS RECENTLY COME TO MY ATTENTION THAT A RECENT UPDATE IS SERIOUSLY BUGGED AND MY INTEGRALS DO NOT WORK. PLEASE STAND BY.
+
+
 
 Currently, all I can do is the one electron integrals 
