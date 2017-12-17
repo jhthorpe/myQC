@@ -602,26 +602,28 @@ PROGRAM int1e
     ! internal
     INTEGER, DIMENSION(0:2) :: la,lb
     REAL(KIND=8) :: temp
-    INTEGER :: i,j,k,orba,orbb,ori,ta,tb
+    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb
 
+    ta = 0
     !update each element in set
     DO i=0,seta(0)-1 !go through set A
       orba = seta(2+i) !id of orbital
-
       !find where we are in bas weights
-      ta = 0
-      DO k=0,orba-1
-        ta = ta + basinfo(u,3+k*4+4)
-      END DO
+!      ta = 0
+!      DO k=0,orba-1
+!        ta = ta + basinfo(u,3+k*4+4)
+!      END DO
 
+      tb = 0
       DO j=0,setb(0)-1 !go through set B
         orbb = setb(2+j) !id of orbital
+        primb = basinfo(v,3+orbb*4+4)
 
-        tb = 0
-        DO k=0,orbb-1
-          tb = tb + basinfo(v,3+k*4+4)
-        END DO
-        WRITE(*,*) "ta,tb,a,b,orba,orbb",ta,tb,a,b,orba,orbb
+!        tb = 0
+!        DO k=0,orbb-1
+!          tb = tb + basinfo(v,3+k*4+4)
+!        END DO
+        WRITE(*,*) "a,b,ta,tb,orba,orbb,a-ta,b-tb",a,b,ta,tb,orba,orbb,a-ta,b-tb 
         
         ! get angular quantum numbers for each orbital 
         ori = basinfo(u,4*(orba+1)+2)
@@ -641,14 +643,18 @@ PROGRAM int1e
         END IF
 
         ! update Suv 
-        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,orba,(a-ta)*2)*bas(v,orbb,(b-tb)*2) ! WORK NOTE - hardcoded in bas
+!        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,orba,(a-ta)*2)*bas(v,orbb,(b-tb)*2) ! WORK NOTE - hardcoded in bas
+        temp = 1.0D0
         temp = temp * gtoD(basinfo(u,4*(orba+1)+1),aa)                !basis set coefficients
         temp = temp * gtoD(basinfo(v,4*(orbb+1)+1),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
 
         Sb(orba,orbb) = Sb(orba,orbb) + temp
- 
+        
+        tb = primb !number of primatives in previous set
       END DO 
+      prima = basinfo(v,3+orba*4+4)
+      ta = prima
     END DO
 
   END SUBROUTINE overlap
