@@ -190,7 +190,7 @@ PROGRAM int1e
 
     !Internal
     REAL(KIND=8) :: timeS, timeF
-    INTEGER :: u,v,col,row,col0,row0
+    INTEGER :: u,v,col,row,col0,row0,i,j
 
     CALL CPU_TIME(timeS)
     WRITE(*,*) "constructing Overlap and Fock matrix"
@@ -203,6 +203,7 @@ PROGRAM int1e
         !determine length, width, and starting points of block
         col = basinfo(u,2) !number of orbitals in a
         row = basinfo(v,2) ! number of orbitals in b
+
         !construct overlap within block
         CALL block(S(col0:col0+col-1,row0:row0+row-1),F(col0:col0+col-1,row0:row0+row-1), &
         bas,basinfo,atoms,xyz,u,v,col,row,set,setinfo)
@@ -270,6 +271,13 @@ PROGRAM int1e
     setlena = setinfo(u,2)
     setlenb = setinfo(v,2)
 
+    !zero Sb and Fb
+    DO i=0,na-1
+      Sb(i,:) = (/ (0.0D0, j=0,nb-1) /)
+      Fb(i,:) = (/ (0.0D0, j=0,nb-1) /)
+    END DO
+
+
     DO a=0, setinfo(u,0)-1 !iterate through set A 
       aa = set(u,a) !alpha a
       amax = setinfo(u,2+a*setlena+2)   !get max ang qn
@@ -297,10 +305,10 @@ PROGRAM int1e
           CYCLE
         END IF 
         
-        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax)
+        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax+2) ! +2 for kinetic term
 
         ! 2) use setinfo to update Overlap and Fock
-        CALL overlap(Suv,u,v,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+        CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
         setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
  
         DEALLOCATE(coef)
@@ -572,47 +580,76 @@ PROGRAM int1e
 !---------------------------------------------------------------------
 !	Calculate matrix element of overlap matrix
 !---------------------------------------------------------------------
-  SUBROUTINE overlap(Suv,u,v,p,bas,basinfo,coef,seta,setb,aa,bb,EIJ)
+  SUBROUTINE overlap(Sb,u,v,a,b,p,bas,basinfo,coef,seta,setb,aa,bb,EIJ)
     IMPLICIT NONE
 
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
 
     ! Values
+    ! a,b	: int, set number we're on
+    ! la,lb	: 1D int, angular quantum numbers 
+    ! ta,tb	: int, tracking a and b
     
     ! Inout
     REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Suv
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Sb
     INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
     INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb
     REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
-    INTEGER, INTENT(IN) :: u, v
+    INTEGER, INTENT(IN) :: u, v, a, b
 
     ! internal
+    INTEGER, DIMENSION(0:2) :: la,lb
     REAL(KIND=8) :: temp
-    INTEGER :: i,j,a,b
+    INTEGER :: i,j,k,orba,orbb,ori,ta,tb
 
     !update each element in set
     DO i=0,seta(0)-1 !go through set A
-      a = seta(2+i) !id of orbital
+      orba = seta(2+i) !id of orbital
+
+      !find where we are in bas weights
+      ta = 0
+      DO k=0,orba-1
+        ta = ta + basinfo(u,3+k*4+4)
+      END DO
+
       DO j=0,setb(0)-1 !go through set B
-        b - setb(2+j) !id of orbital
-         
-        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
+        orbb = setb(2+j) !id of orbital
+
+        tb = 0
+        DO k=0,orbb-1
+          tb = tb + basinfo(v,3+k*4+4)
+        END DO
+        WRITE(*,*) "ta,tb,a,b,orba,orbb",ta,tb,a,b,orba,orbb
+        
+        ! get angular quantum numbers for each orbital 
+        ori = basinfo(u,4*(orba+1)+2)
+        IF (ori .EQ. -1) THEN  ! s type orbital
+          la = [basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1)]
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN !p type orbital 
+          la = [0, 0, 0]
+          la(ori) = basinfo(u,4*(orba+1)+1)
+        END IF
+
+        ori = basinfo(v,4*(orbb+1)+2)
+        IF (ori .EQ. -1) THEN  ! s type orbital
+          lb = [basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1)]
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN !p type orbital 
+          lb = [0,0,0]
+          lb(ori) = basinfo(v,4*(orbb+1)+1)
+        END IF
+
+        ! update Suv 
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,orba,(a-ta)*2)*bas(v,orbb,(b-tb)*2) ! WORK NOTE - hardcoded in bas
+        temp = temp * gtoD(basinfo(u,4*(orba+1)+1),aa)                !basis set coefficients
+        temp = temp * gtoD(basinfo(v,4*(orbb+1)+1),bb)                !basis set coefficeints
+        temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
+
+        Sb(orba,orbb) = Sb(orba,orbb) + temp
+ 
       END DO 
     END DO
-
-
-
-
-
-    ! precalculated constants
-!    temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)                !basis set coefficients
-!    temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)                !basis set coefficeints
-!    ! integral coefficients
-!    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
-
-!    overlap = temp
 
   END SUBROUTINE overlap
 

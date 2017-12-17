@@ -32,6 +32,13 @@ program test
     WRITE(*,*) "~~~~~~~~~~"
   END DO
 
+  WRITE(*,*) 
+  ta = 0
+  DO k=0,orba-1
+    ta = ta + basinfo(u,4*(orba+3)+1)
+  END DO
+
+
 
   CALL setenv(atoms,xyz,fmem,options)
 
