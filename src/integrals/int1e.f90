@@ -606,7 +606,7 @@ PROGRAM int1e
       DO j=0,setb(0)-1 !go through set B
         orbb = setb(2+j) !id of orbital
 
-        WRITE(*,*) "a,b,ta,tb,orba,orbb,a-ta,b-tb",a,b,ta,tb,orba,orbb,a-ta,b-tb 
+!        WRITE(*,*) "a,b,ta,tb,orba,orbb,a-ta,b-tb",a,b,ta,tb,orba,orbb,a-ta,b-tb 
         
         ! get angular quantum numbers for each orbital 
         ori = basinfo(u,4*(orba+1)+2)
@@ -626,8 +626,8 @@ PROGRAM int1e
         END IF
 
         ! update Suv 
-!        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,orba,(a-ta)*2)*bas(v,orbb,(b-tb)*2) ! WORK NOTE - hardcoded in bas
-        temp = 1.0D0
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,2+i)*bas(v,b,2+j)        ! WORK NOTE - hardcoded in bas
+!        temp = 1.0D0
         temp = temp * gtoD(basinfo(u,4*(orba+1)+1),aa)                !basis set coefficients
         temp = temp * gtoD(basinfo(v,4*(orbb+1)+1),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
@@ -637,7 +637,7 @@ PROGRAM int1e
       END DO 
     END DO
 
-    WRITE(*,*) "==========="
+!    WRITE(*,*) "==========="
 
   END SUBROUTINE overlap
 
