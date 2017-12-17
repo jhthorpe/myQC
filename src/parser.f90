@@ -213,6 +213,9 @@ PROGRAM parser
     ELSE IF (chr .EQ. 'tester2') THEN
       getbasis = 2
       WRITE(*,*) "basis : tester2"
+    ELSE IF (chr .EQ. 'tester3') THEN
+      getbasis = 3
+      WRITE(*,*) "basis : tester3"
     ELSE
       WRITE(*,*) "Sorry, that basis has not been implimented. Exiting..."
       STOP 'bad basis'

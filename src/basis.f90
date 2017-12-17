@@ -20,9 +20,11 @@ MODULE basis
 !---------------------------------------------------------------------
 !		Construct Basis, Set, basinfo, and setinfo
 !---------------------------------------------------------------------
-  SUBROUTINE buildBasis(bkey,atoms,B,basinfo,set,setinfo)
+  SUBROUTINE buildBasis(bkey,atoms,B,basinfo,set,setinfo,offset)
 
     ! Basis is a 3D array, 1st index is each atom, 2nd index is each orbital section, 3rd index are the individual values within the section in a linear array. They must be iterated through differently for each basis set 
+
+    ! Basis is now ordered by [atom, setnum, {alpha, #orbs, w0,w1,w2,...}]
 
     ! Values
     ! bkey	: int representation of basis set
@@ -35,26 +37,29 @@ MODULE basis
     ! C		: char 1D array of basis names
     ! Aname	: chr rep of atom
     ! almax	: int, max number of exp coef in set
+    ! offset	: 2D int, array of offsets for getting basis primative weights
+    ! ttab	: 1D bool, array for holding if we've seen this exp coef before
 
     ! INOUT
     REAL(KIND=8),DIMENSION(:,:,:),ALLOCATABLE,INTENT(INOUT) :: B
     REAL(KIND=8), DIMENSION(:,:),ALLOCATABLE, INTENT(INOUT) :: set 
-    INTEGER, DIMENSION(:,:), ALLOCATABLE :: basinfo,setinfo
+    INTEGER, DIMENSION(:,:), ALLOCATABLE, INTENT(INOUT) :: basinfo,setinfo,offset
     INTEGER,DIMENSION(0:),INTENT(IN) :: atoms
     INTEGER,INTENT(IN) :: bkey 
 
     !Internal 
     REAL(KIND=8),DIMENSION(:),ALLOCATABLE :: val
-    REAL(KIND=8) :: temp
+    LOGICAL, DIMENSION(:), ALLOCATABLE :: ttab
     CHARACTER(LEN=2),DIMENSION(0:9) :: A
-    CHARACTER(LEN=8),DIMENSION(0:2) :: C 
+    CHARACTER(LEN=8),DIMENSION(0:3) :: C 
     CHARACTER(LEN=8) :: line
     CHARACTER(LEN=2) :: Aname
+    REAL(KIND=8) :: temp
     INTEGER :: i,j,k,l,m,n,Anum,Smax,Cmax,func,coef,sec,ang,pri,orb
-    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum, lmax
+    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum,lmax,off,change
 
     A = ['H ','He','Li','Be','B ','C ','N ','O ','F ','Ne']
-    C = ['STO-3G ', 'tester1','tester2']
+    C = ['STO-3G ', 'tester1','tester2','tester3']
     Anum = SIZE(atoms)
 
     WRITE(*,*) "getbasis called..."
@@ -63,6 +68,7 @@ MODULE basis
     OPEN (unit=2,file="mybasis",status="old",access="sequential")
     OPEN (unit=3,file='basinfo',status='replace',access='sequential')
     OPEN (unit=4,file='setinfo',status='replace',access='sequential')
+!    OPEN (unit=5,file='offset',status='replace',access='sequential')
     
     !This is absolutely disgusting code, I will fix later
     
@@ -76,10 +82,13 @@ MODULE basis
       !setup basis array from line below title, if first run
       IF (i .EQ. 0) THEN
         READ(2,*) Smax, Cmax, Omax, almax !max number of sections (orbital types), max constants, max orbitals
-        ALLOCATE(B(0:Anum-1,0:(Omax-1),0:(Cmax-1)))
+!        ALLOCATE(B(0:Anum-1,0:(Omax-1),0:(Cmax-1)))
+        ALLOCATE(B(0:Anum-1,0:almax-1,0:Omax+1))
         ALLOCATE(basinfo(0:Anum-1,0:4*Omax+3))
         ALLOCATE(set(0:Anum-1,0:almax-1))
         ALLOCATE(setinfo(0:Anum-1,0:almax*(2+Omax)+2))
+!        ALLOCATE(offset(0:Anum-1,0:Omax-1))
+        ALLOCATE(ttab(0:almax-1))
         DO j=0,Anum-1
           ! zero bas
           DO k=0,Omax-1
@@ -87,9 +96,10 @@ MODULE basis
               B(j,k,m) = 0.0D0
             END DO
           END DO
-          ! zero set and setinfo
+          ! zero set,setinfo, and offset
           set(i,:) = (/ (0.0D0, k=0,almax-1) /)
           setinfo(i,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
+!          offset(i,:) = (/ (0, k=0,Omax-1) /)
         END DO
       END IF
 
@@ -103,7 +113,7 @@ MODULE basis
       basinfo(i,0) = atoms(i)
 
       !We are at atom, get basis stuff      
-      READ(2,*) sec, orb, nset !number of sections, number of orbitals, number of sets
+      READ(2,*) sec, orb, nset                             !# sections, # orbitals, # sets
 
       !add orbitals of atom into basinfo
       basinfo(i,1) = sec
@@ -111,46 +121,94 @@ MODULE basis
       basinfo(i,3) = -1
 
       !update setinfo
-      setinfo(i,0) = nset !number of sets
-      setinfo(i,1) = orb  !number of orbitals
-      setinfo(i,2) = Omax+2 !length of each set, including empty values becauase I'm lazy
+      setinfo(i,0) = nset                                  !number of sets
+      setinfo(i,1) = orb                                   !number of orbitals
+      setinfo(i,2) = Omax+2                                !length of each set
 
+      !tracking variables
       orbnum = 0
+      off = 0
+
+      !zero ttab
+      DO k=0,almax-1
+        ttab(k) = .FALSE. 
+      END DO
+      change = 0
 
       !go through each section
       DO j=0,sec-1 
         READ(2,*) func, coef, pri, ang, ori !number of functions(primatives), number of coefficients,angular quantum number, number of orientations (-1 spherical, 2 xyz ...), # of new sets
   
-        ! insert values of basis 
+          ! insert values of basis 
         ALLOCATE(val(0:coef-1)) 
+
+!        off = off + change
+!
+!        !deal with offsets
+!        ! S-TYPE
+!        IF (ang .EQ. 0) THEN
+!          offset(i,orbnum) = off
+!        ! P-TYPE
+!        ELSE IF (ang .EQ. 1) THEN
+!          offset(i,orbnum) = off
+!          offset(i,orbnum+1) = off
+!          offset(i,orbnum+2) = off
+!        ! D-TYPE
+!        ELSE
+!          WRITE(*,*) "basis: have not implimented that angular momentum yet,n,l", pri,ang
+!          STOP "bad angular momentum in basis"
+!        END IF
+!
+!        change = 0                                         !track number of changes
 
         !go through each primative
         DO k=0,func-1 
           READ(2,*) val, temp
-          DO m=0,coef-1 !assign linear array values
-            DO l=0,nori-1
-              B(i,j+l,2*k+m) = val(m) 
-            END DO
-          END DO ! m loop (coefficients) 
+
+          !DO m=0,coef-1 !assign linear array values
+          !  DO l=0,nori-1
+          !    B(i,j+l,2*k+m) = val(m) 
+          !  END DO
+          !END DO ! m loop (coefficients) 
 
           !update set info
           setn = NINT(temp) 
-          set(i,setn) = val(coef-1) !add coefficient to set 
-          setorbs = setinfo(i,2+setn*(Omax+2)+1) !get number of orbitals currently in set
+          set(i,setn) = val(coef-1)                        !add exp coef to set 
+          setorbs = setinfo(i,2+setn*(Omax+2)+1)           !get #orb in set
+
+          !update offset
+!          IF ( .NOT. ttab(setn) ) THEN
+!            ttab(setn) = .TRUE. 
+!            change = change + 1
+!            WRITE(*,*) "unseen: n,l,setn", pri,ang,setn,off 
+!          ELSE
+!            WRITE(*,*) "n,l,setnum,off",pri,ang,setn,off
+!          END IF
 
           !deal with orientation for set
-          IF (ori .EQ. -1) THEN !s-type
+          ! S-TYPE
+          IF (ori .EQ. -1) THEN 
             setorbs = setorbs + 1 
-            setinfo(i,2+setn*(Omax+2)+2+setorbs) = orbnum !update add orbital into set
-          ELSE IF (ori .EQ. 2) THEN !p-type
+            setinfo(i,2+setn*(Omax+2)+2+setorbs) = orbnum  ! update set orbital count
+            B(i,setn,0) = val(coef-1)                      ! add exp coef to bas  
+            B(i,setn,1) = setorbs                           ! add number of orbitals to set
+            B(i,setn,1+setorbs) = val(0)                    ! WORK NOTE- HARDCODED 
+
+          ! P-TYPE
+          ELSE IF (ori .EQ. 2) THEN 
             DO m=0,2   
               setorbs = setorbs + 1
               setinfo(i,2+setn*(Omax+2)+2+setorbs) = orbnum
+              B(i,setn,0) = val(coef-1)                    ! add exp coef to bas  
+              B(i,setn,1) = setorbs                        ! add number of orbitals to set
+              B(i,setn,1+setorbs) = val(0)                  ! WORK NOTE- HARDCODED 
               orbnum = orbnum + 1 
             END DO
             orbnum = orbnum - 3  !reset orbnumber to keep with basinfo
             !check if we need to update lmax
             IF (setinfo(i,2+setn*(Omax+2)+2) .LT. 1) setinfo(i,2+setn*(Omax+2)+2) = 1
+
+          ! D-TPYE
           ELSE 
             WRITE(*,*) "that angular qunatum number not implimented yet in basis.f90:getbasis."
             WRITE(*,*) "probably also need to re-write coefficient program so that it works with d-orbitals"
@@ -161,7 +219,7 @@ MODULE basis
           setinfo(i,setn*(Omax+2)+3) = setorbs
 
         END DO ! k loop (primatives)
-
+ 
         orbnum = orbnum + 1
 
         DEALLOCATE(val)
@@ -188,9 +246,10 @@ MODULE basis
         basinfo(i,4*(j+1):4*(j+1)+3) = [0, 0, 0, 0]
       END DO
 
-      !write to basinfo/setinfo
+      !write to basinfo/setinfo/offset
       WRITE(3,*) basinfo(i,:)
       WRITE(4,*) setinfo(i,:)
+!      WRITE(5,*) offset(i,:)
 
       !set up for next atom
       REWIND (2)
@@ -203,19 +262,19 @@ MODULE basis
     WRITE(3,*) 
     WRITE(3,*) 
     !write to bottom of basinfo
-    DO i=0,Anum-1
-      WRITE(3,*) "atom #:", i
-      DO j=0,basinfo(i,2)-1
-        WRITE(3,*) B(i,j,:) 
-      END DO
-    END DO
-    WRITE(3,*) 
+!    DO i=0,Anum-1
+!      WRITE(3,*) "atom #:", i
+!      DO j=0,basinfo(i,2)-1
+!        WRITE(3,*) B(i,j,:) 
+!      END DO
+!    END DO
+!    WRITE(3,*) 
+
  
+!    CLOSE (unit=5,status='keep')
     CLOSE (unit=4,status='keep')
     CLOSE (unit=3,status='keep')
     CLOSE (unit=2,status="keep")
-
-    
 
   END SUBROUTINE buildBasis
 

@@ -37,7 +37,7 @@ PROGRAM int1e
   ! Variables  
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: bas
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc,set
-  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo, setinfo
+  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo, setinfo,offset
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
   INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
@@ -53,22 +53,11 @@ PROGRAM int1e
 
 !the actual stuff
 ! construct the basis
-  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo)
+  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,offset)
   ! write out basis set for checking, include in verbosity later
   ! WORK NOTE - maybe add in memory of basis set here?
-  WRITE(*,*)
-  WRITE(*,*) "Basis set"
-  DO i=0,nnuc-1
-    WRITE(*,*) "Nuclei #", i+1
-    WRITE(*,*) "atom : ", atoms(i)
-    DO j=1,basinfo(i,1)
-      WRITE(*,*) "orbital (n,l) : ", basinfo(i,4*j), basinfo(i,4*j+1)
-      DO k=0,basinfo(i,4*j+3)-1
-        WRITE(*,*) bas(i,j-1,2*k), bas(i,j-1,2*k+1) 
-      END DO
-    END DO
-  END DO
-  WRITE(*,*) "=================================="
+
+  CALL printBasis(nnuc,atoms,setinfo,basinfo,bas,set)
   CALL nmem(fmem)
 
 ! 1) calculate overlap matrix and kinetic energy integrals
@@ -602,27 +591,21 @@ PROGRAM int1e
     ! internal
     INTEGER, DIMENSION(0:2) :: la,lb
     REAL(KIND=8) :: temp
-    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb
+    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb,setlenb,setlena
 
+    setlena = set(u,2)
+    setlenb = set(v,2)
     ta = 0
+    tb = 0
+
     !update each element in set
     DO i=0,seta(0)-1 !go through set A
-      orba = seta(2+i) !id of orbital
-      !find where we are in bas weights
-!      ta = 0
-!      DO k=0,orba-1
-!        ta = ta + basinfo(u,3+k*4+4)
-!      END DO
 
-      tb = 0
+      orba = seta(2+i) !id of orbital
+
       DO j=0,setb(0)-1 !go through set B
         orbb = setb(2+j) !id of orbital
-        primb = basinfo(v,3+orbb*4+4)
 
-!        tb = 0
-!        DO k=0,orbb-1
-!          tb = tb + basinfo(v,3+k*4+4)
-!        END DO
         WRITE(*,*) "a,b,ta,tb,orba,orbb,a-ta,b-tb",a,b,ta,tb,orba,orbb,a-ta,b-tb 
         
         ! get angular quantum numbers for each orbital 
@@ -651,14 +634,58 @@ PROGRAM int1e
 
         Sb(orba,orbb) = Sb(orba,orbb) + temp
         
-        tb = primb !number of primatives in previous set
       END DO 
-      prima = basinfo(v,3+orba*4+4)
-      ta = prima
     END DO
+
+    WRITE(*,*) "==========="
 
   END SUBROUTINE overlap
 
+
+!---------------------------------------------------------------------
+!		Print Basis information	
+!---------------------------------------------------------------------
+  SUBROUTINE printBasis(nnuc,atoms,setinfo,basinfo,bas,set)
+    IMPLICIT NONE
+
+    ! inout
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: set
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo, setinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: atoms
+    INTEGER, INTENT(IN) :: nnuc
+
+    !internal
+    INTEGER :: i,j,k,orb,setlen,n,l
+
+999 FORMAT(2x,A8,1x,I2)
+998 FORMAT(4x,A8,1x,I2,4x,A8,1x,F15.8)
+997 FORMAT(3x,A6,1x,I2)
+996 FORMAT(4x,F15.8,2x,I2,2x,I2,2x,I2)
+
+    WRITE(*,*)
+    WRITE(*,*) "Basis set"
+
+    ! go through atoms
+    DO i=0,nnuc-1
+      WRITE(*,999) "Nuclei #", i+1
+      WRITE(*,997) "atom :", atoms(i)
+
+      ! go through sets
+      DO j=0,setinfo(i,0)-1
+        WRITE(*,998) "set #:", j+1, "alpha :", set(i,j) 
+        ! go print elements of each set
+        setlen = setinfo(i,2) 
+        DO k=0,NINT(bas(i,j,1))-1
+          orb = setinfo(i,2+k+j*setlen+3)
+          WRITE(*,996) bas(i,j,2+k), basinfo(i,4*(orb+1)+0),basinfo(i,4*(orb+1)+1),basinfo(i,4*(orb+1)+2) 
+        END DO
+
+      END DO
+    END DO
+    WRITE(*,*) "=================================="
+
+  END SUBROUTINE printBasis
 
 !=====================================================================
 !                       FUNCTIONS
