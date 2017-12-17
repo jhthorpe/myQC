@@ -182,7 +182,7 @@ PROGRAM int1e
     INTEGER :: u,v,col,row,col0,row0,i,j
 
     CALL CPU_TIME(timeS)
-    WRITE(*,*) "constructing Overlap and Fock matrix"
+    WRITE(*,*) "constructing Overlap and 1e-Fock matrix"
 
     !Matrix blocked by atoms
     col0 = 0
@@ -300,6 +300,9 @@ PROGRAM int1e
         CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
         setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
  
+        CALL kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
+
         DEALLOCATE(coef)
 
       END DO !end b
@@ -310,8 +313,6 @@ PROGRAM int1e
 !
 !            ! 3) add everything together for overlap/kinetic matrix elements
 !            
-!            tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ) 
-!            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ)
 !            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
 !            tempFb = coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
 !   
@@ -591,12 +592,7 @@ PROGRAM int1e
     ! internal
     INTEGER, DIMENSION(0:2) :: la,lb
     REAL(KIND=8) :: temp
-    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb,setlenb,setlena
-
-    setlena = set(u,2)
-    setlenb = set(v,2)
-    ta = 0
-    tb = 0
+    INTEGER :: i,j,k,orba,orbb,ori,prima,primb
 
     !update each element in set
     DO i=0,seta(0)-1 !go through set A
@@ -633,6 +629,7 @@ PROGRAM int1e
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
 
         Sb(orba,orbb) = Sb(orba,orbb) + temp
+
         
       END DO 
     END DO
@@ -641,6 +638,98 @@ PROGRAM int1e
 
   END SUBROUTINE overlap
 
+!---------------------------------------------------------------------
+!	Calculate kinetic energy of a pair of orbitals
+!---------------------------------------------------------------------
+  SUBROUTINE kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,seta,setb,aa,bb,EIJ)
+    IMPLICIT NONE
+
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+
+    ! na,nb	: 1D int, list of angular quantum number, named n for stupid reasons
+
+    ! inout
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Fb
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb
+    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
+    INTEGER, INTENT(IN) :: u, v, a, b
+
+    !internal
+    REAL(KIND=8) :: temp,val
+    INTEGER, DIMENSION(0:2) :: na,nb
+    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb
+
+    DO i=0,seta(0)-1
+      orba = seta(2+i)
+
+      DO j=0,setb(0)-1
+        orbb = setb(2+j)
+
+        temp = 0.0D0
+        val = 0.0D0
+
+        ori = basinfo(u,4*(orba+1)+2)
+    
+        !S-TYPE
+        IF (ori .EQ. -1) THEN  
+          na = [basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+          na = [0, 0, 0]
+          na(ori) = basinfo(u,4*(orba+1)+1)
+        END IF
+
+        ori = basinfo(v,4*(orbb+1)+2)
+
+        !S-TYPE
+        IF (ori .EQ. -1) THEN  
+          nb = [basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+          nb = [0,0,0]
+          nb(ori) = basinfo(v,4*(orbb+1)+1)
+        END IF
+
+        !xpart
+        temp = nb(0)*(nb(0)-1)*coef(0,0,na(0),nb(0)-2)
+        temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
+        temp = temp - 2.0D0*bb*(nb(0)+1)*coef(0,0,na(0),nb(0))
+        temp = temp + 4.0D0*bb**2.0D0*coef(0,0,na(0),nb(0)+2)
+        temp = temp * coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2)) 
+        val = val + temp
+        !ypart
+        temp = nb(1)*(nb(1)-1)*coef(1,0,na(1),nb(1)-2)
+        temp = temp - 2.0D0*bb*nb(1)*coef(1,0,na(1),nb(1)) 
+        temp = temp - 2.0D0*bb*(nb(1)+1)*coef(1,0,na(1),nb(1))
+        temp = temp + 4.0D0*bb**2.0D0*coef(1,0,na(1),nb(1)+2)
+        temp = temp * coef(0,0,na(0),nb(0))*coef(2,0,na(2),nb(2)) 
+        val = val + temp
+        !zpart
+        temp = nb(2)*(nb(2)-1)*coef(2,0,na(2),nb(2)-2)
+        temp = temp - 2.0D0*bb*nb(2)*coef(2,0,na(2),nb(2)) 
+        temp = temp - 2.0D0*bb*(nb(2)+1)*coef(2,0,na(2),nb(2))
+        temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
+        temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
+        val = val + temp
+        !leading coefficients
+        val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
+        val = val * bas(u,a,2+i)*bas(v,b,2+j)     !basis set weights
+        val = val * gtoD(basinfo(u,4*(orba+1)+1),aa) !primative constants 
+        val = val * gtoD(basinfo(v,4*(orbb+1)+1),bb) !primative constants 
+
+        Fb(orba,orbb) = Fb(orba,orbb) + val
+
+        WRITE(*,*) "seta, setb, i,j,orba,orbb", a,b,i,j,orba,orbb
+      END DO
+    END DO
+
+    WRITE(*,*) "==========="
+!    WRITE(*,*) "given", a,b,seta
+
+  END SUBROUTINE kinetic
 
 !---------------------------------------------------------------------
 !		Print Basis information	
@@ -716,57 +805,6 @@ PROGRAM int1e
 
   END FUNCTION gtoD
 
-!---------------------------------------------------------------------
-!	Calculate kinetic energy of a pair of orbitals
-!---------------------------------------------------------------------
-  REAL(KIND=8) FUNCTION kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,na,nb,aa,bb,EIJ)
-    IMPLICIT NONE
-
-    ! inout
-    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
-    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb
-    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
-    INTEGER, INTENT(IN) :: u, v, s, t, a, b
-    
-    !internal
-    REAL(KIND=8) :: temp,val
-
-    temp = 0.0D0
-    val = 0.0D0
-
-    !xpart
-    temp = nb(0)*(nb(0)-1)*coef(0,0,na(0),nb(0)-2)
-    temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
-    temp = temp - 2.0D0*bb*(nb(0)+1)*coef(0,0,na(0),nb(0))
-    temp = temp + 4.0D0*bb**2.0D0*coef(0,0,na(0),nb(0)+2)
-    temp = temp * coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2)) 
-    val = val + temp
-    !ypart
-    temp = nb(1)*(nb(1)-1)*coef(1,0,na(1),nb(1)-2)
-    temp = temp - 2.0D0*bb*nb(1)*coef(1,0,na(1),nb(1)) 
-    temp = temp - 2.0D0*bb*(nb(1)+1)*coef(1,0,na(1),nb(1))
-    temp = temp + 4.0D0*bb**2.0D0*coef(1,0,na(1),nb(1)+2)
-    temp = temp * coef(0,0,na(0),nb(0))*coef(2,0,na(2),nb(2)) 
-    val = val + temp
-    !zpart
-    temp = nb(2)*(nb(2)-1)*coef(2,0,na(2),nb(2)-2)
-    temp = temp - 2.0D0*bb*nb(2)*coef(2,0,na(2),nb(2)) 
-    temp = temp - 2.0D0*bb*(nb(2)+1)*coef(2,0,na(2),nb(2))
-    temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
-    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
-    val = val + temp
-    !leading coefficients
-    val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
-    val = val * bas(u,a,s*2)*bas(v,b,t*2)     !basis set weights
-    val = val * gtoD(basinfo(u,4*(a+1)+1),aa) !primative constants 
-    val = val * gtoD(basinfo(v,4*(b+1)+1),bb) !primative constants 
-
-    kinetic = val
-  
-  END FUNCTION kinetic
 
 !---------------------------------------------------------------------
 !	Calculate the coulomb potential of a gaussian of two orbitals

@@ -259,8 +259,9 @@ MODULE basis
     WRITE(3,*)
     WRITE(3,*) "atom, #sections, #orbitals, dummy, {principle quantum number, angular quantum number, orientation, #primatives}"
 
-    WRITE(3,*) 
-    WRITE(3,*) 
+    WRITE(4,*) 
+    WRITE(4,*) 
+    WRITE(4,*) "#sets, #orbitals, setlength, {#orbs in set, max ang qn, orb1, orb2... maxorb}," 
     !write to bottom of basinfo
 !    DO i=0,Anum-1
 !      WRITE(3,*) "atom #:", i
