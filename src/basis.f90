@@ -51,7 +51,7 @@ MODULE basis
     CHARACTER(LEN=8) :: line
     CHARACTER(LEN=2) :: Aname
     INTEGER :: i,j,k,l,m,n,Anum,Smax,Cmax,func,coef,sec,ang,pri,orb
-    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,numorbs, lmax
+    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum, lmax
 
     A = ['H ','He','Li','Be','B ','C ','N ','O ','F ','Ne']
     C = ['STO-3G ', 'tester1','tester2']
@@ -115,7 +115,7 @@ MODULE basis
       setinfo(i,1) = orb  !number of orbitals
       setinfo(i,2) = Omax+2 !length of each set, including empty values becauase I'm lazy
 
-      numorbs = 0
+      orbnum = 0
 
       !go through each section
       DO j=0,sec-1 
@@ -123,7 +123,9 @@ MODULE basis
   
         ! insert values of basis 
         ALLOCATE(val(0:coef-1)) 
-        DO k=0,func-1 !go through each primative
+
+        !go through each primative
+        DO k=0,func-1 
           READ(2,*) val, temp
           DO m=0,coef-1 !assign linear array values
             DO l=0,nori-1
@@ -139,14 +141,14 @@ MODULE basis
           !deal with orientation for set
           IF (ori .EQ. -1) THEN !s-type
             setorbs = setorbs + 1 
-            setinfo(i,2+setn*(Omax+2)+2+setorbs) = numorbs !update add orbital into set
-            numorbs = numorbs + 1
+            setinfo(i,2+setn*(Omax+2)+2+setorbs) = orbnum !update add orbital into set
           ELSE IF (ori .EQ. 2) THEN !p-type
             DO m=0,2   
               setorbs = setorbs + 1
-              setinfo(i,2+setn*(Omax+2)+2+setorbs) = numorbs
-              numorbs = numorbs + 1 
+              setinfo(i,2+setn*(Omax+2)+2+setorbs) = orbnum
+              orbnum = orbnum + 1 
             END DO
+            orbnum = orbnum - 3  !reset orbnumber to keep with basinfo
             !check if we need to update lmax
             IF (setinfo(i,2+setn*(Omax+2)+2) .LT. 1) setinfo(i,2+setn*(Omax+2)+2) = 1
           ELSE 
@@ -159,6 +161,9 @@ MODULE basis
           setinfo(i,setn*(Omax+2)+3) = setorbs
 
         END DO ! k loop (primatives)
+
+        orbnum = orbnum + 1
+
         DEALLOCATE(val)
 
         ! Dealing with x,y,z orbitals

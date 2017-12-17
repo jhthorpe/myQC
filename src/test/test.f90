@@ -25,6 +25,8 @@ program test
       DO k=1,setinfo(i,3+j*setlen)
         WRITE(*,*) setinfo(i,4+k + j*setlen) 
       END DO
+      WRITE(*,*) "setinfo: ",setinfo(i,2+j*setlen+1:2+(j+1)*setlen)
+      WRITE(*,*) 
     END DO 
     WRITE(*,*) "~~~~~~~~~~"
     WRITE(*,*) "~~~~~~~~~~"

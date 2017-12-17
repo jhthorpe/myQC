@@ -264,19 +264,22 @@ PROGRAM int1e
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
     INTEGER, DIMENSION(0:2) :: la,lb,amax, bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
-    INTEGER :: i,j,k,s,t,a,b,ori,nset,setlena
+    INTEGER :: i,j,k,s,t,a,b,ori,nset,setlena,setlenb
 
     WRITE(*,*) "u,v", u, v
     setlena = setinfo(u,2)
-    
+    setlenb = setinfo(v,2)
+
     DO a=0, setinfo(u,0)-1 !iterate through set A 
       aa = set(u,a) !alpha a
-      la = setinfo(u,2+a*setlena+2)   !get max ang qn
+      amax = setinfo(u,2+a*setlena+2)   !get max ang qn
       DO b=0, setinfo(v,0)-1 !iterate through set B 
 !        valSb = 0.0D0
 !        valFb = 0.0D0
 
         bb = set(v,b) !alpha b
+        bmax = setinfo(v,2+b*setlenb+2)
+
         ! 1) get overlap location
         p = aa + bb 
         m = aa * bb
@@ -294,15 +297,19 @@ PROGRAM int1e
           CYCLE
         END IF 
         
+        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax)
+
+        ! 2) use setinfo to update Overlap and Fock
+        CALL overlap(Suv,u,v,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
+ 
+        DEALLOCATE(coef)
+
       END DO !end b
     END DO !end a
 
 !        DO s=0,basinfo(u,4*(a+1)+3)-1 !iterate through primatives of set a 
 !          DO t=0,basinfo(v,4*(b+1)+3)-1 !iterate thorugh primatives of set b
-!
-!
-!   
-!            CALL getcoef(coef,PA,PB,aa,bb,amax,bmax)
 !
 !            ! 3) add everything together for overlap/kinetic matrix elements
 !            
@@ -562,6 +569,54 @@ PROGRAM int1e
 
   END SUBROUTINE
 
+!---------------------------------------------------------------------
+!	Calculate matrix element of overlap matrix
+!---------------------------------------------------------------------
+  SUBROUTINE overlap(Suv,u,v,p,bas,basinfo,coef,seta,setb,aa,bb,EIJ)
+    IMPLICIT NONE
+
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+
+    ! Values
+    
+    ! Inout
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Suv
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb
+    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
+    INTEGER, INTENT(IN) :: u, v
+
+    ! internal
+    REAL(KIND=8) :: temp
+    INTEGER :: i,j,a,b
+
+    !update each element in set
+    DO i=0,seta(0)-1 !go through set A
+      a = seta(2+i) !id of orbital
+      DO j=0,setb(0)-1 !go through set B
+        b - setb(2+j) !id of orbital
+         
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
+      END DO 
+    END DO
+
+
+
+
+
+    ! precalculated constants
+!    temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)                !basis set coefficients
+!    temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)                !basis set coefficeints
+!    ! integral coefficients
+!    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
+
+!    overlap = temp
+
+  END SUBROUTINE overlap
+
+
 !=====================================================================
 !                       FUNCTIONS
 
@@ -590,34 +645,6 @@ PROGRAM int1e
     END IF
 
   END FUNCTION gtoD
-
-!---------------------------------------------------------------------
-!	Calculate matrix element of overlap matrix
-!---------------------------------------------------------------------
-  REAL(KIND=8) FUNCTION overlap(u,v,a,b,s,t,p,bas,basinfo,coef,na,nb,aa,bb,EIJ)
-    IMPLICIT NONE
-
-    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
-
-    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb
-    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
-    INTEGER, INTENT(IN) :: u, v, s, t, a, b
-
-    REAL(KIND=8) :: temp
-
-    ! precalculated constants
-    temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,s*2)*bas(v,b,t*2) ! WORK NOTE - hardcoded
-    temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)                !basis set coefficients
-    temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)                !basis set coefficeints
-    ! integral coefficients
-    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2))
-
-    overlap = temp
-
-  END FUNCTION overlap
 
 !---------------------------------------------------------------------
 !	Calculate kinetic energy of a pair of orbitals
