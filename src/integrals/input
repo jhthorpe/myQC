@@ -1,5 +1,8 @@
-ATOM
+DIATOMIC
+H
 C
+
+1.0
 
 CALC= SCF
 BASIS= STO-3G 

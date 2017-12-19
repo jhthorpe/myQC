@@ -100,6 +100,7 @@ MODULE basis
           ! zero set,setinfo, and offset
           set(j,:) = (/ (0.0D0, k=0,almax-1) /)
           setinfo(j,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
+          basinfo(j,:) = (/ (0, k=0,4*Omax+3) /)
 !          offset(i,:) = (/ (0, k=0,Omax-1) /)
         END DO
       END IF
@@ -142,48 +143,14 @@ MODULE basis
           ! insert values of basis 
         ALLOCATE(val(0:coef-1)) 
 
-!        off = off + change
-!
-!        !deal with offsets
-!        ! S-TYPE
-!        IF (ang .EQ. 0) THEN
-!          offset(i,orbnum) = off
-!        ! P-TYPE
-!        ELSE IF (ang .EQ. 1) THEN
-!          offset(i,orbnum) = off
-!          offset(i,orbnum+1) = off
-!          offset(i,orbnum+2) = off
-!        ! D-TYPE
-!        ELSE
-!          WRITE(*,*) "basis: have not implimented that angular momentum yet,n,l", pri,ang
-!          STOP "bad angular momentum in basis"
-!        END IF
-!
-!        change = 0                                         !track number of changes
-
         !go through each primative
         DO k=0,func-1 
           READ(2,*) val, temp
-
-          !DO m=0,coef-1 !assign linear array values
-          !  DO l=0,nori-1
-          !    B(i,j+l,2*k+m) = val(m) 
-          !  END DO
-          !END DO ! m loop (coefficients) 
 
           !update set info
           setn = NINT(temp) 
           set(i,setn) = val(coef-1)                        !add exp coef to set 
           setorbs = setinfo(i,2+setn*(Omax+2)+1)           !get #orb in set
-
-          !update offset
-!          IF ( .NOT. ttab(setn) ) THEN
-!            ttab(setn) = .TRUE. 
-!            change = change + 1
-!            WRITE(*,*) "unseen: n,l,setn", pri,ang,setn,off 
-!          ELSE
-!            WRITE(*,*) "n,l,setnum,off",pri,ang,setn,off
-!          END IF
 
           !deal with orientation for set
           ! S-TYPE
