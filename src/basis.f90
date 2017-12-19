@@ -37,8 +37,7 @@ MODULE basis
     ! C		: char 1D array of basis names
     ! Aname	: chr rep of atom
     ! almax	: int, max number of exp coef in set
-    ! offset	: 2D int, array of offsets for getting basis primative weights
-    ! ttab	: 1D bool, array for holding if we've seen this exp coef before
+    ! off	: int, tracks offset of set values
 
     ! INOUT
     REAL(KIND=8),DIMENSION(:,:,:),ALLOCATABLE,INTENT(INOUT) :: B
@@ -56,7 +55,7 @@ MODULE basis
     CHARACTER(LEN=2) :: Aname
     REAL(KIND=8) :: temp
     INTEGER :: i,j,k,l,m,n,Anum,Smax,Cmax,func,coef,sec,ang,pri,orb
-    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum,lmax,off,change
+    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum,lmax,off
 
     A = ['H ','He','Li','Be','B ','C ','N ','O ','F ','Ne']
     C = ['STO-3G ', 'tester1','tester2','tester3']
@@ -71,6 +70,8 @@ MODULE basis
 !    OPEN (unit=5,file='offset',status='replace',access='sequential')
     
     !This is absolutely disgusting code, I will fix later
+
+    off = 0 
     
     ! Go through each atom
     DO i=0,Anum-1 
@@ -91,14 +92,14 @@ MODULE basis
         ALLOCATE(ttab(0:almax-1))
         DO j=0,Anum-1
           ! zero bas
-          DO k=0,Omax-1
-            DO m=0,Cmax-1
+          DO k=0,almax-1
+            DO m=0,Omax-1
               B(j,k,m) = 0.0D0
             END DO
           END DO
           ! zero set,setinfo, and offset
-          set(i,:) = (/ (0.0D0, k=0,almax-1) /)
-          setinfo(i,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
+          set(j,:) = (/ (0.0D0, k=0,almax-1) /)
+          setinfo(j,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
 !          offset(i,:) = (/ (0, k=0,Omax-1) /)
         END DO
       END IF
@@ -133,7 +134,6 @@ MODULE basis
       DO k=0,almax-1
         ttab(k) = .FALSE. 
       END DO
-      change = 0
 
       !go through each section
       DO j=0,sec-1 

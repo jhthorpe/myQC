@@ -254,7 +254,7 @@ PROGRAM int1e
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
     INTEGER, DIMENSION(0:2) :: la,lb,amax, bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
-    INTEGER :: i,j,k,s,t,a,b,ori,nset,setlena,setlenb
+    INTEGER :: i,j,k,l,s,t,a,b,ori,nset,setlena,setlenb
 
     WRITE(*,*) "u,v", u, v
     setlena = setinfo(u,2)
@@ -266,16 +266,22 @@ PROGRAM int1e
       Fb(i,:) = (/ (0.0D0, j=0,nb-1) /)
     END DO
 
-
+    ! subdiagonal + diagonal
     DO a=0, setinfo(u,0)-1 !iterate through set A 
       aa = set(u,a) !alpha a
-      amax = setinfo(u,2+a*setlena+2)   !get max ang qn
+
+      DO l=0,2                               !set amax values
+        amax(l) = setinfo(u,2+a*setlena+2)   !get max ang qn
+      END DO
+
       DO b=0, setinfo(v,0)-1 !iterate through set B 
-!        valSb = 0.0D0
-!        valFb = 0.0D0
+!      DO b=a, setinfo(v,0)-1 !iterate through set B 
 
         bb = set(v,b) !alpha b
-        bmax = setinfo(v,2+b*setlenb+2)
+        DO l=0,2
+          bmax(l) = setinfo(v,2+b*setlenb+2) + 2
+        END DO
+
 
         ! 1) get overlap location
         p = aa + bb 
@@ -293,8 +299,8 @@ PROGRAM int1e
         IF (EIJ .LT. 1.0D-14) THEN
           CYCLE
         END IF 
-        
-        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax+2) ! +2 for kinetic term
+  
+        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax) 
 
         ! 2) use setinfo to update Overlap and Fock
         CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
@@ -308,22 +314,8 @@ PROGRAM int1e
       END DO !end b
     END DO !end a
 
-!        DO s=0,basinfo(u,4*(a+1)+3)-1 !iterate through primatives of set a 
-!          DO t=0,basinfo(v,4*(b+1)+3)-1 !iterate thorugh primatives of set b
-!
-!            ! 3) add everything together for overlap/kinetic matrix elements
-!            
 !            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
 !            tempFb = coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
-!   
-!            valSb = valSb + tempSb
-!            valFb = valFb + tempFb
-!            DEALLOCATE(coef)
-!
-!          END DO !end t
-!        END DO !end s
-!        Sb(a,b) = valSb
-!        Fb(a,b) = valFb
 
   END SUBROUTINE block
 
@@ -375,12 +367,13 @@ PROGRAM int1e
       END DO
     END DO 
 
+
     ! call recursive function on top
     DO l=0,2
       CALL lrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
       CALL rrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
     END DO
-        
+
     DEALLOCATE (fmat)
 
   END SUBROUTINE getcoef
@@ -423,38 +416,32 @@ PROGRAM int1e
     END IF
 
     ! 2) non-base case
-    ! if i is zero, we will need this in overlap
-    IF (j .EQ. k) THEN 
-      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
-      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
-      M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
-      fmat(l,i,j,k) = .TRUE. 
-      RETURN
-    ! get the rest of what we need
-    ! if k is bigger, lower it
-    ELSE IF (j .LT. k) THEN
+    IF (j .LE. k) THEN                        ! go right
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
       fmat(l,i,j,k) = .TRUE. 
       RETURN
-    ! otherwise, lower j (doesn't really matter which way you do it)
-    ELSE IF (j .GT. k) THEN
+    ELSE IF (j .GT. k) THEN                   ! go left
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       fmat(l,i,j,k) = .TRUE. 
       RETURN
     ELSE 
       WRITE(*,*) "Somehow you broke this at:", i,j,k
       STOP "error in lrec"
     END IF
+
+    
  
   END SUBROUTINE lrec
 
@@ -493,23 +480,13 @@ PROGRAM int1e
       M(l,i,j,k) = 1.0D0
       fmat(l,i,j,k) = .TRUE.
       RETURN 
-    END IF
+    END IF 
     
     ! 2) non-base case 
-    ! if i is zero, we will need this in overlap
-    IF (j .EQ. k) THEN 
-      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
-      M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
-      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
-      fmat(l,i,j,k) = .TRUE. 
-      RETURN
-    ! get the rest of what we need
-    ! if k is bigger, lower it
-    ELSE IF (j .LT. k) THEN
+    IF (j .LE. k) THEN
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
@@ -522,12 +499,16 @@ PROGRAM int1e
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       fmat(l,i,j,k) = .TRUE. 
       RETURN
     ELSE 
       WRITE(*,*) "Somehow you broke this, i,j,k", i,j,k
       STOP "error in rrec"
     END IF
+
 
   END SUBROUTINE rrec
 
@@ -623,13 +604,11 @@ PROGRAM int1e
 
         ! update Suv 
         temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,2+i)*bas(v,b,2+j)        ! WORK NOTE - hardcoded in bas
-!        temp = 1.0D0
         temp = temp * gtoD(basinfo(u,4*(orba+1)+1),aa)                !basis set coefficients
         temp = temp * gtoD(basinfo(v,4*(orbb+1)+1),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
 
         Sb(orba,orbb) = Sb(orba,orbb) + temp
-
         
       END DO 
     END DO
@@ -693,6 +672,8 @@ PROGRAM int1e
           nb(ori) = basinfo(v,4*(orbb+1)+1)
         END IF
 
+!        WRITE(*,*) "a,b, la, lb", a, b, na, nb, coef(0,0,na(0),nb(0)+2)
+
         !xpart
         temp = nb(0)*(nb(0)-1)*coef(0,0,na(0),nb(0)-2)
         temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
@@ -722,11 +703,18 @@ PROGRAM int1e
 
         Fb(orba,orbb) = Fb(orba,orbb) + val
 
-        WRITE(*,*) "seta, setb, i,j,orba,orbb", a,b,i,j,orba,orbb
+!        IF (orba .EQ. 1 .AND. orbb .EQ. 0) THEN
+!          WRITE(*,*) "1,0:", a,b, coef(0,0,na(0),nb(0)+2),coef(1,0,na(1),nb(1)),coef(2,0,na(2),nb(2))
+!          WRITE(*,*) "1,0:", a,b, coef(0,0,na(0),nb(0)+2),coef(1,0,na(1),nb(1)),coef(2,0,na(2),nb(2))
+!        ELSE IF (orba .EQ. 0 .AND. orbb .EQ. 1) THEN
+!          WRITE(*,*) "a,b", a, b, coef(0,0,na(0),nb(0)+2),coef(1,0,na(1),nb(1)),coef(2,0,na(2),nb(2))
+!          WRITE(*,*) "0,1:", a, b, coef(0,0,na(0),nb(0)+2),coef(1,0,na(1),nb(1)),coef(2,0,na(2),nb(2))
+!        END IF
+!        WRITE(*,*) "orba,orbb,la,lb,seta,setb", orba,orbb,na(2),nb(2), 
       END DO
     END DO
 
-    WRITE(*,*) "==========="
+!    WRITE(*,*) "==========="
 !    WRITE(*,*) "given", a,b,seta
 
   END SUBROUTINE kinetic
