@@ -798,7 +798,8 @@ PROGRAM int1e
       DO i=0,Nmax
         DO j=0,Lmax
           DO k=0,Mmax
-            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+            !CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+            CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
           END DO
         END DO
       END DO
@@ -862,43 +863,6 @@ PROGRAM int1e
     DEALLOCATE(nucpos)
 
   END SUBROUTINE coulomb
-
-!------ WORK LINE
-
-!
-!
-!
-!      temp = 0.0D0
-! 
-!      ! skip cycle if coef is 0
-!      ! Sum RNLM over all N,L,M 
-!      DO i=0,N ! loop over N
-!        !IF (ABS(coef(0,i,na(0),nb(0))) .LT. 1.0D-14) CYCLE
-!        DO j=0,L !loop over L
-!          !IF (ABS(coef(1,j,na(1),nb(1))) .LT. 1.0D-14) CYCLE 
-!          DO k=0,M !loop over M
-!            !IF (ABS(coef(2,k,na(2),nb(2))) .LT. 1.0D-14) CYCLE
-!            CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
-!            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
-!            IF (.NOT. Rbol(i,j,k,0)) THEN
-!              WRITE(*,*) "here - bad Rijk", i,j,k
-!              STOP
-!            END IF 
-!            temp = temp + coef(0,i,na(0),nb(0))*coef(1,j,na(1),nb(1))*coef(2,k,na(2),nb(2))*Rtab(i,j,k,0)      
-!          END DO
-!        END DO
-!      END DO
-!
-!      ! add to coulombic integral
-!      temp = temp * (2.0D0*Pi/ap)                  !from Boys
-!      temp = temp * bas(u,a,s*2)*bas(v,b,t*2)      !basis set weights
-!      temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)  !primative constants
-!      temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)  !primative constants
-!      temp = temp * atoms(c)*EIJ                   !proton number and overlap coefficient
-!      val = val - temp                             !negative sign for coulombic attraction
-!
-!    
-
 
 !---------------------------------------------------------------------
 !		Print Basis information	
