@@ -9,9 +9,8 @@ My crummy implementation of Hartree Fock
 5) Run 'clean' to remove intermediate files
 
 ====  NOTES and BUGS  ===
-- Current atoms: H,He,Li,Be,C 
+- Current atoms: All 1st and 2nd row elements 
 - Current basis sets: STO-3G
-- Current systems: Atoms, Diatomics, both closed shell.
-- You can get around the diatomic molecule restriction by editing the nucpos and envdat files after running 'parse' but before running 'int1e'.
+- Current systems: Atoms, Diatomics, cartesian molecules, closed shell only.
 
 Currently, all I can do is the one electron integrals 
