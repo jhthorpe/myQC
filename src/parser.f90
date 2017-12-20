@@ -314,15 +314,19 @@ PROGRAM parser
     ! Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz 
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: r 
+    REAL(KIND=8), DIMENSION(0:2) :: COM
+    REAL(KIND=8), DIMENSION(1:10) :: mass
+    REAL(KIND=8) :: temp
     INTEGER :: i,j,nnuc
 
     nnuc = SIZE(atoms)
 
     ALLOCATE(xyz(0:nnuc-1,0:2))
     ALLOCATE(r(0:nnuc-1))
-    
+    COM = [0.0D0, 0.0D0, 0.0D0] 
+    mass = [1.000, 4.000, 7.000, 9.000, 11.000, 12.000, 14.000, 16.000, 19.000, 20.000]
+
     !write xyz file
-    !WORK NOTE - currently hardcoded, only works for linear molecules
     OPEN(unit=1,file='nucpos',status='replace',access='sequential') 
     OPEN(unit=2,file='radii',status='replace',access='sequential')
     OPEN(unit=3,file='envdat',status='replace',access='sequential')
@@ -330,10 +334,28 @@ PROGRAM parser
 
     !write xyz file
     xyz(0,:) = [0.0D0, 0.0D0, 0.0D0]
-    WRITE(1,*) atoms(0), 0.0D0, 0.0D0, 0.0D0 
+
+    !WORK NOTE - currently hardcoded, only works for linear molecules
     DO i=1,nnuc-1 
-      WRITE(1,*) atoms(i), 0.0D0, 0.0D0, radii(i-1)*A2b 
       xyz(i,:) = [0.0D0, 0.0D0, radii(i-1)*A2b]
+    END DO
+
+    !get COM 
+    DO i=0,nnuc-1
+     COM(0) = COM(0) + mass(atoms(i))*xyz(i,0) 
+     COM(1) = COM(1) + mass(atoms(i))*xyz(i,1) 
+     COM(2) = COM(2) + mass(atoms(i))*xyz(i,2) 
+     temp = temp + mass(atoms(i)) 
+    END DO
+
+    COM(:) = COM(:) / temp
+
+    !recenter
+    DO i=0,nnuc-1
+      xyz(i,0) = xyz(i,0) - COM(0) 
+      xyz(i,1) = xyz(i,1) - COM(1) 
+      xyz(i,2) = xyz(i,2) - COM(2) 
+      WRITE(1,*) atoms(i), xyz(i,:)
     END DO
 
     !write radii file
@@ -363,6 +385,7 @@ PROGRAM parser
     CLOSE(unit=2)
     CLOSE(unit=3)
     CLOSE(unit=4)
+
 
     DEALLOCATE(xyz)
     DEALLOCATE(r)
