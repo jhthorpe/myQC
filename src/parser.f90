@@ -392,7 +392,7 @@ PROGRAM parser
     !get COM 
     DO i=0,nnuc-1
      COM(0) = COM(0) + mass(atoms(i))*xyz(i,0) 
-     COM(1) = COM(1) + mass(atoms(i))*xyz(i,1) 
+     COM(1) = COM(1) + mass(atoms(i))*xyz(i,1)
      COM(2) = COM(2) + mass(atoms(i))*xyz(i,2) 
      temp = temp + mass(atoms(i)) 
     END DO
@@ -401,9 +401,9 @@ PROGRAM parser
 
     !recenter
     DO i=0,nnuc-1
-      xyz(i,0) = xyz(i,0) - COM(0) 
-      xyz(i,1) = xyz(i,1) - COM(1) 
-      xyz(i,2) = xyz(i,2) - COM(2) 
+      xyz(i,0) = (xyz(i,0) - COM(0))*A2B 
+      xyz(i,1) = (xyz(i,1) - COM(1))*A2B 
+      xyz(i,2) = (xyz(i,2) - COM(2))*A2B 
       WRITE(1,*) atoms(i), xyz(i,:)
     END DO
 
