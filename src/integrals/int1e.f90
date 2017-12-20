@@ -266,24 +266,21 @@ PROGRAM int1e
       Fb(i,:) = (/ (0.0D0, j=0,nb-1) /)
     END DO
 
-    ! subdiagonal + diagonal
-    DO a=0, setinfo(u,0)-1 !iterate through set A 
-      aa = set(u,a) !alpha a
+    DO a=0, setinfo(u,0)-1                   !iterate through set A 
+      aa = set(u,a)                          !alpha a
 
       DO l=0,2                               !set amax values
         amax(l) = setinfo(u,2+a*setlena+2)   !get max ang qn
-        la = amax
+        la(l) = amax(l)
       END DO
 
-      DO b=0, setinfo(v,0)-1 !iterate through set B 
-!      DO b=a, setinfo(v,0)-1 !iterate through set B 
+      DO b=0, setinfo(v,0)-1                 !iterate through set B 
+        bb = set(v,b)                        !alpha b
 
-        bb = set(v,b) !alpha b
         DO l=0,2
           bmax(l) = setinfo(v,2+b*setlenb+2) + 2
           lb(l) = setinfo(v,2+b*setlenb+2)
         END DO
-
 
         ! 1) get overlap location
         p = aa + bb 
@@ -798,8 +795,11 @@ PROGRAM int1e
       DO i=0,Nmax
         DO j=0,Lmax
           DO k=0,Mmax
-            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
-            !CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(ABS(PP(0)),ABS(PP(1)),ABS(PP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(PP(0),PP(1),PP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+            CALL RNLMj(-CP(0),-CP(1),-CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
           END DO
         END DO
       END DO
@@ -810,6 +810,11 @@ PROGRAM int1e
 
         DO j=0,setb(0)-1                 ! loop over B
           orbb = setb(2+j)
+
+          IF (orba .EQ. 0 .AND. orbb .EQ. 5) THEN
+            WRITE(*,*) CP(:)
+
+          END IF
 
           temp = 0.0D0
           val = 0.0D0
