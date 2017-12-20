@@ -20,25 +20,28 @@ PROGRAM parser
   ! options	: 1D in, list of calculation options
 
   !options currently:
-  ! 0) molecule type : 0 - atom, 1 - diatomic, 2 - linear, 3- everything else
+  ! 0) geometry type    : 1 - atom, 2 - diatomic, 3 - linear, 4- internal, 5- cartesian 
   ! 1) calculation type : 0 - scf 
   ! 2) basis set        : 0 - STO-3G
   ! 3) referecnce       : 0 - RHF, 1 - UHF, 2 - ROHF
   ! 4) parallel alg     : 0 - None, 1 - OMP, 2 - MPI
   ! 5) number of procs  : number
   ! 6) memory           : number in MB
-  ! 7) verbosity        : 0 - none, 1 - some, 2 - all
+  ! 7) verbosity        : 0 - none, 1 - some, 2 - all, 3 - wtf
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
+  REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
   INTEGER(KIND=8),DIMENSION(0:7) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
   CHARACTER(LEN=20) :: str
+  CHARACTER(LEN=2) :: id
   REAL(KIND=8) :: val, timeS, timeF
-  INTEGER :: i
+  INTEGER :: i,nnuc
+  LOGICAL :: flag
 
   CALL CPU_TIME(timeS)
 
@@ -59,15 +62,18 @@ PROGRAM parser
   ! atom read
   IF (options(0) .EQ. 1) THEN
     ALLOCATE(atoms(0:0))
+    ALLOCATE(radii(0:0))
+    ALLOCATE(xyz(0:0,0:0))
     READ(1,*) str
     atoms(0) = getelem(str) 
     READ(1,*) 
 
-  !diatomic read
+  !Diatomic read
   ELSE IF (options(0) .EQ. 2) THEN
     !get atoms
     ALLOCATE(atoms(0:1))
     ALLOCATE(radii(0:0))
+    ALLOCATE(xyz(0:1,0:2))
     DO i=0,1
       READ(1,*) str
       atoms(i) = getelem(str)
@@ -77,6 +83,41 @@ PROGRAM parser
     READ(1,*) radii(0)
     READ(1,*)
 
+  ! Cartesian Read
+  ELSE IF (options(0) .EQ. 5) THEN
+    flag = .TRUE.
+    nnuc = 0
+
+    ! get number of atoms
+    DO WHILE (flag) 
+      READ(1,*) str
+      IF (str .EQ. 'END') THEN
+        flag = .FALSE.
+      ELSE
+        nnuc = nnuc + 1
+      END IF
+    END DO
+    
+    IF (nnuc .LE. 0 ) STOP "No atoms in system"
+    ALLOCATE(atoms(0:nnuc-1))
+    ALLOCATE(xyz(0:nnuc-1,0:2))
+    ALLOCATE(radii(0:0))
+
+    REWIND(1)
+    READ(1,*)
+
+    !construct molecule
+    DO i=0,nnuc-1
+      READ(1,*) id, xyz(i,:)
+      WRITE(*,*) id, xyz(i,:)
+      atoms(i) = getelem(id)
+    END DO
+ 
+    !check it isn't crap
+    IF (.NOT. checkgeom(xyz,nnuc)) STOP 'atoms too close'
+    READ(1,*)
+   
+  !Not implimented yet 
   ELSE
     WRITE(*,*) "Sorry, that system type not implimented yet. Exiting parser."
     STOP 'bad system'
@@ -102,18 +143,22 @@ PROGRAM parser
   options(7) = getverb(line(1)) 
   !~~~~~~~~~~~~~~
     
-  WRITE(*,*) "Atom array" 
-  WRITE(*,*) atoms
-  WRITE(*,*) "Radii array"
-  WRITE(*,*) radii
+  IF (options(0) .NE. 5) THEN
+    WRITE(*,*) "Atom array" 
+    WRITE(*,*) atoms
+    WRITE(*,*) "Radii array"
+    WRITE(*,*) radii
+  END IF
 
-  CALL build(atoms,radii,options)
+
+  CALL build(atoms,radii,options,xyz)
 
   CLOSE (unit=1, status="keep")
   WRITE(*,*) "=================================="
 
   IF (options(0) .NE. 1) DEALLOCATE(radii)
   DEALLOCATE(atoms)
+  DEALLOCATE(xyz)
 
   CALL CPU_TIME(timeF)
 
@@ -127,7 +172,7 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=2),INTENT(IN) :: chr
     ! WORK NOTES : ugly - impliment dictionary?
-    WRITE(*,*) chr
+    IF (options(0) .NE. 5) WRITE(*,*) chr
     getelem = 1
     IF (chr .EQ. 'H') THEN
       getelem = 1
@@ -160,7 +205,7 @@ PROGRAM parser
   ! Function to return the system option value
   INTEGER FUNCTION getsys(chr)
     IMPLICIT NONE
-    CHARACTER(LEN=8),INTENT(IN) :: chr
+    CHARACTER(LEN=9),INTENT(IN) :: chr
     ! WORK NOTE : ugly - impliment a dictionary?
     getsys = 3
     IF (chr .EQ. 'ATOM') THEN
@@ -174,7 +219,10 @@ PROGRAM parser
       WRITE(*,*) "System Type :  LINEAR" 
     ELSE IF (chr .EQ. 'MOLECULE') THEN
       getsys = 4
-      WRITE(*,*) "System Type :  MOLECULE" 
+      WRITE(*,*) "System Type :  INTERNAL" 
+    ELSE IF (chr .EQ. 'CARTESIAN') THEN
+      getsys = 5
+      WRITE(*,*) "System Type : CARTESIAN"
     ELSE
       WRITE(*,*) "Bad system type input. Exiting..."
       STOP 'bad system'
@@ -299,20 +347,23 @@ PROGRAM parser
     IF (chr .EQ. '1') THEN
       getverb = 1
       WRITE(*,*) "Verbosity : 1"
+    ELSE IF (chr .EQ. '0') THEN
+      getverb = 0
+      WRITE(*,*) "Verbosity : 0"
     END IF
     END FUNCTION getverb
 !~~~~~~~~~~
 ! Subroutine that actually build the xyz and radii files 
-  SUBROUTINE build(atoms, radii, options)
+  SUBROUTINE build(atoms, radii, options, xyz)
     IMPLICIT NONE
 
     ! Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: xyz 
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: radii
     INTEGER(KIND=8), DIMENSION(0:) :: options
     INTEGER, DIMENSION(0:) :: atoms
 
     ! Internal
-    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz 
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: r 
     REAL(KIND=8), DIMENSION(0:2) :: COM
     REAL(KIND=8), DIMENSION(1:10) :: mass
@@ -321,7 +372,6 @@ PROGRAM parser
 
     nnuc = SIZE(atoms)
 
-    ALLOCATE(xyz(0:nnuc-1,0:2))
     ALLOCATE(r(0:nnuc-1))
     COM = [0.0D0, 0.0D0, 0.0D0] 
     mass = [1.000, 4.000, 7.000, 9.000, 11.000, 12.000, 14.000, 16.000, 19.000, 20.000]
@@ -332,13 +382,12 @@ PROGRAM parser
     OPEN(unit=3,file='envdat',status='replace',access='sequential')
     OPEN(unit=4,file='fmem',status='replace',access='sequential')
 
-    !write xyz file
-    xyz(0,:) = [0.0D0, 0.0D0, 0.0D0]
-
     !WORK NOTE - currently hardcoded, only works for linear molecules
-    DO i=1,nnuc-1 
-      xyz(i,:) = [0.0D0, 0.0D0, radii(i-1)*A2b]
-    END DO
+    IF (options(0) .EQ. 1) THEN
+      DO i=1,nnuc-1 
+        xyz(i,:) = [0.0D0, 0.0D0, radii(i-1)*A2b]
+      END DO
+    END IF
 
     !get COM 
     DO i=0,nnuc-1
@@ -386,12 +435,38 @@ PROGRAM parser
     CLOSE(unit=3)
     CLOSE(unit=4)
 
-
-    DEALLOCATE(xyz)
     DEALLOCATE(r)
 
   END SUBROUTINE build
   
+!~~~~~~~~~~
+  ! function that returns false if the geom is good
+  LOGICAL FUNCTION checkgeom(xyz,nnuc)
+    IMPLICIT NONE
+ 
+    ! inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    INTEGER, INTENT(IN) :: nnuc
+
+    ! internal
+    REAL(KIND=8) :: r, tol
+    INTEGER :: i,j
+
+    checkgeom = .TRUE.
+
+    DO i=0, nnuc-1
+      DO j=i+1,nnuc-1
+        r = (xyz(i,0)-xyz(j,0))**2.0D0 
+        r = r + (xyz(i,1)-xyz(j,1))**2.0D0
+        r = r + (xyz(i,2)-xyz(j,2))**2.0D0
+        IF (SQRT(r) .LT. 0.20D0) THEN
+          WRITE(*,*) "These atoms are too close (r < 0.2 A) :", i,j
+          checkgeom = .FALSE.
+        END IF
+      END DO
+    END DO    
+
+  END FUNCTION checkgeom
 !~~~~~~~~~~
 
 END PROGRAM parser
