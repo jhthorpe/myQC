@@ -140,8 +140,8 @@ MODULE aux
     INTEGER :: j,k,Tk
 
     !read in Ftab
-    OPEN(unit=1,file='Ftab',status='old',access='sequential')
-    READ(1,*) Ftab
+    OPEN(unit=1,file='Ftab',status='old',access='sequential',form='unformatted')
+    READ(1) Ftab
     CLOSE(unit=1)
 
     Fj = (/ (0.0D0, j=0,SIZE(Fj)-1) /)
