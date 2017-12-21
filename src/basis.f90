@@ -37,8 +37,7 @@ MODULE basis
     ! C		: char 1D array of basis names
     ! Aname	: chr rep of atom
     ! almax	: int, max number of exp coef in set
-    ! offset	: 2D int, array of offsets for getting basis primative weights
-    ! ttab	: 1D bool, array for holding if we've seen this exp coef before
+    ! off	: int, tracks offset of set values
 
     ! INOUT
     REAL(KIND=8),DIMENSION(:,:,:),ALLOCATABLE,INTENT(INOUT) :: B
@@ -56,7 +55,7 @@ MODULE basis
     CHARACTER(LEN=2) :: Aname
     REAL(KIND=8) :: temp
     INTEGER :: i,j,k,l,m,n,Anum,Smax,Cmax,func,coef,sec,ang,pri,orb
-    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum,lmax,off,change
+    INTEGER :: Omax,ori,nori,almax,nset,setn,setorbs,orbnum,lmax,off
 
     A = ['H ','He','Li','Be','B ','C ','N ','O ','F ','Ne']
     C = ['STO-3G ', 'tester1','tester2','tester3']
@@ -71,6 +70,8 @@ MODULE basis
 !    OPEN (unit=5,file='offset',status='replace',access='sequential')
     
     !This is absolutely disgusting code, I will fix later
+
+    off = 0 
     
     ! Go through each atom
     DO i=0,Anum-1 
@@ -91,14 +92,15 @@ MODULE basis
         ALLOCATE(ttab(0:almax-1))
         DO j=0,Anum-1
           ! zero bas
-          DO k=0,Omax-1
-            DO m=0,Cmax-1
+          DO k=0,almax-1
+            DO m=0,Omax-1
               B(j,k,m) = 0.0D0
             END DO
           END DO
           ! zero set,setinfo, and offset
-          set(i,:) = (/ (0.0D0, k=0,almax-1) /)
-          setinfo(i,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
+          set(j,:) = (/ (0.0D0, k=0,almax-1) /)
+          setinfo(j,:) = (/ (0, k=0,almax*(2+Omax)+2) /)
+          basinfo(j,:) = (/ (0, k=0,4*Omax+3) /)
 !          offset(i,:) = (/ (0, k=0,Omax-1) /)
         END DO
       END IF
@@ -133,7 +135,6 @@ MODULE basis
       DO k=0,almax-1
         ttab(k) = .FALSE. 
       END DO
-      change = 0
 
       !go through each section
       DO j=0,sec-1 
@@ -142,48 +143,14 @@ MODULE basis
           ! insert values of basis 
         ALLOCATE(val(0:coef-1)) 
 
-!        off = off + change
-!
-!        !deal with offsets
-!        ! S-TYPE
-!        IF (ang .EQ. 0) THEN
-!          offset(i,orbnum) = off
-!        ! P-TYPE
-!        ELSE IF (ang .EQ. 1) THEN
-!          offset(i,orbnum) = off
-!          offset(i,orbnum+1) = off
-!          offset(i,orbnum+2) = off
-!        ! D-TYPE
-!        ELSE
-!          WRITE(*,*) "basis: have not implimented that angular momentum yet,n,l", pri,ang
-!          STOP "bad angular momentum in basis"
-!        END IF
-!
-!        change = 0                                         !track number of changes
-
         !go through each primative
         DO k=0,func-1 
           READ(2,*) val, temp
-
-          !DO m=0,coef-1 !assign linear array values
-          !  DO l=0,nori-1
-          !    B(i,j+l,2*k+m) = val(m) 
-          !  END DO
-          !END DO ! m loop (coefficients) 
 
           !update set info
           setn = NINT(temp) 
           set(i,setn) = val(coef-1)                        !add exp coef to set 
           setorbs = setinfo(i,2+setn*(Omax+2)+1)           !get #orb in set
-
-          !update offset
-!          IF ( .NOT. ttab(setn) ) THEN
-!            ttab(setn) = .TRUE. 
-!            change = change + 1
-!            WRITE(*,*) "unseen: n,l,setn", pri,ang,setn,off 
-!          ELSE
-!            WRITE(*,*) "n,l,setnum,off",pri,ang,setn,off
-!          END IF
 
           !deal with orientation for set
           ! S-TYPE
@@ -259,8 +226,9 @@ MODULE basis
     WRITE(3,*)
     WRITE(3,*) "atom, #sections, #orbitals, dummy, {principle quantum number, angular quantum number, orientation, #primatives}"
 
-    WRITE(3,*) 
-    WRITE(3,*) 
+    WRITE(4,*) 
+    WRITE(4,*) 
+    WRITE(4,*) "#sets, #orbitals, setlength, {#orbs in set, max ang qn, orb1, orb2... maxorb}," 
     !write to bottom of basinfo
 !    DO i=0,Anum-1
 !      WRITE(3,*) "atom #:", i

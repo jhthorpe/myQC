@@ -182,7 +182,7 @@ PROGRAM int1e
     INTEGER :: u,v,col,row,col0,row0,i,j
 
     CALL CPU_TIME(timeS)
-    WRITE(*,*) "constructing Overlap and Fock matrix"
+    WRITE(*,*) "constructing Overlap and 1e-Fock matrix"
 
     !Matrix blocked by atoms
     col0 = 0
@@ -254,7 +254,7 @@ PROGRAM int1e
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
     INTEGER, DIMENSION(0:2) :: la,lb,amax, bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
-    INTEGER :: i,j,k,s,t,a,b,ori,nset,setlena,setlenb
+    INTEGER :: i,j,k,l,s,t,a,b,ori,nset,setlena,setlenb
 
     WRITE(*,*) "u,v", u, v
     setlena = setinfo(u,2)
@@ -266,16 +266,21 @@ PROGRAM int1e
       Fb(i,:) = (/ (0.0D0, j=0,nb-1) /)
     END DO
 
+    DO a=0, setinfo(u,0)-1                   !iterate through set A 
+      aa = set(u,a)                          !alpha a
 
-    DO a=0, setinfo(u,0)-1 !iterate through set A 
-      aa = set(u,a) !alpha a
-      amax = setinfo(u,2+a*setlena+2)   !get max ang qn
-      DO b=0, setinfo(v,0)-1 !iterate through set B 
-!        valSb = 0.0D0
-!        valFb = 0.0D0
+      DO l=0,2                               !set amax values
+        amax(l) = setinfo(u,2+a*setlena+2)   !get max ang qn
+        la(l) = amax(l)
+      END DO
 
-        bb = set(v,b) !alpha b
-        bmax = setinfo(v,2+b*setlenb+2)
+      DO b=0, setinfo(v,0)-1                 !iterate through set B 
+        bb = set(v,b)                        !alpha b
+
+        DO l=0,2
+          bmax(l) = setinfo(v,2+b*setlenb+2) + 2
+          lb(l) = setinfo(v,2+b*setlenb+2)
+        END DO
 
         ! 1) get overlap location
         p = aa + bb 
@@ -293,36 +298,24 @@ PROGRAM int1e
         IF (EIJ .LT. 1.0D-14) THEN
           CYCLE
         END IF 
-        
-        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax+2) ! +2 for kinetic term
+  
+        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax) 
 
         ! 2) use setinfo to update Overlap and Fock
         CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
         setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
  
+!        CALL kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
+
+        CALL coulomb(Fb,u,v,a,b,p,bas,basinfo,PP,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,atoms,EIJ,coef,setlena,setlenb,la,lb)
+
         DEALLOCATE(coef)
 
       END DO !end b
     END DO !end a
 
-!        DO s=0,basinfo(u,4*(a+1)+3)-1 !iterate through primatives of set a 
-!          DO t=0,basinfo(v,4*(b+1)+3)-1 !iterate thorugh primatives of set b
-!
-!            ! 3) add everything together for overlap/kinetic matrix elements
-!            
-!            tempSb = overlap(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ) 
-!            tempFb = kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,la,lb,aa,bb,EIJ)
-!            tempFb = tempFb + coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
-!            tempFb = coulomb(u,v,a,b,s,t,p,bas,basinfo,PP,la,lb,aa,bb,atoms,EIJ,coef)
-!   
-!            valSb = valSb + tempSb
-!            valFb = valFb + tempFb
-!            DEALLOCATE(coef)
-!
-!          END DO !end t
-!        END DO !end s
-!        Sb(a,b) = valSb
-!        Fb(a,b) = valFb
 
   END SUBROUTINE block
 
@@ -374,12 +367,13 @@ PROGRAM int1e
       END DO
     END DO 
 
+
     ! call recursive function on top
     DO l=0,2
       CALL lrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
       CALL rrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
     END DO
-        
+
     DEALLOCATE (fmat)
 
   END SUBROUTINE getcoef
@@ -422,38 +416,32 @@ PROGRAM int1e
     END IF
 
     ! 2) non-base case
-    ! if i is zero, we will need this in overlap
-    IF (j .EQ. k) THEN 
-      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
-      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
-      M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
-      fmat(l,i,j,k) = .TRUE. 
-      RETURN
-    ! get the rest of what we need
-    ! if k is bigger, lower it
-    ELSE IF (j .LT. k) THEN
+    IF (j .LE. k) THEN                        ! go right
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)   
       fmat(l,i,j,k) = .TRUE. 
       RETURN
-    ! otherwise, lower j (doesn't really matter which way you do it)
-    ELSE IF (j .GT. k) THEN
+    ELSE IF (j .GT. k) THEN                   ! go left
       CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       fmat(l,i,j,k) = .TRUE. 
       RETURN
     ELSE 
       WRITE(*,*) "Somehow you broke this at:", i,j,k
       STOP "error in lrec"
     END IF
+
+    
  
   END SUBROUTINE lrec
 
@@ -492,23 +480,13 @@ PROGRAM int1e
       M(l,i,j,k) = 1.0D0
       fmat(l,i,j,k) = .TRUE.
       RETURN 
-    END IF
+    END IF 
     
     ! 2) non-base case 
-    ! if i is zero, we will need this in overlap
-    IF (j .EQ. k) THEN 
-      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
-      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
-      M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
-      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
-      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
-      fmat(l,i,j,k) = .TRUE. 
-      RETURN
-    ! get the rest of what we need
-    ! if k is bigger, lower it
-    ELSE IF (j .LT. k) THEN
+    IF (j .LE. k) THEN
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
       CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
@@ -521,12 +499,16 @@ PROGRAM int1e
       CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat) 
       CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat) 
       M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)   
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat) 
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat) 
       fmat(l,i,j,k) = .TRUE. 
       RETURN
     ELSE 
       WRITE(*,*) "Somehow you broke this, i,j,k", i,j,k
       STOP "error in rrec"
     END IF
+
 
   END SUBROUTINE rrec
 
@@ -591,12 +573,7 @@ PROGRAM int1e
     ! internal
     INTEGER, DIMENSION(0:2) :: la,lb
     REAL(KIND=8) :: temp
-    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb,setlenb,setlena
-
-    setlena = set(u,2)
-    setlenb = set(v,2)
-    ta = 0
-    tb = 0
+    INTEGER :: i,j,k,orba,orbb,ori,prima,primb
 
     !update each element in set
     DO i=0,seta(0)-1 !go through set A
@@ -606,8 +583,6 @@ PROGRAM int1e
       DO j=0,setb(0)-1 !go through set B
         orbb = setb(2+j) !id of orbital
 
-!        WRITE(*,*) "a,b,ta,tb,orba,orbb,a-ta,b-tb",a,b,ta,tb,orba,orbb,a-ta,b-tb 
-        
         ! get angular quantum numbers for each orbital 
         ori = basinfo(u,4*(orba+1)+2)
         IF (ori .EQ. -1) THEN  ! s type orbital
@@ -627,7 +602,6 @@ PROGRAM int1e
 
         ! update Suv 
         temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*bas(u,a,2+i)*bas(v,b,2+j)        ! WORK NOTE - hardcoded in bas
-!        temp = 1.0D0
         temp = temp * gtoD(basinfo(u,4*(orba+1)+1),aa)                !basis set coefficients
         temp = temp * gtoD(basinfo(v,4*(orbb+1)+1),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
@@ -637,10 +611,263 @@ PROGRAM int1e
       END DO 
     END DO
 
-!    WRITE(*,*) "==========="
-
   END SUBROUTINE overlap
 
+!---------------------------------------------------------------------
+!	Calculate kinetic energy of a pair of orbitals
+!---------------------------------------------------------------------
+  SUBROUTINE kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,seta,setb,aa,bb,EIJ)
+    IMPLICIT NONE
+
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+
+    ! na,nb	: 1D int, list of angular quantum number, named n for stupid reasons
+
+    ! inout
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Fb
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb
+    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
+    INTEGER, INTENT(IN) :: u, v, a, b
+
+    !internal
+    REAL(KIND=8) :: temp,val
+    INTEGER, DIMENSION(0:2) :: na,nb
+    INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb
+
+    DO i=0,seta(0)-1
+      orba = seta(2+i)
+
+      DO j=0,setb(0)-1
+        orbb = setb(2+j)
+
+        temp = 0.0D0
+        val = 0.0D0
+
+        ori = basinfo(u,4*(orba+1)+2)
+    
+        !S-TYPE
+        IF (ori .EQ. -1) THEN  
+          na = [basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+          na = [0, 0, 0]
+          na(ori) = basinfo(u,4*(orba+1)+1)
+        END IF
+
+        ori = basinfo(v,4*(orbb+1)+2)
+
+        !S-TYPE
+        IF (ori .EQ. -1) THEN  
+          nb = [basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+          nb = [0,0,0]
+          nb(ori) = basinfo(v,4*(orbb+1)+1)
+        END IF
+
+        !xpart
+        temp = nb(0)*(nb(0)-1)*coef(0,0,na(0),nb(0)-2)
+        temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
+        temp = temp - 2.0D0*bb*(nb(0)+1)*coef(0,0,na(0),nb(0))
+        temp = temp + 4.0D0*bb**2.0D0*coef(0,0,na(0),nb(0)+2)
+        temp = temp * coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2)) 
+        val = val + temp
+        !ypart
+        temp = nb(1)*(nb(1)-1)*coef(1,0,na(1),nb(1)-2)
+        temp = temp - 2.0D0*bb*nb(1)*coef(1,0,na(1),nb(1)) 
+        temp = temp - 2.0D0*bb*(nb(1)+1)*coef(1,0,na(1),nb(1))
+        temp = temp + 4.0D0*bb**2.0D0*coef(1,0,na(1),nb(1)+2)
+        temp = temp * coef(0,0,na(0),nb(0))*coef(2,0,na(2),nb(2)) 
+        val = val + temp
+        !zpart
+        temp = nb(2)*(nb(2)-1)*coef(2,0,na(2),nb(2)-2)
+        temp = temp - 2.0D0*bb*nb(2)*coef(2,0,na(2),nb(2)) 
+        temp = temp - 2.0D0*bb*(nb(2)+1)*coef(2,0,na(2),nb(2))
+        temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
+        temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
+        val = val + temp
+        !leading coefficients
+        val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
+        val = val * bas(u,a,2+i)*bas(v,b,2+j)     !basis set weights
+        val = val * gtoD(basinfo(u,4*(orba+1)+1),aa) !primative constants 
+        val = val * gtoD(basinfo(v,4*(orbb+1)+1),bb) !primative constants 
+
+        Fb(orba,orbb) = Fb(orba,orbb) + val
+
+      END DO
+    END DO
+
+!    WRITE(*,*) "==========="
+!    WRITE(*,*) "given", a,b,seta
+
+  END SUBROUTINE kinetic
+
+!---------------------------------------------------------------------
+!	Calculate the coulomb potential of a gaussian of two orbitals
+!---------------------------------------------------------------------
+  SUBROUTINE coulomb(Fb,u,v,a,b,ap,bas,basinfo,PP,seta,setb,aa,bb,atoms,EIJ,coef,lenA,lenB,lmaxA,lmaxB)
+    IMPLICIT NONE
+    ! Values
+    ! Fb	: 2D dp, nuclear block of Fock Matrix
+    ! T		: dp, input to RNLMj
+    ! ap	: dp, alpha of overlap gausian
+    ! Rtab	: 4D dp, table of RNLM values
+    ! Rbol	: 4D dp, table input to RNLMj
+    ! nb,na	: 1D int, angular momentum values for b and a, {n,l,m} 
+    ! nucpos	: 2D dp, list of nuclear positions
+    ! PP	: 1D dp, list of overlap x,y,z
+    ! CP 	: 1D dp, line segment between nucleus C and overlap PP
+    ! Fj	: 1D dp, table of Boys integral 
+    ! EIJ	: dp, correction of combining two gaussians
+    ! coef	: 4D dp, table of guassian coefficients from overlap 
+    ! lenA,lenB	: int, length of sets in A and B
+    ! lmaxA	: 1D int, max ang quantum number of set A, B
+
+    ! inout
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Fb
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb, atoms, lmaxA, lmaxB
+    REAL(KIND=8), INTENT(IN) :: aa, bb, ap, EIJ
+    INTEGER, INTENT(IN) :: u, v, a, b, lenA, lenB
+    
+    !internal
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
+    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: Rbol
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: nucpos
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj,CP
+    INTEGER, DIMENSION(0:2) :: na, nb
+    REAL(KIND=8) :: temp,val,TT,hmm
+    INTEGER :: c,p,i,j,k,N,L,M,Nmax,Lmax,Mmax,nnuc,dummy,ori,orba,orbb
+
+    val = 0.0D0
+    nnuc = SIZE(atoms)
+
+    Nmax = lmaxA(0) + lmaxB(0) 
+    Lmax = lmaxA(1) + lmaxB(1) 
+    Mmax = lmaxA(2) + lmaxB(2) 
+
+    ALLOCATE(Fj(0:Nmax+Lmax+Mmax))
+    ALLOCATE(CP(0:2))
+    ALLOCATE(Rtab(-2:Nmax,-2:Lmax,-2:Mmax,0:Nmax+Lmax+Mmax))
+    ALLOCATE(Rbol(-2:Nmax,-2:Lmax,-2:Mmax,0:Nmax+Lmax+Mmax))
+    ALLOCATE(nucpos(0:nnuc-1,0:2))
+
+    ! get nuclear positions
+    OPEN(unit=1,file='nucpos',status='old',access='sequential')
+    DO c=0,nnuc-1
+      READ(1,*) dummy, nucpos(c,0:2) 
+    END DO 
+    CLOSE(unit=1)
+
+!    WRITE(*,*) "at a, b",a,b, lmaxA(0), lmaxB(0)
+    
+    DO c=0,nnuc-1                         ! loop through atoms
+
+      DO i=0,2                            ! construct PC
+        CP(i) = nucpos(c,i) - PP(i)
+      END DO
+      TT = ap*(CP(0)**2.0D0 + CP(1)**2.0D0 + CP(2)**2.0D0)
+
+      DO i=0,Nmax+Lmax+Mmax               ! get Boys table
+        Fj(i) = 0.0D0 
+      END DO
+      CALL Boys(Fj,Nmax+Lmax+Mmax,TT)
+
+       DO i=-2,Nmax
+         DO j=-2,Lmax
+           DO k=-2,Mmax
+             DO p=0,Nmax+Lmax+Mmax
+               Rtab(i,j,k,p) = 0.0D0
+               Rbol(i,j,k,p) = .FALSE.
+             END DO
+           END DO
+         END DO
+       END DO
+     
+      ! WORK NOTE - check that it is correct to use ABS here with the weird directions of the kinetic integrals
+      DO i=0,Nmax
+        DO j=0,Lmax
+          DO k=0,Mmax
+!            CALL RNLMj(ABS(PP(0)),ABS(PP(1)),ABS(PP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(PP(0),PP(1),PP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
+!            CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+            CALL RNLMj(-CP(0),-CP(1),-CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
+          END DO
+        END DO
+      END DO
+
+      !loop over set elements
+      DO i=0,seta(0)-1                   ! loop over A
+        orba = seta(2+i)
+
+        DO j=0,setb(0)-1                 ! loop over B
+          orbb = setb(2+j)
+
+          IF (orba .EQ. 0 .AND. orbb .EQ. 5) THEN
+            WRITE(*,*) CP(:)
+
+          END IF
+
+          temp = 0.0D0
+          val = 0.0D0
+ 
+          !get ang max for each orbital within set
+          ori = basinfo(u,4*(orba+1)+2)
+          !S-TYPE
+          IF (ori .EQ. -1) THEN  
+           na = [basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1)]
+          !P-TYPE
+          ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+            na = [0, 0, 0]
+            na(ori) = basinfo(u,4*(orba+1)+1)
+          END IF
+
+          ori = basinfo(v,4*(orbb+1)+2)
+          !S-TYPE
+          IF (ori .EQ. -1) THEN  
+            nb = [basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1)]
+          !P-TYPE
+          ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+            nb = [0,0,0]
+            nb(ori) = basinfo(v,4*(orbb+1)+1)
+          END IF
+
+          ! loop over all possible solutions
+          DO N=0,na(0)+nb(0)
+            DO L=0, na(1)+nb(1)
+              DO M=0,na(2)+nb(2)
+                temp = temp + coef(0,N,na(0),nb(0))*coef(1,L,na(1),nb(1))*coef(2,M,na(2),nb(2))*Rtab(N,L,M,0)
+              END DO
+            END DO
+          END DO
+
+          temp = temp * (2.0D0*Pi/ap)                     !from Boys
+          temp = temp * bas(u,a,2+i)*bas(v,b,2+j)         !basis set weights
+          temp = temp * gtoD(basinfo(u,4*(orba+1)+1),aa)  !primative constants
+          temp = temp * gtoD(basinfo(v,4*(orbb+1)+1),bb)  !primative constants
+          temp = temp * atoms(c)*EIJ                      !proton number and overlap coefficient
+          
+          Fb(orba,orbb) = Fb(orba,orbb) - temp
+
+        END DO                           ! end loop over B
+      END DO                             ! end loop over A
+    END DO                               ! end nuclei loop
+
+    DEALLOCATE(Fj)
+    DEALLOCATE(CP)
+    DEALLOCATE(Rtab)
+    DEALLOCATE(Rbol)
+    DEALLOCATE(nucpos)
+
+  END SUBROUTINE coulomb
 
 !---------------------------------------------------------------------
 !		Print Basis information	
@@ -716,183 +943,6 @@ PROGRAM int1e
 
   END FUNCTION gtoD
 
-!---------------------------------------------------------------------
-!	Calculate kinetic energy of a pair of orbitals
-!---------------------------------------------------------------------
-  REAL(KIND=8) FUNCTION kinetic(u,v,a,b,s,t,p,bas,basinfo,coef,na,nb,aa,bb,EIJ)
-    IMPLICIT NONE
 
-    ! inout
-    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
-    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb
-    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
-    INTEGER, INTENT(IN) :: u, v, s, t, a, b
-    
-    !internal
-    REAL(KIND=8) :: temp,val
-
-    temp = 0.0D0
-    val = 0.0D0
-
-    !xpart
-    temp = nb(0)*(nb(0)-1)*coef(0,0,na(0),nb(0)-2)
-    temp = temp - 2.0D0*bb*nb(0)*coef(0,0,na(0),nb(0)) 
-    temp = temp - 2.0D0*bb*(nb(0)+1)*coef(0,0,na(0),nb(0))
-    temp = temp + 4.0D0*bb**2.0D0*coef(0,0,na(0),nb(0)+2)
-    temp = temp * coef(1,0,na(1),nb(1))*coef(2,0,na(2),nb(2)) 
-    val = val + temp
-    !ypart
-    temp = nb(1)*(nb(1)-1)*coef(1,0,na(1),nb(1)-2)
-    temp = temp - 2.0D0*bb*nb(1)*coef(1,0,na(1),nb(1)) 
-    temp = temp - 2.0D0*bb*(nb(1)+1)*coef(1,0,na(1),nb(1))
-    temp = temp + 4.0D0*bb**2.0D0*coef(1,0,na(1),nb(1)+2)
-    temp = temp * coef(0,0,na(0),nb(0))*coef(2,0,na(2),nb(2)) 
-    val = val + temp
-    !zpart
-    temp = nb(2)*(nb(2)-1)*coef(2,0,na(2),nb(2)-2)
-    temp = temp - 2.0D0*bb*nb(2)*coef(2,0,na(2),nb(2)) 
-    temp = temp - 2.0D0*bb*(nb(2)+1)*coef(2,0,na(2),nb(2))
-    temp = temp + 4.0D0*bb**2.0D0*coef(2,0,na(2),nb(2)+2)
-    temp = temp * coef(0,0,na(0),nb(0))*coef(1,0,na(1),nb(1)) 
-    val = val + temp
-    !leading coefficients
-    val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
-    val = val * bas(u,a,s*2)*bas(v,b,t*2)     !basis set weights
-    val = val * gtoD(basinfo(u,4*(a+1)+1),aa) !primative constants 
-    val = val * gtoD(basinfo(v,4*(b+1)+1),bb) !primative constants 
-
-    kinetic = val
-  
-  END FUNCTION kinetic
-
-!---------------------------------------------------------------------
-!	Calculate the coulomb potential of a gaussian of two orbitals
-!---------------------------------------------------------------------
-  REAL(KIND=8) FUNCTION coulomb(u,v,a,b,s,t,ap,bas,basinfo,PP,na,nb,aa,bb,atoms,EIJ,coef)
-    IMPLICIT NONE
-    ! Values
-    ! T		: dp, input to RNLMj
-    ! ap	: dp, alpha of overlap gausian
-    ! Rtab	: 4D dp, table of RNLM values
-    ! Rbol	: 4D dp, table input to RNLMj
-    ! nb,na	: 1D int, angular momentum values for b and a, {n,l,m} 
-    ! nucpos	: 2D dp, list of nuclear positions
-    ! PP	: 1D dp, list of overlap x,y,z
-    ! CP 	: 1D dp, line segment between nucleus C and overlap PP
-    ! Fj	: 1D dp, table of Boys integral 
-    ! EIJ	: dp, correction of combining two gaussians
-    ! coef	: 4D dp, table of guassian coefficients from overlap 
-
-    ! inout
-    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
-    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP
-    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: na, nb, atoms
-    REAL(KIND=8), INTENT(IN) :: aa, bb, ap, EIJ
-    INTEGER, INTENT(IN) :: u, v, s, t, a, b
-    
-    !internal
-    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
-    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: Rbol
-    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: nucpos
-    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj,CP
-    REAL(KIND=8) :: temp,val,TT,hmm
-    INTEGER :: c,p,i,j,k,N,L,M,nnuc,dummy
-
-    val = 0.0D0
-    nnuc = SIZE(atoms)
-
-    ! combined quantum numbers
-    N = na(0) + nb(0)
-    L = na(1) + nb(1)
-    M = na(2) + nb(2)
-
-    ALLOCATE(Fj(0:N+L+M))
-    ALLOCATE(CP(0:2))
-    ALLOCATE(Rtab(-2:N,-2:L,-2:M,0:N+L+M))
-    ALLOCATE(Rbol(-2:N,-2:L,-2:M,0:N+L+M))
-    ALLOCATE(nucpos(0:nnuc-1,0:2))
-
-    ! get nuclear positions
-    OPEN(unit=1,file='nucpos',status='old',access='sequential')
-    DO c=0,nnuc-1
-      READ(1,*) dummy, nucpos(c,0:2) 
-    END DO 
-    CLOSE(unit=1)
-
-    ! loop through atoms
-    DO c=0,nnuc-1
-
-      !construct PC
-      DO i=0,2
-        CP(i) = nucpos(c,i) - PP(i)
-      END DO
-      TT = ap*(CP(0)**2.0D0 + CP(1)**2.0D0 + CP(2)**2.0D0)
-
-      !get Boys table
-      DO i=0,N+L+M
-        Fj(i) = 0.0D0 
-      END DO
-      CALL Boys(Fj,N+L+M,TT)
-
-      !setup recursion tables
-       DO i=-2,N
-         DO j=-2,L
-           DO k=-2,M
-             DO p=0,N+L+M
-               Rtab(i,j,k,p) = 0.0D0
-               Rbol(i,j,k,p) = .FALSE.
-             END DO
-           END DO
-         END DO
-       END DO
-      
-!      CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),N,L,M,0,ap,Fj,Rtab,Rbol)
-
-      temp = 0.0D0
- 
-      ! skip cycle if coef is 0
-      ! Sum RNLM over all N,L,M 
-      DO i=0,N ! loop over N
-        !IF (ABS(coef(0,i,na(0),nb(0))) .LT. 1.0D-14) CYCLE
-        DO j=0,L !loop over L
-          !IF (ABS(coef(1,j,na(1),nb(1))) .LT. 1.0D-14) CYCLE 
-          DO k=0,M !loop over M
-            !IF (ABS(coef(2,k,na(2),nb(2))) .LT. 1.0D-14) CYCLE
-            CALL RNLMj(CP(0),CP(1),CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
-!            CALL RNLMj(ABS(CP(0)),ABS(CP(1)),ABS(CP(2)),i,j,k,0,ap,Fj,Rtab,Rbol)
-!            IF (.NOT. Rbol(i,j,k,0)) THEN
-!              WRITE(*,*) "here - bad Rijk", i,j,k
-!              STOP
-!            END IF 
-            temp = temp + coef(0,i,na(0),nb(0))*coef(1,j,na(1),nb(1))*coef(2,k,na(2),nb(2))*Rtab(i,j,k,0)      
-          END DO
-        END DO
-      END DO
-
-      ! add to coulombic integral
-      temp = temp * (2.0D0*Pi/ap)                  !from Boys
-      temp = temp * bas(u,a,s*2)*bas(v,b,t*2)      !basis set weights
-      temp = temp * gtoD(basinfo(u,4*(a+1)+1),aa)  !primative constants
-      temp = temp * gtoD(basinfo(v,4*(b+1)+1),bb)  !primative constants
-      temp = temp * atoms(c)*EIJ                   !proton number and overlap coefficient
-      val = val - temp                             !negative sign for coulombic attraction
-
-    END DO
-    
-    coulomb = val
-
-    DEALLOCATE(Fj)
-    DEALLOCATE(CP)
-    DEALLOCATE(Rtab)
-    DEALLOCATE(Rbol)
-    DEALLOCATE(nucpos)
-
-  END FUNCTION coulomb
 !---------------------------------------------------------------------
 END PROGRAM int1e
