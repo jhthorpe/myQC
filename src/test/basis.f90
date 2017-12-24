@@ -122,7 +122,7 @@ MODULE basis
         READ(2,*) func, coef, pri, ang, ori 
         ALLOCATE(val(0:coef-1))            ! structure input array 
         
-        !Primatives
+        !Primatives - Set updates
         DO k=0,func-1       
           READ(2,*) val, temp              ! coefs, setinfo
 
@@ -141,12 +141,10 @@ MODULE basis
           !P-TYPE
           ELSE IF (ori .EQ. 2) THEN
             DO m=0,2
-              setinfo(1+(setn+setnum)*setl+4+setorbs) = orbnum
+              setinfo(1+(setn+setnum)*setl+4+setorbs) = orbnum + m
               bas(setorbs+(setn+setnum)*OpS) = val(0)
               setorbs = setorbs + 1
-              orbnum = orbnum + 1
             END DO
-            orbnum = orbnum - 3
             !check if we need to update lmax
             IF (setinfo(1+setn*setl+2+setnum*setl) .LT. 1) setinfo(1+setn*setl+2+setnum*setl) = 1
  
@@ -159,17 +157,26 @@ MODULE basis
 
           setinfo(1+(setn+setnum)*setl+1) = setorbs
 
-!--- WORK MARK
         END DO                             ! k loop (primatives)
 
-        orbnum = orbnum + 1
+        !Orbitals - basis updates
+        ! S-TYPE
+        IF (ori .EQ. -1) THEN
+          !basinfo(i,4*(j+1):4*(j+1)+3) = [pri, ang, ori, func]
+          !basinfo() = [pri, ang, ori, func,i]
+          orbnum = orbnum + 1
+        ! P-TYPE
+        ELSE IF (ori .EQ. 2) THEN
+          orbnum = orbnum + 3
+
+        END IF
 
         DEALLOCATE(val)
 
       END DO                               ! j loop (orbitals)
 
       !set up data for next atom
-      setnum = set(0) 
+      setnum = setinfo(0) 
 
       !set up for next atom
       REWIND (2)
