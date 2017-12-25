@@ -120,7 +120,7 @@ MODULE basis
       
       !We are at atom, adjust basis stuff      
       READ(2,*) sec, orb, nset             !#sections, #orbitals, #sets
-      basinfo(0) = Anum                    !number of atoms
+      basinfo(0) = OpS                    !number of atoms
       basinfo(1) = basinfo(1) + orb        !number of orbitals
       setinfo(0) = setinfo(0) + nset       !number of sets
       setinfo(1) = 3 + OpS                !length of each set
@@ -209,7 +209,7 @@ MODULE basis
     ! write output
     WRITE(3,*) basinfo(:)
     WRITE(3,*)
-    WRITE(3,*) "#atoms, #orbitals, {principle qn., angular qn., orientation, #primatives, center number},... "
+    WRITE(3,*) "#orbitals per set, #orbitals, {principle qn., angular qn., orientation, #primatives, center number},... "
     WRITE(4,*) setinfo(:)
     WRITE(4,*) 
     WRITE(4,*) "#sets, length of each set,{#orbitals, max ang qn., center num, [orbital 0, orbital 1, ...]},..."
