@@ -162,13 +162,21 @@ MODULE basis
         !Orbitals - basis updates
         ! S-TYPE
         IF (ori .EQ. -1) THEN
-          !basinfo(i,4*(j+1):4*(j+1)+3) = [pri, ang, ori, func]
-          !basinfo() = [pri, ang, ori, func,i]
+          basinfo(2+5*orbnum:2+5*(orbnum+1)-1) = [pri, ang, ori, func,i]
           orbnum = orbnum + 1
+
         ! P-TYPE
         ELSE IF (ori .EQ. 2) THEN
+          DO m=0,2
+            basinfo(2+5*(orbnum+m):2+5*(orbnum+m+1)-1) = [pri, ang, m, func,i]
+          END DO
           orbnum = orbnum + 3
 
+        ! D-TYPE
+        ELSE
+          WRITE(*,*) "that angular qunatum number not implimented yet in basis.f90:getbasis."
+          WRITE(*,*) "probably also need to re-write coefficient program so that it works with d-orbitals"
+          STOP "bad angular quantum number"
         END IF
 
         DEALLOCATE(val)
@@ -189,7 +197,7 @@ MODULE basis
     WRITE(3,*) "#atoms, #orbitals, {principle qn., angular qn., orientation, #primatives, center number},... "
     WRITE(4,*) setinfo(:)
     WRITE(4,*) 
-    WRITE(4,*) "#sets, length of each set,{#orbitals, max ang qn., center num, [orbital 0, orbital 1, ...},..."
+    WRITE(4,*) "#sets, length of each set,{#orbitals, max ang qn., center num, [orbital 0, orbital 1, ...]},..."
 
     CLOSE (unit=4,status='keep')
     CLOSE (unit=3,status='keep')

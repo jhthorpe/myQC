@@ -7,7 +7,7 @@ program test
   INTEGER,  DIMENSION(0:1) :: atoms
   INTEGER :: bkey
 
-  atoms = [1,3]
+  atoms = [3,1]
   bkey = 0
 
   CALL buildBasis(bkey,atoms,bas,basinfo,set,setinfo)
