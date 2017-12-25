@@ -35,9 +35,9 @@ PROGRAM int1e
   ! setinfo	: 2D int, array of set information
 
   ! Variables  
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: bas,set
-  INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo, setinfo
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: bas
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc,set
+  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo, setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
   INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
@@ -53,18 +53,22 @@ PROGRAM int1e
 
 !the actual stuff
 ! construct the basis
-  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,.TRUE.)
+  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,offset)
   ! write out basis set for checking, include in verbosity later
   ! WORK NOTE - maybe add in memory of basis set here?
 
+  CALL printBasis(nnuc,atoms,setinfo,basinfo,bas,set)
   CALL nmem(fmem)
 
 ! 1) calculate overlap matrix and kinetic energy integrals
   !get number of orbitals
   npri = 0
-  norb = basinfo(1) 
-  DO i=0,norb-1
-      npri = npri + basinfo(1+i*5+4) 
+  norb = 0
+  DO i=0,nnuc-1
+    norb = norb + basinfo(i,2) 
+    DO j=1,basinfo(i,2)
+      npri = npri + basinfo(i,4*(j)+3) 
+    END DO
   END DO
   WRITE(*,*) 
   WRITE(*,*) "Number of orbitals : ", norb
@@ -158,91 +162,45 @@ PROGRAM int1e
     ! fmem	: dp, free memory left in MB
     ! nnuc	: int, number of nuclii
     ! norb	: int, number of orbitals in molecule
-    ! bas	: 1D dp, basis weights for each atom
-    ! basinfo	: 1D int, array of basis information
+    ! bas	: 2D dp, basis for each atom: atom : orbital : [d,a]
+    ! basinfo	: 2D int, array of basis information
     ! options	: 1D int, array of options
     ! set	: 1D dp, array of exponential alphas
-    ! setinfo	: 1D int, stores information about set
-    ! coef	: 3D dp, array of coefficients for overlap, (xyz,i,j,k)
-    ! PA,PB,PP	: 1D dp, array of distances to overlap, PP = overlap
-    ! EIJ	: dp, gaussian at molecular center
-    ! val 	: dp, current evaluation of integral
-    ! p		: dp, addition of two coeffiecients
-    ! aa,bb	: dp, coefficients of Guassians for atoms a and b
+    ! setinfo	: 2D int, stores information about set
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S,F 
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: bas, set
-    INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo, setinfo
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz, set
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo, setinfo
     INTEGER, DIMENSION(0:), INTENT(IN) :: options, atoms
     REAL(KIND=8), INTENT(IN) :: fmem
     INTEGER, INTENT(IN) :: norb,nnuc
 
     !Internal
-    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:) :: coef
-    REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
-    INTEGER, DIMENSION(0:2) :: la,lb,amax,bmax
-    REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     REAL(KIND=8) :: timeS, timeF
-    INTEGER :: a,b,u,v,col,row,col0,row0,i,j,k,l,setl,nset,ori
+    INTEGER :: u,v,col,row,col0,row0,i,j
 
     CALL CPU_TIME(timeS)
     WRITE(*,*) "constructing Overlap and 1e-Fock matrix"
 
-    !zero S and F
-    DO i=0,norb-1
-     S(i,:) = (/ (0.0D0, j=0,norb-1) /)
-     F(i,:) = (/ (0.0D0, j=0,norb-1) /)
-    END DO
+    !Matrix blocked by atoms
+    col0 = 0
+    DO u=0,nnuc-1
+      row0 = 0
+      DO v=0,nnuc-1 
+        !determine length, width, and starting points of block
+        col = basinfo(u,2) !number of orbitals in a
+        row = basinfo(v,2) ! number of orbitals in b
 
-    nset = setinfo(0)
-    setl = setinfo(1)
+        !construct overlap within block
+        CALL block(S(col0:col0+col-1,row0:row0+row-1),F(col0:col0+col-1,row0:row0+row-1), &
+        bas,basinfo,atoms,xyz,u,v,col,row,set,setinfo)
 
-    ! left set
-    DO a=0,nset-1
-      
-      !get data
-      aa = set(a)                            !alpha a
-      u = setinfo(1+a*setl+3)                !center number
-      DO l=0,2                               !set amax values
-        amax(l) = setinfo(1+a*setl+2)        !get max ang qn
-        la(l) = amax(l)
+        row0 = row0 + row
       END DO
-     
-      ! right set 
-      DO b=0,nset-1 
-
-        !get data
-        bb = set(b)                           !alpha b
-        v = setinfo(1+b*setl+3)               !center number
-        DO l=0,2
-          bmax(l) = setinfo(1+b*setl+2) + 2  ! + 2 for kinetic terms
-          lb(l) = setinfo(1+b*setl+2)
-        END DO
-
-        ! 1) get overlap location
-        p = aa + bb 
-        m = aa * bb
-        DO i=0,2
-          AB(i) = xyz(u,i) - xyz(v,i)
-          PP(i) = (aa*xyz(u,i) + bb*xyz(v,i))/p
-          PA(i) = PP(i) - xyz(u,i)
-          PB(i) = PP(i) - xyz(v,i)
-        END DO 
-
-        ! screen for sufficiently small constant
-        EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p) 
-        IF (EIJ .LT. 1.0D-14) THEN
-          CYCLE
-        END IF 
-  
-        CALL getcoef(coef,PA,PB,aa,bb,amax,bmax) 
-
-        DEALLOCATE(coef)
-
-      END DO                                   !loop over left orbital
-    END DO                                     !loop over right orbital
+      col0 = col0 + col
+    END DO 
 
     OPEN(unit=1,file='Suv',status='replace',access='sequential')
       WRITE(1,*) S(:,:)    
@@ -256,21 +214,7 @@ PROGRAM int1e
     WRITE(*,*) "Overlap and Fock constructed in (s) :", (timeF-timeS)
 
   END SUBROUTINE proc1e
-!
-!        ! 2) use setinfo to update Overlap and Fock
-!!        CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
-!!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
-! 
-!!        CALL kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
-!!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
-!
-!!        CALL coulomb(Fb,u,v,a,b,p,bas,basinfo,PP,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
-!!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,atoms,EIJ,coef,setlena,setlenb,la,lb)
-!
-!        DEALLOCATE(coef)
-!
-!      END DO !end b
-!
+
 !---------------------------------------------------------------------
 !		Calculate block of Overlap and Fock matrix 
 !---------------------------------------------------------------------
@@ -358,14 +302,14 @@ PROGRAM int1e
         CALL getcoef(coef,PA,PB,aa,bb,amax,bmax) 
 
         ! 2) use setinfo to update Overlap and Fock
-!        CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
-!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
+        CALL overlap(Sb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
  
 !        CALL kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
 !        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
 
-!        CALL coulomb(Fb,u,v,a,b,p,bas,basinfo,PP,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
-!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,atoms,EIJ,coef,setlena,setlenb,la,lb)
+        CALL coulomb(Fb,u,v,a,b,p,bas,basinfo,PP,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
+        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,atoms,EIJ,coef,setlena,setlenb,la,lb)
 
         DEALLOCATE(coef)
 
@@ -924,6 +868,51 @@ PROGRAM int1e
     DEALLOCATE(nucpos)
 
   END SUBROUTINE coulomb
+
+!---------------------------------------------------------------------
+!		Print Basis information	
+!---------------------------------------------------------------------
+  SUBROUTINE printBasis(nnuc,atoms,setinfo,basinfo,bas,set)
+    IMPLICIT NONE
+
+    ! inout
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: set
+    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo, setinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: atoms
+    INTEGER, INTENT(IN) :: nnuc
+
+    !internal
+    INTEGER :: i,j,k,orb,setlen,n,l
+
+999 FORMAT(2x,A8,1x,I2)
+998 FORMAT(4x,A8,1x,I2,4x,A8,1x,F15.8)
+997 FORMAT(3x,A6,1x,I2)
+996 FORMAT(4x,F15.8,2x,I2,2x,I2,2x,I2)
+
+    WRITE(*,*)
+    WRITE(*,*) "Basis set"
+
+    ! go through atoms
+    DO i=0,nnuc-1
+      WRITE(*,999) "Nuclei #", i+1
+      WRITE(*,997) "atom :", atoms(i)
+
+      ! go through sets
+      DO j=0,setinfo(i,0)-1
+        WRITE(*,998) "set #:", j+1, "alpha :", set(i,j) 
+        ! go print elements of each set
+        setlen = setinfo(i,2) 
+        DO k=0,NINT(bas(i,j,1))-1
+          orb = setinfo(i,2+k+j*setlen+3)
+          WRITE(*,996) bas(i,j,2+k), basinfo(i,4*(orb+1)+0),basinfo(i,4*(orb+1)+1),basinfo(i,4*(orb+1)+2) 
+        END DO
+
+      END DO
+    END DO
+    WRITE(*,*) "=================================="
+
+  END SUBROUTINE printBasis
 
 !=====================================================================
 !                       FUNCTIONS

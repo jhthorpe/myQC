@@ -34,9 +34,9 @@ PROGRAM int2e
   ! setinfo	: 2D int, array of set information
 
   ! Variables  
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: bas
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,F,set
-  INTEGER, ALLOCATABLE, DIMENSION(:,:) :: basinfo,setinfo,offset
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,F
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: bas,set
+  INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo,setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options
   REAL(KIND=8) :: timeS, timeF, fmem
   INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
@@ -51,7 +51,7 @@ PROGRAM int2e
   IF (flag) STOP
 
   ! build the basis set
-  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,offset)
+  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,.FALSE.)
 
   ! check that Fock has been created 
   INQUIRE(file='Fuv',EXIST=flag2)
