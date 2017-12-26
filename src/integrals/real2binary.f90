@@ -1,4 +1,4 @@
-program test
+program R2B
   implicit none
 
   REAL(KIND=8), DIMENSION(0:120,0:22) :: Ftab
@@ -11,4 +11,4 @@ program test
   WRITE(2) Ftab
   CLOSE(unit=2)
 
-end program test
+end program R2B

@@ -245,6 +245,8 @@ PROGRAM int1e
         CALL overlap(S,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,coef,&
         setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ)
 
+        CALL kinetic(F,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,coef,&
+        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ)
         DEALLOCATE(coef)
 
       END DO                                   !loop over left orbital
@@ -262,9 +264,6 @@ PROGRAM int1e
     WRITE(*,*) "Overlap and Fock constructed in (s) :", (timeF-timeS)
 
   END SUBROUTINE proc1e
-! 
-!!        CALL kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
-!!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,EIJ)
 !
 !!        CALL coulomb(Fb,u,v,a,b,p,bas,basinfo,PP,setinfo(u,2+a*setlena+1:2+(a+1)*setlena),&
 !!        setinfo(v,2+b*setlenb+1:2+(b+1)*setlenb),aa,bb,atoms,EIJ,coef,setlena,setlenb,la,lb)
@@ -380,7 +379,6 @@ PROGRAM int1e
 !---------------------------------------------------------------------
 !		Calculate coefficients of overlap Gaussians 
 !---------------------------------------------------------------------
-
   SUBROUTINE getcoef(M,PA,PB,aa,bb,amax,bmax)
     IMPLICIT NONE
 
@@ -665,7 +663,7 @@ PROGRAM int1e
         END IF
 
         ! update Suv 
-        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)        ! WORK NOTE - hardcoded in bas
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
         temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
         temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
@@ -680,19 +678,20 @@ PROGRAM int1e
 !---------------------------------------------------------------------
 !	Calculate kinetic energy of a pair of orbitals
 !---------------------------------------------------------------------
-  SUBROUTINE kinetic(Fb,u,v,a,b,p,bas,basinfo,coef,seta,setb,aa,bb,EIJ)
+  SUBROUTINE kinetic(F,u,v,a,b,p,basa,basb,basinfo,coef,seta,setb,aa,bb,EIJ)
     IMPLICIT NONE
 
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
 
     ! na,nb	: 1D int, list of angular quantum number, named n for stupid reasons
+    ! basa,basb	: 1D dp, array of weights within set a,b
+    ! seta,setb	: 1D int, array of setinfo for set a, b
 
     ! inout
     REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: bas
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Fb
-    INTEGER, DIMENSION(0:,0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: F
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa,basb
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb, basinfo
     REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
     INTEGER, INTENT(IN) :: u, v, a, b
 
@@ -702,34 +701,32 @@ PROGRAM int1e
     INTEGER :: i,j,k,orba,orbb,ori,ta,tb,prima,primb
 
     DO i=0,seta(0)-1
-      orba = seta(2+i)
+      orba = seta(3+i)
 
       DO j=0,setb(0)-1
-        orbb = setb(2+j)
+        orbb = setb(3+j)
 
         temp = 0.0D0
         val = 0.0D0
 
-        ori = basinfo(u,4*(orba+1)+2)
-    
+        ori = basinfo(1+5*orba+3)
         !S-TYPE
         IF (ori .EQ. -1) THEN  
-          na = [basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1),basinfo(u,4*(orba+1)+1)]
+          na = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)] 
         !P-TYPE
         ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
           na = [0, 0, 0]
-          na(ori) = basinfo(u,4*(orba+1)+1)
+          na(ori) = basinfo(1+5*orba+2) 
         END IF
 
-        ori = basinfo(v,4*(orbb+1)+2)
-
+        ori = basinfo(1+5*orbb+3) 
         !S-TYPE
         IF (ori .EQ. -1) THEN  
-          nb = [basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1),basinfo(v,4*(orbb+1)+1)]
+          nb = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)] 
         !P-TYPE
         ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
           nb = [0,0,0]
-          nb(ori) = basinfo(v,4*(orbb+1)+1)
+          nb(ori) = basinfo(1+5*orbb+2)
         END IF
 
         !xpart
@@ -755,17 +752,14 @@ PROGRAM int1e
         val = val + temp
         !leading coefficients
         val = val * (-0.5D0)*EIJ*(Pi/p)**(3.0D0/2.0D0) !integration constants
-        val = val * bas(u,a,2+i)*bas(v,b,2+j)     !basis set weights
-        val = val * gtoD(basinfo(u,4*(orba+1)+1),aa) !primative constants 
-        val = val * gtoD(basinfo(v,4*(orbb+1)+1),bb) !primative constants 
+        val = val * basa(i)*basb(j)                    !basis set weights
+        val = val * gtoD(basinfo(1+5*orba+2),aa)       !primative constants 
+        val = val * gtoD(basinfo(1+5*orbb+2),bb)       !primative constants 
 
-        Fb(orba,orbb) = Fb(orba,orbb) + val
+        F(orba,orbb) = F(orba,orbb) + val
 
       END DO
     END DO
-
-!    WRITE(*,*) "==========="
-!    WRITE(*,*) "given", a,b,seta
 
   END SUBROUTINE kinetic
 
