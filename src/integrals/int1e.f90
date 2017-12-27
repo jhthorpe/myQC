@@ -40,7 +40,7 @@ PROGRAM int1e
   INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo, setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
-  INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat
+  INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat, maxN,maxL
   LOGICAL :: flag1,flag2,flag
 
 ! input managment 
@@ -51,9 +51,14 @@ PROGRAM int1e
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
 
+!format stuff
+999 FORMAT(1x,A43,F8.5)
+998 FORMAT(1x,A21,2x,I4)
+997 FORMAT(1x,A18,F8.5)
+
 !the actual stuff
 ! construct the basis
-  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,.TRUE.)
+  CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,.TRUE.,maxN,maxL)
   ! write out basis set for checking, include in verbosity later
   ! WORK NOTE - maybe add in memory of basis set here?
 
@@ -67,19 +72,19 @@ PROGRAM int1e
       npri = npri + basinfo(1+i*5+4) 
   END DO
   WRITE(*,*) 
-  WRITE(*,*) "Number of orbitals : ", norb
-  WRITE(*,*) "Number of primatives : ", npri
+  WRITE(*,*) "Number of orbitals    ", norb
+  WRITE(*,*) "Number of primatives  ", npri
   WRITE(*,*)
 
-  WRITE(*,*) "Allocating space for overlap matrix (MB) : ", norb*norb*8/1.0E6
+  WRITE(*,999) "Allocating space for overlap matrix (MB)   ", norb*norb*8/1.0E6
   ALLOCATE(S(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
-  WRITE(*,*) "Allocating space for Fock matrix (MB) : ", norb*norb*8/1.0E6
+  WRITE(*,999) "Allocating space for Fock matrix (MB)      ", norb*norb*8/1.0E6
   ALLOCATE(F(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
-  WRITE(*,*) "Allocating space for MO coefficients (MB) : ", norb*norb*8/1.0E6
+  WRITE(*,999) "Allocating space for MO coefficients (MB)  ", norb*norb*8/1.0E6
   ALLOCATE(MOc(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
@@ -103,7 +108,7 @@ PROGRAM int1e
     WRITE(*,*) "Reading overlap matrix from Suv"
     READ(1,*) S(:,:)
     WRITE(*,*) "Reading Fock matrix from Fuv"
-    READ(1,*) F(:,:)
+    READ(2,*) F(:,:)
     CLOSE(unit=2)
     CLOSE(unit=1)
   END IF
@@ -139,7 +144,7 @@ PROGRAM int1e
   fmem = fmem + 3*norb*norb*8/1.0E6
   CALL setenv(atoms,xyz,fmem,options)
   CALL CPU_TIME(timeF)
-  WRITE(*,*) "int1e ran in (s) : ", (timeF - timeS) 
+  WRITE(*,997) "int1e ran in (s) :", (timeF - timeS) 
 
   CONTAINS 
 !=====================================================================
@@ -186,10 +191,12 @@ PROGRAM int1e
     INTEGER, DIMENSION(0:2) :: la,lb,amax,bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     REAL(KIND=8) :: timeS, timeF
-    INTEGER :: a,b,u,v,col,row,col0,row0,i,j,k,l,setl,nset,ori,OpS
+    INTEGER :: a,b,u,v,i,j,k,l,setl,nset,OpS
 
     CALL CPU_TIME(timeS)
     WRITE(*,*) "constructing Overlap and 1e-Fock matrix"
+
+996 FORMAT(1x,A37,2x,F8.5)
 
     !zero S and F
     DO i=0,norb-1
@@ -266,7 +273,7 @@ PROGRAM int1e
     CLOSE(unit=1)
 
     CALL CPU_TIME(timeF)
-    WRITE(*,*) "Overlap and Fock constructed in (s) :", (timeF-timeS)
+    WRITE(*,996) "Overlap and Fock constructed in (s) :", (timeF-timeS)
 
   END SUBROUTINE proc1e
 
@@ -529,7 +536,6 @@ PROGRAM int1e
 
     !update each element in set
     DO i=0,seta(0)-1 !go through set A
-
       orba = seta(3+i) !id of orbital
 
       DO j=0,setb(0)-1 !go through set B

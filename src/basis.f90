@@ -20,7 +20,7 @@ MODULE basis
 !---------------------------------------------------------------------
 !		Construct Basis, Set, basinfo, and setinfo
 !---------------------------------------------------------------------
-  SUBROUTINE buildBasis(bkey,atoms,bas,basinfo,set,setinfo,verb)
+  SUBROUTINE buildBasis(bkey,atoms,bas,basinfo,set,setinfo,verb,maxN,maxL)
 
     ! Basis is a 3D array, 1st index is each atom, 2nd index is each orbital section, 3rd index are the individual values within the section in a linear array. They must be iterated through differently for each basis set 
 
@@ -44,11 +44,14 @@ MODULE basis
     ! Omax	: int, max orbitals in atom of basis
     ! setl	: int, number of units in one section of set
     ! OpS	: int, max orbs per set
+    ! maxN	: int, max principle quantum number
+    ! maxL	: int, max angular quantum number
 
     ! INOUT
     REAL(KIND=8),DIMENSION(:),ALLOCATABLE,INTENT(INOUT) :: bas,set
     INTEGER, DIMENSION(:), ALLOCATABLE, INTENT(INOUT) :: basinfo,setinfo
     INTEGER, DIMENSION(0:),INTENT(IN) :: atoms
+    INTEGER, INTENT(INOUT) :: maxN, maxL
     INTEGER, INTENT(IN) :: bkey 
     LOGICAL, INTENT(IN) :: verb
 
@@ -73,7 +76,7 @@ MODULE basis
 996 FORMAT(4x,I2,1x,I2)
 995 FORMAT(4x,F15.8,1x,F15.8)
 
-    WRITE(*,*) "getbasis called..."
+    IF (verb) WRITE(*,*) "getbasis called..."
 
     !Open basis file
     OPEN (unit=2,file="mybasis",status="old",access="sequential")
@@ -96,6 +99,7 @@ MODULE basis
       ! If first run, setup the basis set
       IF (i .EQ. 0) THEN
         READ(2,*) Smax, Cmax, Omax, almax, OpS 
+        READ(2,*) maxN, maxL
         ALLOCATE(bas(0:(Anum*almax*OpS)-1)) 
         ALLOCATE(basinfo(0:2+(5*Omax*Anum)-1))
         ALLOCATE(set(0:(Anum*almax)-1))
@@ -131,17 +135,17 @@ MODULE basis
 
         !#primatives, #coefficients, angular qn, #orientations (-1 spherical, 2 xyz ...), # of new sets
         READ(2,*) func, coef, pri, ang, ori 
-        ALLOCATE(val(0:coef-1))            ! structure input array 
+        ALLOCATE(val(0:coef-1))                        ! structure input array 
 
         IF (verb) WRITE(*,996) pri, ang
         
         !Primatives - Set updates
         DO k=0,func-1       
-          READ(2,*) val, temp              ! coefs, setinfo
+          READ(2,*) val, temp                          !coefs, setinfo
 
           !update set info
-          setn = NINT(temp)                !ID of set 
-          set(setnum + setn) = val(coef - 1)      !exp coef of set
+          setn = NINT(temp)                            !ID of set 
+          set(setnum + setn) = val(coef - 1)           !exp coef of set
           setorbs = setinfo(1+setn*setl+1+setnum*setl) !#orbs in set so far
           setinfo(1+(setnum+setn)*setl+3) = i
 

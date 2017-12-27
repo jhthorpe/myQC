@@ -21,7 +21,7 @@ PROGRAM parser
 
   !options currently:
   ! 0) geometry type    : 1 - atom, 2 - diatomic, 3 - linear, 4- internal, 5- cartesian 
-  ! 1) calculation type : 0 - scf 
+  ! 1) calculation type : 0 - SCF 
   ! 2) basis set        : 0 - STO-3G
   ! 3) referecnce       : 0 - RHF, 1 - UHF, 2 - ROHF
   ! 4) parallel alg     : 0 - None, 1 - OMP, 2 - MPI
@@ -343,13 +343,18 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=20),INTENT(IN) :: chr
     ! WORK NOTE : ugly - impliment dictionary?
-    getverb = 1
+    getverb = 0
     IF (chr .EQ. '1') THEN
       getverb = 1
-      WRITE(*,*) "Verbosity : 1"
-    ELSE IF (chr .EQ. '0') THEN
-      getverb = 0
-      WRITE(*,*) "Verbosity : 0"
+      WRITE(*,*) "Verbosity : 1 (some)"
+    ELSE IF (chr .EQ. '2') THEN
+      getverb = 2
+      WRITE(*,*) "Verbosity : 2 (detailed)"
+    ELSE IF (chr .EQ. '3') THEN
+      getverb = 3
+      WRITE(*,*) "Verbosity : 3 (wtf)"
+    ELSE
+      WRITE(*,*) "Verbosity : 0 (basic)"
     END IF
     END FUNCTION getverb
 !~~~~~~~~~~
