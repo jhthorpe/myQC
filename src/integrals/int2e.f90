@@ -105,13 +105,16 @@ PROGRAM int2e
     INTEGER, INTENT(IN) :: nnuc,maxL
 
     !Internal
-    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: XX
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: XX,coefAB,coefCD
     REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: II
-    REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ,la,lb,lc,ld
-    REAL(KIND=8) :: timeS,timeF,temp,p,q,EIJ,EGH
+    REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, QC, QD, CD
+    REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ
+    INTEGER, DIMENSION(0:2) :: la,lb,lc,ld
+    REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
+    REAL(KIND=8) :: aa,bb,cc,dd,p,q
     INTEGER :: nset,setl,OpS,stat1,stat2,setK,maxK 
     INTEGER :: orba,orbb,orbc,orbd,norb
-    INTEGER :: a,b,c,d,g,h,i,j,k
+    INTEGER :: a,b,c,d,g,h,i,j,k,m,u,v
 
     CALL CPU_TIME(timeS)
 
@@ -154,9 +157,28 @@ PROGRAM int2e
 
     !"sum" over a,b sets
     DO a=0,nset-1
-      DO b=0,nset-1      
+      aa = set(a)                            !alpha a
+      u = setinfo(1+a*setl+3)
+      la(:) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
 
-        !get overlap location
+      DO b=0,nset-1      
+        bb = set(b)                           !alpha b
+        v = setinfo(1+b*setl+3)
+        lb = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
+
+        !left overlap
+        p = aa + bb
+        m = aa * bb
+        DO i=0,2
+          AB(i) = xyz(u,i) - xyz(v,i)
+          PP(i) = (aa*xyz(u,i) + bb*xyz(v,i))/p
+          PA(i) = PP(i) - xyz(u,i)
+          PB(i) = PP(i) - xyz(v,i)
+        END DO
+
+        ! screen for sufficiently small constant
+        EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p)
+        IF (EIJ .LT. 1.0D-14) CYClE             !WORK NOTE- is this safe?
 
         !zero II
         DO k=0,setK
@@ -165,9 +187,29 @@ PROGRAM int2e
           END DO
         END DO
 
+        CALL getcoef(coefAB,PA,PB,aa,bb,la,lb)
+
         !"sum" over c,d sets
         DO c=0,nset-1
           DO d=0,nset-1
+
+        ! 1) get overlap location
+        p = aa + bb
+        m = aa * bb
+        DO i=0,2
+          AB(i) = xyz(u,i) - xyz(v,i)
+          PP(i) = (aa*xyz(u,i) + bb*xyz(v,i))/p
+          PA(i) = PP(i) - xyz(u,i)
+          PB(i) = PP(i) - xyz(v,i)
+        END DO
+
+        ! screen for sufficiently small constant
+        EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p)
+        IF (EIJ .LT. 1.0D-14) THEN
+          CYCLE
+        END IF
+
+
             ! internal loop over sets
 !            CALL colII(II,setK,maxK,a,b,c,d,p,q,PP,QQ,PQ,setinfo(1+a*setl+1:1+(a+1)*setl),&
 !            setinfo(1+b*setl+1:1+(b+1)*setl),setinfo(1+c*setl+1:1+(c+1)*setl),&
@@ -186,6 +228,8 @@ PROGRAM int2e
             END DO
           END DO
         END DO
+
+        DEALLOCATE(coefAB)
 
       END DO                                       !end loop over b
     END DO                                         !end loop over a

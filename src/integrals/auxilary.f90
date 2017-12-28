@@ -342,5 +342,193 @@ MODULE aux
   END FUNCTION dfactR8
 
 !---------------------------------------------------------------------
+!               Calculate coefficients of overlap Gaussians 
+!---------------------------------------------------------------------
+  SUBROUTINE getcoef(M,PA,PB,aa,bb,amax,bmax)
+    IMPLICIT NONE
+
+    ! M         : 2D dp, coefficient matrix d_{i}^{j,k} = M(0,i,j,k)
+    ! PA        : 1D dp, (xa,ya,za) distance from central gaussian
+    ! PB        : 1D dp, (xb,yb,zb) distance from central gaussian
+    ! aa        : dp, coefficient of atom A -WARNING, currently assuming are same for all orbs
+    ! bb        : dp, coefficient of atom B
+    ! amax      : 1D int, max angular quantum number of A needed
+    ! amax      : 1D int, max angular quantum number of B needed
+    ! nmax      : int, max total quantum number needed
+    ! nn        : int, total number of elements
+    ! fmat      : 3D dp, boolean array, tracks what has been calculated 
+
+    ! Inout
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:), INTENT(INOUT) :: M
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    INTEGER, DIMENSION(0:2), INTENT(IN) :: amax, bmax
+    REAL(KIND=8), INTENT(IN) :: aa,bb
+
+    ! Internal
+    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: fmat
+    INTEGER, DIMENSION(0:2) :: nmax,nn
+    REAL(KIND=8) :: pp
+    INTEGER :: l,i,j,k
+
+    pp = aa+bb
+    nmax = [amax(0)+bmax(0),amax(1)+bmax(1),amax(2)+bmax(2)]
+
+    ALLOCATE(M(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
+    ALLOCATE(fmat(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
+
+    !initialize coefficient matrices
+    DO l=0,2
+      DO i=-2,MAXVAL(amax)+MAXVAL(bmax)
+        DO j=-2,MAXVAL(amax)+2
+          DO k=-2,MAXVAL(bmax)+2
+            M(l,i,j,k) = 0.0D0
+            fmat(l,i,j,k) = .FALSE.
+          END DO
+        END DO
+      END DO
+    END DO
+
+    ! call recursive function on top
+    DO l=0,2
+      CALL lrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
+      CALL rrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
+    END DO
+
+    DEALLOCATE (fmat)
+
+  END SUBROUTINE getcoef
+
+!---------------------------------------------------------------------
+!       Left side (A) recursion on coefficients Hermite Gaussians
+!---------------------------------------------------------------------
+  RECURSIVE SUBROUTINE lrec(M,l,i,j,k,PA,PB,pp,fmat)
+    IMPLICIT NONE
+
+    ! M         : 4D dp, matrix of coefficients
+    ! i,j,k     : int, index of coefficient we need. i=N,j=n,k=nbar
+    ! l         : int, coordinite of coefficient we need 0=x,1=y,2=z)
+    ! PA, PB    : 1D dp, list of x,y,z distances of atoms A,B from P
+    ! fmat      : 3D dp, list of which values we already have
+    ! pp        : dp, value of sum of coefficients
+
+    ! INOUT
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: M
+    LOGICAL, DIMENSION(0:,-2:,-2:,-2:),INTENT(INOUT) :: fmat
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    REAL(KIND=8), INTENT(IN) :: pp
+    INTEGER, INTENT(IN) :: i,j,k,l
+
+    ! 1) base cases
+    ! check if we've already seen this point 
+    IF (fmat(l,i,j,k)) THEN
+      RETURN
+    END IF
+    ! check for "bad" points
+    IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+      M(l,i,j,k) = 0.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ! check for d000 base case
+    ELSE IF (i .EQ. 0 .AND. j .EQ. 0 .AND. k .EQ. 0) THEN
+      M(l,i,j,k) = 1.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    END IF
+
+    ! 2) non-base case
+    IF (j .LE. k) THEN                        ! go right
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ELSE IF (j .GT. k) THEN                   ! go left
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ELSE
+      WRITE(*,*) "Somehow you broke this at:", i,j,k
+      STOP "error in lrec"
+    END IF
+
+  END SUBROUTINE lrec
+
+!---------------------------------------------------------------------
+!       Right side (B) recursion on coefficients of Hermite Gaussians
+!---------------------------------------------------------------------
+  RECURSIVE SUBROUTINE rrec(M,l,i,j,k,PA,PB,pp,fmat)
+    IMPLICIT NONE
+
+    ! M         : 4D dp, matrix of coefficients
+    ! i,j,k     : int, index of coefficient we need. i=N,j=n,k=nbar
+    ! l         : int, coordinate we need (0=x,1=y,2=z)
+    ! PA, PB    : 1D dp, list of x,y,z distances of atoms A,B from P
+    ! fmat      : 3D dp, list of which values we already have
+    ! pp        : dp, value of sum of coefficients
+
+    ! INOUT
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: M
+    LOGICAL, DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: fmat
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    REAL(KIND=8), INTENT(IN) :: pp
+    INTEGER, INTENT(IN) :: i,j,k,l
+
+    ! 1) base cases
+    ! check if we've seen before 
+    IF (fmat(l,i,j,k)) THEN
+      RETURN
+    END IF
+    ! check for "bad" points 
+    IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+      M(l,i,j,k) = 0.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ! check for d000 base case
+    ELSE IF (i .EQ. 0 .AND. j .EQ. 0 .AND. k .EQ. 0) THEN
+      M(l,i,j,k) = 1.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    END IF
+
+    ! 2) non-base case 
+    IF (j .LE. k) THEN
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ! otherwise, lower j (doesn't really matter which way you do it)
+    ELSE IF (j .GT. k) THEN
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ELSE
+      WRITE(*,*) "Somehow you broke this, i,j,k", i,j,k
+      STOP "error in rrec"
+    END IF
+
+  END SUBROUTINE rrec
+
+!---------------------------------------------------------------------
 
 END MODULE aux
