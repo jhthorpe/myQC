@@ -66,7 +66,7 @@ PROGRAM int2e
     !we aren't actually reading anything, but they don't need to know that ;)"
   ELSE
     WRITE(*,*) "Constructing two electron integrals"
-    CALL proc2e(bas,basinfo,atoms,options,fmem,nnuc,xyz,norb,set,setinfo,maxL)
+    CALL proc2e(bas,basinfo,atoms,options,fmem,nnuc,xyz,set,setinfo,maxL)
   END IF
 
 
@@ -77,7 +77,7 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 ! 		Processes the two electron integrals
 !---------------------------------------------------------------------
-  SUBROUTINE proc2e(bas,basinfo,atoms,options,fmem,nnuc,xyz,norb,set,setinfo,maxL)
+  SUBROUTINE proc2e(bas,basinfo,atoms,options,fmem,nnuc,xyz,set,setinfo,maxL)
     IMPLICIT NONE
     ! Values
     ! xyz	: 2D dp, array of nuclear positions
@@ -91,8 +91,10 @@ PROGRAM int2e
     ! setinfo	: 1D int, array of information about sets
     ! options	: 1D int, array of options
     ! II	: 3D dp, intermediate array 
-    ! XX	: 4D dp, two electron repulsion integrals
+    ! XX	: 4D dp, two electron repulsion integrals, on orbitals i,j,g,h
     ! maxL	: int, max principle,angular quantum numbers
+    ! PP,QQ,PQ	: 1D dp, arrays of overlap integral distances
+    ! la,lb,...	: 1D in, arrays that contain the angular quantum numbers of sets 
  
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
@@ -100,14 +102,16 @@ PROGRAM int2e
     INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo,setinfo
     INTEGER, DIMENSION(0:), INTENT(IN) :: options, atoms
     REAL(KIND=8), INTENT(INOUT) :: fmem
-    INTEGER, INTENT(IN) :: norb,nnuc,maxL
+    INTEGER, INTENT(IN) :: nnuc,maxL
 
     !Internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: XX
     REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: II
-    REAL(KIND=8) :: timeS, timeF, temp
-    INTEGER :: nset,setl,OpS,stat1,stat2 
-    INTEGER :: a,b,c,d,g,h,i,j
+    REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ,la,lb,lc,ld
+    REAL(KIND=8) :: timeS,timeF,temp,p,q,EIJ,EGH
+    INTEGER :: nset,setl,OpS,stat1,stat2,setK,maxK 
+    INTEGER :: orba,orbb,orbc,orbd,norb
+    INTEGER :: a,b,c,d,g,h,i,j,k
 
     CALL CPU_TIME(timeS)
 
@@ -119,16 +123,18 @@ PROGRAM int2e
     nset = setinfo(0)
     setl = setinfo(1)
     OpS = basinfo(0)
+    norb = basinfo(1)
+    setK = (2*maxL)**3
 
     !Iuv will be my intermediate file for the integrals
     OPEN(unit=42,file='Iuv',status='replace',access='sequential',form='unformatted') 
  
     !allocate memory
-    temp = (nset**(4.0D0))*8.0/1.0E6 
-    temp = temp + (2*maxL)**(3)*8.0D0/1.0E6
+    temp = (norb**(4))*8.0/1.0E6 
+    temp = temp + 2*setK*norb*norb*8.0D0/1.0E6
     WRITE(*,998) "Allocating space for intermediate matrices (MB)", temp 
-    ALLOCATE(XX(0:nset-1,0:nset-1,0:nset-1,0:nset-1),STAT=stat1)
-    ALLOCATE(II(0:(2*maxL)**(3),0:nset-1,0:nset-1),STAT=stat2)
+    ALLOCATE(XX(0:norb-1,0:norb-1,0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(II(0:setK,0:norb-1,0:norb-1),STAT=stat2)
     IF (stat1+stat2 .NE. 0) THEN
       WRITE(*,*) "Could not allocate memory in int2e:proc2e"
       CALL EXECUTE_COMMAND_LINE('touch error')
@@ -138,39 +144,44 @@ PROGRAM int2e
     CALL nmem(fmem)
 
     !zero XX
-    DO i=0,nset-1
-      DO j=0,nset-1
-        DO g=0, nset-1
-          XX(i,j,g,:) = (/ (0.0D0, h=0, nset-1) /) 
+    DO i=0,norb-1
+      DO j=0,norb-1
+        DO g=0,norb-1
+          XX(i,j,g,:) = (/ (0.0D0, h=0, norb-1) /) 
         END DO
       END DO
     END DO
 
-    !"sum" over a,b
+    !"sum" over a,b sets
     DO a=0,nset-1
       DO b=0,nset-1      
 
+        !get overlap location
+
         !zero II
-        DO i=0,nset-1
-          DO j=0,nset-1
-            II(i,j,:) = (/ (0.0D0, g=0, nset-1) /)
+        DO k=0,setK
+          DO g=0,norb-1
+            II(k,g,:) = (/ (0.0D0, h=0, norb-1) /)
           END DO
         END DO
 
-        !"sum" over c,d
+        !"sum" over c,d sets
         DO c=0,nset-1
           DO d=0,nset-1
-          
+            ! internal loop over sets
+!            CALL colII(II,setK,maxK,a,b,c,d,p,q,PP,QQ,PQ,setinfo(1+a*setl+1:1+(a+1)*setl),&
+!            setinfo(1+b*setl+1:1+(b+1)*setl),setinfo(1+c*setl+1:1+(c+1)*setl),&
+!            setinfo(1+d*setl+1:1+(d+1)*setl),set,la,lb,lc,ld,EIJ,EGH)
           END DO                                   !end loop over d
         END DO                                     !end loop over c
 
-        !"loop" over g,h
-        DO g=0,setl-1
-          DO h=0,setl-1
-            !"loop" over i,j
-            DO i=0,setl-1
-              DO j=0,setl-1
-                XX(i,j,g,h) = XX(i,j,g,h) + 1.0D0
+        !"loop" over g,h orbitals
+        DO h=0,norb-1
+          DO g=0,norb-1
+            !"loop" over i,j orbitals
+            DO j=0,norb-1
+              DO i=0,norb-1
+!               CALL inner loop on k,i,j
               END DO
             END DO
           END DO
@@ -182,26 +193,27 @@ PROGRAM int2e
     WRITE(42) XX 
     CLOSE(unit=42,status='keep')
 
+    !Optional Printing
     IF (options(7) .GE. 3) THEN 
-      WRITE(*,*) "Two electron Integrals by Set" 
+      WRITE(*,*) "Two electron Integrals by Orbital" 
       WRITE(*,997) "I   J   G   H    Value"   
-      DO i=0,nset-1
-        DO j=0,nset-1
-          DO g=0,nset-1
-            DO h=0,nset-1
+      DO i=0,norb-1
+        DO j=0,norb-1
+          DO g=0,norb-1
+            DO h=0,norb-1
               WRITE(*,996) i,j,g,h,XX(i,j,g,h)
-            END DO 
+            END DO
           END DO
         END DO
       END DO
-      
     END IF
 
     DEALLOCATE(XX)
     DEALLOCATE(II)
 
     !reassign memory
-    fmem = fmem + (nset**(4.0D0)+nset**(3.0D0))*8.0/1.0E6
+    fmem = fmem + (norb**(4))*8.0/1.0E6
+    fmem = fmem + (2*setK)*norb*norb*8.0D0/1.0E6
     CALL nmem(fmem)
 
     CALL CPU_TIME(timeF) 
@@ -209,6 +221,14 @@ PROGRAM int2e
     WRITE(*,999) "Two electron integrals constructed in (s)", (timeF-timeS)
 
   END SUBROUTINE proc2e
+
+!---------------------------------------------------------------------
+!		Generates intermediate II for electron repulsion	
+!---------------------------------------------------------------------
+  SUBROUTINE colII 
+    IMPLICIT NONE
+
+  END SUBROUTINE colII
 
 !===================================================================
 !                       FUNCTIONS
