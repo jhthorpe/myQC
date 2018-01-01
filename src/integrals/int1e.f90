@@ -175,6 +175,7 @@ PROGRAM int1e
     ! p		: dp, addition of two coeffiecients
     ! aa,bb	: dp, coefficients of Guassians for atoms a and b
     ! OpS	: int, max orbitals per set
+    ! Dk	: 1D int, tracks nonzero coefficients
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S,F 
@@ -188,10 +189,11 @@ PROGRAM int1e
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:) :: coef
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
+    INTEGER, DIMENSION(:), ALLOCATABLE :: Dk
     INTEGER, DIMENSION(0:2) :: la,lb,amax,bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     REAL(KIND=8) :: timeS, timeF
-    INTEGER :: a,b,u,v,i,j,k,l,setl,nset,OpS
+    INTEGER :: a,b,u,v,i,j,k,l,setl,nset,OpS,kmax
 
     CALL CPU_TIME(timeS)
     WRITE(*,*) "constructing Overlap and 1e-Fock matrix"
@@ -203,6 +205,8 @@ PROGRAM int1e
      S(i,:) = (/ (0.0D0, j=0,norb-1) /)
      F(i,:) = (/ (0.0D0, j=0,norb-1) /)
     END DO
+
+    ALLOCATE(Dk(0:maxL**3)) 
 
     nset = setinfo(0)
     setl = setinfo(1)
@@ -271,6 +275,8 @@ PROGRAM int1e
     OPEN(unit=1,file='Fuv',status='replace',access='sequential')
       WRITE(1,*) F(:,:)
     CLOSE(unit=1)
+
+    DEALLOCATE(Dk)
 
     CALL CPU_TIME(timeF)
     WRITE(*,996) "Overlap and Fock constructed in (s) :", (timeF-timeS)

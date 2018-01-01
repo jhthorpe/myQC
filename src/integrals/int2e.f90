@@ -94,7 +94,9 @@ PROGRAM int2e
     ! XX	: 4D dp, two electron repulsion integrals, on orbitals i,j,g,h
     ! maxL	: int, max principle,angular quantum numbers
     ! PP,QQ,PQ	: 1D dp, arrays of overlap integral distances
-    ! la,lb,...	: 1D in, arrays that contain the angular quantum numbers of sets 
+    ! la,lb,...	: 1D int, arrays that contain the angular quantum numbers of sets 
+    ! ABk,CDk	: 1D int, contains nonzero indices of coefficients
+    ! kmax	: int, max k value that is nonzero
  
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
@@ -109,10 +111,11 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: II
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, QC, QD, CD
     REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ
+    INTEGER, DIMENSION(:), ALLOCATABLE :: ABk,CDk
     INTEGER, DIMENSION(0:2) :: la,lb,lc,ld
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
     REAL(KIND=8) :: aa,bb,cc,dd,p,q
-    INTEGER :: nset,setl,OpS,stat1,stat2,setK,maxK 
+    INTEGER :: nset,setl,OpS,stat1,stat2,setK,kmaxAB,kmaxCD 
     INTEGER :: orba,orbb,orbc,orbd,norb
     INTEGER :: a,b,c,d,g,h,i,j,k,m,n,s,t,u,v
 
@@ -127,7 +130,10 @@ PROGRAM int2e
     setl = setinfo(1)
     OpS = basinfo(0)
     norb = basinfo(1)
-    setK = (2*maxL)**3
+    setK = (maxL)**3
+
+    ALLOCATE(ABk(0:maxl**3))
+    ALLOCATE(CDk(0:maxl**3))
 
     !Iuv will be my intermediate file for the integrals
     OPEN(unit=42,file='Iuv',status='replace',access='sequential',form='unformatted') 
