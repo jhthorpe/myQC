@@ -94,7 +94,7 @@ PROGRAM int2e
     ! XX	: 4D dp, two electron repulsion integrals, on orbitals i,j,g,h
     ! maxL	: int, max principle,angular quantum numbers
     ! PP,QQ,PQ	: 1D dp, arrays of overlap integral distances
-    ! la,lb,...	: 1D int, arrays that contain the angular quantum numbers of sets 
+    ! la,lb,...	: 1D int, arrays that contain the max angular quantum numbers of sets 
     ! ABk,CDk	: 1D int, contains nonzero indices of coefficients
     ! kmax	: int, max k value that is nonzero
  
@@ -112,7 +112,7 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, QC, QD, CD
     REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ
     INTEGER, DIMENSION(:), ALLOCATABLE :: ABk,CDk
-    INTEGER, DIMENSION(0:2) :: la,lb,lc,ld
+    INTEGER, DIMENSION(0:2) :: la,lb,lc,ld,na,nb,nc,nd
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
     REAL(KIND=8) :: aa,bb,cc,dd,p,q
     INTEGER :: nset,setl,OpS,stat1,stat2,setK,kmaxAB,kmaxCD 
@@ -164,13 +164,19 @@ PROGRAM int2e
     !"sum" over a,b sets
     DO a=0,nset-1
       aa = set(a)                            !alpha a
-      u = setinfo(1+a*setl+3)
+      u = setinfo(1+a*setl+3)                !center number
+      !max angular momentum
       la(:) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
+      !actual angular momentum
+      
+      
 
       DO b=0,nset-1      
         bb = set(b)                           !alpha b
         v = setinfo(1+b*setl+3)
         lb = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
+
+        kmaxAB = -1
 
         !zero II
         DO k=0,setK
@@ -192,6 +198,8 @@ PROGRAM int2e
 
         CALL getcoef(coefAB,PA,PB,aa,bb,la,lb)
 
+        !search for nonzero combinations over sets
+
         !"sum" over c,d sets
         DO c=0,nset-1
           cc = set(c)                            !alpha c
@@ -202,6 +210,8 @@ PROGRAM int2e
             dd = set(d)                          !alpha d
             t = setinfo(1+d*setl+3)
             ld(:) = [setinfo(1+d*setl+2),setinfo(1+d*setl+2),setinfo(1+d*setl+2)]
+
+            kmaxCD = -1
 
             !Right overlap location
             q = cc + dd
@@ -283,7 +293,14 @@ PROGRAM int2e
 
 !---------------------------------------------------------------------
 !		Generates intermediate II for electron repulsion	
+!
+! WORK NOTE - It should be noted that I have (very) inefficiently
+!  implimented this section. Computing Dk for each orbital is... bad.
+!  However, I have created a mixted treatment of each set as a true
+!  ang. momentum eigenfunction (L=n+l+m,M=-L..0..L) without rigerous
+!  effort, and is where I pay the price.
 !---------------------------------------------------------------------
+
   SUBROUTINE clmII(II,a,b,c,d,p,q,PQ,seta,setb,setc,setd,setl,basinfo,bas,&
              EIJ,EGH,coefAB,coefCD,la,lb,lc,ld) 
     IMPLICIT NONE
@@ -362,19 +379,21 @@ PROGRAM int2e
     !setup the intermediate array
     DO g=0,setc(0)-1
       orbc = setc(3+g)
+
+      !get ang qn for each orbital within set
+      ori = basinfo(1+5*orbc+3)
+      !S-TYPE
+      IF (ori .EQ. -1) THEN
+        nc = [basinfo(1+5*orbc+2),basinfo(1+5*orbc+2),basinfo(1+5*orbc+2)]
+      !P-TYPE
+      ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+        nc = [0, 0, 0]
+        nc(ori) = basinfo(1+5*orbc+2)
+      END IF
+
       DO h=0,setd(0)-1
         orbd = setd(3+h)
 
-        !get ang max for each orbital within set
-        ori = basinfo(1+5*orbc+3)
-        !S-TYPE
-        IF (ori .EQ. -1) THEN
-          nc = [basinfo(1+5*orbc+2),basinfo(1+5*orbc+2),basinfo(1+5*orbc+2)]
-        !P-TYPE
-        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
-          nc = [0, 0, 0]
-          nc(ori) = basinfo(1+5*orbc+2)
-        END IF
         ori = basinfo(1+5*orbd+3)
         !S-TYPE
         IF (ori .EQ. -1) THEN

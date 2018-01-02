@@ -530,49 +530,128 @@ MODULE aux
   END SUBROUTINE rrec
 
 !---------------------------------------------------------------------
-!			Get nonzero Nk,Lk,Mk	
+!		Compute nonzero combinations of N,L,M in sets 
 !---------------------------------------------------------------------
-  SUBROUTINE getDk(coef,ll,rr,Dk,kmax)
+  SUBROUTINE getDk(coef,seta,setb,basa,basb,basinfo,Dk,Ck,Ok,kmax,EIJ,setl,aa,bb)
     IMPLICIT NONE
 
     !Values
     ! coef	: 4D dp, matrix of coefficients
-    ! ll,rr	: 1D int, (nl,ll,ml), (nr,lr,mr) ang QN 
-    ! Dk	: 1D int, nonzero Nk+Lk+Mk values
+    ! seta,b	: 1D int, setinfo for seta,setb
+    ! basa,b	: 1D dp, basis set weights for sets a,b 
+    ! basinfo	: 1D int, basinfo for sets a,b
+    ! Dk	: 1D dp, nonzero EIJ*Nk*Lk*Mk values
+    ! Ck	: 1D int, tracks Nk,Lk,Mk combinations 
+    ! Ok	: 1D int, gives orbs of the combination {left orb, right orb}
     ! kmax	: int, max index of nonzero values
+    ! EIJ	: dp, preexponential value
+    ! setl	: int, length of set
+    ! ll,rr	: 1D int, left,right angular quantum numbers
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    INTEGER, DIMENSION(0:), INTENT(INOUT) :: Dk
-    INTEGER, DIMENSION(0:2), INTENT(IN) :: ll,rr
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Dk
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa,basb
+    INTEGER, DIMENSION(0:), INTENT(INOUT) :: Ck,Ok
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb,basinfo
+    REAL(KIND=8), INTENT(IN) :: aa,bb,EIJ
     INTEGER, INTENT(INOUT) :: kmax
+    INTEGER :: setl
 
     !Internal
+    INTEGER, DIMENSION(0:2) :: ll,rr 
     REAL(KIND=8) :: tol
-    INTEGER :: N,L,M,Nmax,Lmax,Mmax
+    INTEGER :: N,L,M,Nmax,Lmax,Mmax,ori
+    INTEGER :: i,j,orba,orbb
    
     tol = 0.2D-15
-    kmax = -1
-    Nmax = ll(0) + rr(0)
-    Lmax = ll(1) + rr(1)
-    Mmax = ll(2) + rr(2)
+ 
+    !go through orbitals of set a 
+    DO i=0, seta(0)-1
+      orba = seta(3+i)
 
-    DO M=0,Mmax
-      IF (ABS(coef(2,M,ll(2),rr(2))) .LT. tol) CYCLE 
-      DO L=0,Lmax
-        IF (ABS(coef(1,L,ll(1),rr(1))) .LT. tol) CYCLE
-        DO N=0,Nmax
-          IF (ABS(coef(0,N,ll(0),rr(0))) .LT. tol) THEN
-            CYCLE
-          ELSE
-            kmax = kmax + 1
-            Dk = 100*N + 10*L + 1*M
-          END IF
+      ! get angular quantum numbers for each orbital 
+      ori = basinfo(1+5*orba+3)
+      !S-TYPE
+      IF (ori .EQ. -1) THEN
+        ll = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)]
+      !P-TYPE
+      ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+        ll = [0, 0, 0]
+        ll(ori) = basinfo(1+5*orba+2)
+      END IF
+
+      !go through orbitals of set b
+      DO j=0, setb(0)-1
+        orbb = setb(3+j)
+
+        ori = basinfo(1+5*orbb+3)
+        !S-TYPE
+        IF (ori .EQ. -1) THEN
+          rr = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+          rr = [0,0,0]
+          rr(ori) = basinfo(1+5*orbb+2)
+        END IF
+
+        Nmax = ll(0) + rr(0)
+        Lmax = ll(1) + rr(1)
+        Mmax = ll(2) + rr(2)
+
+        DO M=0,Mmax
+          IF (ABS(coef(2,M,ll(2),rr(2))) .LT. tol) CYCLE 
+          DO L=0,Lmax
+            IF (ABS(coef(1,L,ll(1),rr(1))) .LT. tol) CYCLE
+            DO N=0,Nmax
+              IF (ABS(coef(0,N,ll(0),rr(0))) .LT. tol) THEN
+                CYCLE
+              ELSE
+                kmax = kmax + 1
+                Ck(kmax) = 300*N + 20*L + 1*M
+                Dk(kmax) = coef(0,N,ll(0),rr(0))*coef(1,L,ll(1),rr(1))*coef(2,M,ll(2),rr(2))
+                Dk(kmax) = Dk(kmax)*EIJ*gtoD(basinfo(1+5*orba+2),aa)*gtoD(basinfo(1+5*orbb+2),bb) 
+                Ok(2*kmax) = orba
+                Ok(2*kmax+1) = orbb
+              END IF
+            END DO
+          END DO
         END DO
+
       END DO
     END DO
 
   END SUBROUTINE getDk
+
+!=====================================================================
+!                       FUNCTIONS
+
+!---------------------------------------------------------------------
+!       Generate coefficients of GTO basis sets 
+!---------------------------------------------------------------------
+  REAL(KIND=8) FUNCTION gtoD(l,a)
+    IMPLICIT NONE
+    
+    ! l         : int, angular momentum quantum number
+    ! a         : dp, coefficient
+    
+    ! Inout 
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+    REAL(KIND=8), INTENT(IN) :: a
+    INTEGER, INTENT(IN) :: l
+    
+    IF (l .EQ. 0) THEN
+      gtoD = (2.0D0*a/Pi)**(3.0D0/4.0D0)
+    ELSE IF (l .EQ. 1) THEN
+      gtoD = (128.0D0*(a**5.0D0)/(Pi**3.0D0))**(1.0D0/4.0D0)
+    ELSE IF (l .EQ. 2) THEN
+      gtoD = (2048.0D0*(a**7.0D0)/(9.0D0*Pi**(3.0D0)))**(1.0D0/4.0D0)
+    ELSE IF (l .GT. 2) THEN
+      WRITE(*,*) "this angular momentum not implimented yet"
+      STOP
+    END IF
+  
+  END FUNCTION gtoD
 !---------------------------------------------------------------------
 
 END MODULE aux

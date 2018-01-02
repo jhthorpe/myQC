@@ -531,6 +531,8 @@ MODULE aux
 
 !---------------------------------------------------------------------
 !			Get nonzero Nk,Lk,Mk	
+! WORK NOTE - I am planning to absorb the loops over the orbitals and
+!   n,l,m into here. It will find the nonzero elements of the set
 !---------------------------------------------------------------------
   SUBROUTINE getDk(coef,ll,rr,Dk,kmax)
     IMPLICIT NONE
@@ -551,22 +553,21 @@ MODULE aux
     REAL(KIND=8) :: tol
     INTEGER :: N,L,M,Nmax,Lmax,Mmax
    
-    tol = 0.1D-15
-    kmax = 0
+    tol = 0.2D-15
     Nmax = ll(0) + rr(0)
     Lmax = ll(1) + rr(1)
     Mmax = ll(2) + rr(2)
 
     DO M=0,Mmax
-      IF (ABS(coef(2,M,ll(2),rr(2)) .LT. tol) CYCLE 
+      IF (ABS(coef(2,M,ll(2),rr(2))) .LT. tol) CYCLE 
       DO L=0,Lmax
-        IF (ABS(coef(1,L,ll(1),rr(1)) .LT. tol) CYCLE
+        IF (ABS(coef(1,L,ll(1),rr(1))) .LT. tol) CYCLE
         DO N=0,Nmax
-          IF (ABS(coef(0,N,ll(0),rr(0) .LT. tol) THEN
+          IF (ABS(coef(0,N,ll(0),rr(0))) .LT. tol) THEN
             CYCLE
           ELSE
             kmax = kmax + 1
-            Dk = 100*N + 10*L + 1*M
+            Dk(kmax) = 300*N + 20*L + 1*M
           END IF
         END DO
       END DO
