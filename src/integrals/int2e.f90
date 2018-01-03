@@ -97,6 +97,8 @@ PROGRAM int2e
     ! la,lb,...	: 1D int, arrays that contain the max angular quantum numbers of sets 
     ! ABk,CDk	: 1D int, contains nonzero indices of coefficients
     ! kmax	: int, max k value that is nonzero
+    ! Dk,Dkp	: 1D dp, array of nonzero coefficients for sets AB and CD
+    ! Ok,Okp	: 1D int, array of orbitals of sets AB, CD, stored {left, right}
  
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
@@ -109,9 +111,10 @@ PROGRAM int2e
     !Internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: XX,coefAB,coefCD
     REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: II
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Dk, Dkp
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, QC, QD, CD
     REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ
-    INTEGER, DIMENSION(:), ALLOCATABLE :: ABk,CDk
+    INTEGER, DIMENSION(:), ALLOCATABLE :: Ck,Ckp,Ok,Okp
     INTEGER, DIMENSION(0:2) :: la,lb,lc,ld,na,nb,nc,nd
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
     REAL(KIND=8) :: aa,bb,cc,dd,p,q
@@ -130,17 +133,21 @@ PROGRAM int2e
     setl = setinfo(1)
     OpS = basinfo(0)
     norb = basinfo(1)
-    setK = (maxL)**3
+    setK = Ops**2*(2*maxL*(2*maxL+1)/2)**3
 
-    ALLOCATE(ABk(0:maxl**3))
-    ALLOCATE(CDk(0:maxl**3))
+    ALLOCATE(Ck(0:setK))
+    ALLOCATE(Ckp(0:setK))
+    ALLOCATE(Dk(0:setK)) 
+    ALLOCATE(Dkp(0:setK))
+    ALLOCATE(Ok(0:2*setK+1))
+    ALLOCATE(Okp(0:2*setK+1))
 
     !Iuv will be my intermediate file for the integrals
     OPEN(unit=42,file='Iuv',status='replace',access='sequential',form='unformatted') 
  
     !allocate memory
     temp = (norb**(4))*8.0/1.0E6 
-    temp = temp + 2*setK*norb*norb*8.0D0/1.0E6
+    temp = temp + setK*norb*norb*8.0D0/1.0E6
     WRITE(*,998) "Allocating space for intermediate matrices (MB)", temp 
     ALLOCATE(XX(0:norb-1,0:norb-1,0:norb-1,0:norb-1),STAT=stat1)
     ALLOCATE(II(0:setK,0:norb-1,0:norb-1),STAT=stat2)
@@ -167,9 +174,6 @@ PROGRAM int2e
       u = setinfo(1+a*setl+3)                !center number
       !max angular momentum
       la(:) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
-      !actual angular momentum
-      
-      
 
       DO b=0,nset-1      
         bb = set(b)                           !alpha b
@@ -197,8 +201,8 @@ PROGRAM int2e
         EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p)
 
         CALL getcoef(coefAB,PA,PB,aa,bb,la,lb)
-
-        !search for nonzero combinations over sets
+        CALL getDk(coefAB,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
+        bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,Dk,Ck,Ok,kmaxAB,EIJ,setl,aa,bb)
 
         !"sum" over c,d sets
         DO c=0,nset-1
@@ -210,8 +214,6 @@ PROGRAM int2e
             dd = set(d)                          !alpha d
             t = setinfo(1+d*setl+3)
             ld(:) = [setinfo(1+d*setl+2),setinfo(1+d*setl+2),setinfo(1+d*setl+2)]
-
-            kmaxCD = -1
 
             !Right overlap location
             q = cc + dd
@@ -225,18 +227,24 @@ PROGRAM int2e
             EGH = EXP(-n*(CD(0)**2.0D0 + CD(1)**2.0D0 + CD(2)**2.0D0)/q)
             IF (EGH * EIJ .LT. 1.0D-14) CYCLE    
      
+            kmaxCD = -1
+
             CALL getcoef(coefCD,QC,QD,cc,dd,lc,ld)
+            CALL getDk(coefCD,setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl), &
+            bas(c*OpS:(c+1)*Ops-1),bas(d*Ops:(d+1)*OpS-1),basinfo,Dkp,Ckp,Okp,kmaxCD,EGH,setl,cc,dd)
 
             ! get overlap of overlaps 
             DO i=0,2
               PQ(i) = PP(i) - QQ(i)
             END DO
    
-            CALL clmII(II,a,b,c,d,p,q,PQ,setinfo(1+a*setl+1:1+(a+1)*setl),&
-            setinfo(1+b*setl+1:1+(b+1)*setl),setinfo(1+c*setl+1:1+(c+1)*setl),&
-            setinfo(1+d*setl+1:1+(d+1)*setl),setl,basinfo,bas,EIJ,EGH,&
-            coefAB,coefCD,la,lb,lc,ld)
+            CALL clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,&
+            setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl),setl)
 
+!            CALL clmII(II,a,b,c,d,p,q,PQ,setinfo(1+a*setl+1:1+(a+1)*setl),&
+!            setinfo(1+b*setl+1:1+(b+1)*setl),setinfo(1+c*setl+1:1+(c+1)*setl),&
+!            setinfo(1+d*setl+1:1+(d+1)*setl),setl,basinfo,bas,EIJ,EGH,&
+!            coefAB,coefCD,la,lb,lc,ld)
              DEALLOCATE(coefCD)
 
           END DO                                   !end loop over d
@@ -279,6 +287,12 @@ PROGRAM int2e
 
     DEALLOCATE(XX)
     DEALLOCATE(II)
+    DEALLOCATE(Ck)
+    DEALLOCATE(Ckp)
+    DEALLOCATE(Dk)
+    DEALLOCATE(Dkp)
+    DEALLOCATE(Ok)
+    DEALLOCATE(Okp)
 
     !reassign memory
     fmem = fmem + (norb**(4))*8.0/1.0E6
@@ -293,42 +307,32 @@ PROGRAM int2e
 
 !---------------------------------------------------------------------
 !		Generates intermediate II for electron repulsion	
-!
-! WORK NOTE - It should be noted that I have (very) inefficiently
-!  implimented this section. Computing Dk for each orbital is... bad.
-!  However, I have created a mixted treatment of each set as a true
-!  ang. momentum eigenfunction (L=n+l+m,M=-L..0..L) without rigerous
-!  effort, and is where I pay the price.
 !---------------------------------------------------------------------
-
-  SUBROUTINE clmII(II,a,b,c,d,p,q,PQ,seta,setb,setc,setd,setl,basinfo,bas,&
-             EIJ,EGH,coefAB,coefCD,la,lb,lc,ld) 
+  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,setc,setd,setl)
+             
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
     !Values
     ! II	: 3D dp, values of intermediate
-    ! a,b,c,d	: int, set ID 
     ! p,q	: dp, alpha p and q, exponential coefficients
     ! PQ	: 1D dp, P-Q array
-    ! seta...	: 1D int, setinfo for set a
-    ! setl	: int, number of values in seta
-    ! basinfo	: 1D int, basinfo
-    ! bas	: 1D dp, basis 
-    ! EIJ,EGH	: dp, Pre-exponential coefficients 
-    ! coefAB,CD	: 4D dp, coefficients of sets AB and CD 
     ! la,b,c,d	: 1D int, max angular QN of set a,b,c,d
+    ! Dk,Dkp	: 1D dp, nonzero coefficients of setAB,CD
+    ! Ck,Ckp	: 1D int, nonzero N,L,M of setAB,CD 
+    ! setc,setd	: 1D int, setinfo c,d 
+    ! setl	: int, length of set
     ! Fj	: 1D dp, Boys function table
     ! Rtab	: 4D dp, recursive auxil. table
     ! Nmax	: int, n + nbar + n' + n'bar
+    ! foo	: int, dummy
 
     !Inout
-    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coefAB,coefCD
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(INOUT) :: II
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ, bas
-    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb,setc,setd,basinfo
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ, Dk,Dkp
+    INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,setc,setd 
     INTEGER, DIMENSION(0:), INTENT(IN) :: la,lb,lc,ld
-    REAL(KIND=8), INTENT(IN) :: p,q,EIJ,EGH
-    INTEGER, INTENT(IN) :: a,b,c,d,setl
+    REAL(KIND=8), INTENT(IN) :: p,q
+    INTEGER, INTENT(IN) :: kmaxAB,kmaxCD,setl
 
     !Internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
@@ -336,8 +340,8 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj
     REAL(KIND=8), DIMENSION(0:2) :: nc,nd
     REAL(KIND=8) :: ll,TT
-    INTEGER :: N,Np,L,Lp,M,Mp,Nmax,Lmax,Mmax,ori,orbc,orbd
-    INTEGER :: i,j,k,z,g,h
+    INTEGER :: N,Np,L,Lp,M,Mp,Nmax,Lmax,Mmax,orbc,orbd,foo
+    INTEGER :: g,h,i,j,k,kp,z
 
     Nmax = la(0) + lb(0) + lc(0) + ld(0)
     Lmax = la(1) + lb(1) + lc(1) + ld(1)
@@ -367,60 +371,44 @@ PROGRAM int2e
       END DO
     END DO
 
-    !recursive call
-    DO N=0,Nmax
-      DO L=0,Lmax
-        DO M=0,Mmax
-          CALL RNLMj(PQ(0),PQ(1),PQ(2),N,L,M,0,p+q,Fj,Rtab,Rbol)
-        END DO
-      END DO
-    END DO
-
     !setup the intermediate array
     DO g=0,setc(0)-1
       orbc = setc(3+g)
 
-      !get ang qn for each orbital within set
-      ori = basinfo(1+5*orbc+3)
-      !S-TYPE
-      IF (ori .EQ. -1) THEN
-        nc = [basinfo(1+5*orbc+2),basinfo(1+5*orbc+2),basinfo(1+5*orbc+2)]
-      !P-TYPE
-      ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
-        nc = [0, 0, 0]
-        nc(ori) = basinfo(1+5*orbc+2)
-      END IF
-
       DO h=0,setd(0)-1
         orbd = setd(3+h)
 
-        ori = basinfo(1+5*orbd+3)
-        !S-TYPE
-        IF (ori .EQ. -1) THEN
-          nd = [basinfo(1+5*orbd+2),basinfo(1+5*orbd+2),basinfo(1+5*orbd+2)]
-        !P-TYPE
-        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
-          nd = [0,0,0]
-          nd(ori) = basinfo(1+5*orbd+2)
-        END IF
+        !loop over k'
+        DO kp=0,kmaxCD
+          foo = Ckp(kp)
+          Np = foo/300
+          foo = foo - Np*300
+          Lp = foo/20
+          Mp = foo - Lp*20
+         
+          DO k=0,kmaxAB
+            foo = Ck(k)
+            N = foo/300
+            foo = foo - N*300
+            L = foo/20
+            M = foo - L*20
+            
+           CALL RNLMj(PQ(0),PQ(1),PQ(2),N+Np,L+Lp,M+Mp,0,p+q,Fj,Rtab,Rbol)
 
-        !DO N=0 
+           II(k,orbc,orbd) = II(k,orbc,orbd) + (-1)**(Np+Lp+Mp)*&
+           ll*Dkp(kp)*Rtab(N+Np,L+Lp,M+Mp,0)
 
-        !END DO
-
-      END DO
-    END DO
+          END DO                                        !end loop over k
+        END DO                                          !end loop over kp
+      END DO                                            !end loop over h
+    END DO                                              !end loop over g
 
     DEALLOCATE(Fj)
     DEALLOCATE(Rtab)
     DEALLOCATE(Rbol)
 
   END SUBROUTINE clmII
-
 !===================================================================
 !                       FUNCTIONS
-!----------
-
-
 
 END PROGRAM int2e

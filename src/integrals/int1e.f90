@@ -575,15 +575,6 @@ PROGRAM int1e
          END DO
        END DO
      
-      ! WORK NOTE - check that below is correct 
-      DO i=0,Nmax
-        DO j=0,Lmax
-          DO k=0,Mmax
-            CALL RNLMj(-CP(0),-CP(1),-CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
-          END DO
-        END DO
-      END DO
-
       !loop over nonzero coefficients
       DO k=0,kmax
         foo = Ck(k) 
@@ -591,6 +582,7 @@ PROGRAM int1e
         foo = foo - N*300
         L = foo/20
         M = foo - L*20
+        CALL RNLMj(-CP(0),-CP(1),-CP(2),N,L,M,0,ap,Fj,Rtab,Rbol)
         temp = atoms(c)*(2.0D0*Pi/ap)*Rtab(N,L,M,0)*Dk(k)
         orba = Ok(2*k)
         orbb = Ok(2*k+1)
