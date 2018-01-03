@@ -12,7 +12,7 @@
  Memory per CPU (MB) :         1000
  Verbosity : 3 (wtf)
  ==================================
- parse ran in (s) :    8.0499999999999973E-004
+ parse ran in (s) :    7.7099999999999998E-004
 
  int1e called
  getbasis called...
@@ -86,7 +86,7 @@
  l,coef           0   1.0000000000000000     
  N,coef           0   0.0000000000000000     
  N,coef           1  0.13323377750188320     
- Overlap and Fock constructed in (s) :   0.00253
+ Overlap and Fock constructed in (s) :   0.00340
  Overlap written to Suv
  One electron energy written to Fuv
 
@@ -94,7 +94,7 @@
  temporarily taking all MO coefficients as one
  MO coefficients written to Cuv
 
- int1e ran in (s) : 0.00353
+ int1e ran in (s) : 0.00539
 
  int2e called
  Constructing two electron integrals
@@ -4174,5 +4174,5 @@
       5   5   4   4         0.70503347
       5   5   5   5         0.70503347
 
- Two electron integrals constructed in (s)    0.0710
+ Two electron integrals constructed in (s)    0.0717
  myQC ran in (s)    0.0009

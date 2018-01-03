@@ -173,14 +173,14 @@ PROGRAM int2e
       aa = set(a)                            !alpha a
       u = setinfo(1+a*setl+3)                !center number
       !max angular momentum
-      la(:) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
+      la(0:2) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
 
       DO b=0,nset-1      
         bb = set(b)                           !alpha b
         v = setinfo(1+b*setl+3)
-        lb = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
+        lb(0:2) = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
 
-        kmaxAB = -1
+        WRITE(*,*) "seta,setb", a, b
 
         !zero II
         DO k=0,setK
@@ -200,10 +200,17 @@ PROGRAM int2e
         END DO
         EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p)
 
-        CALL getcoef(coefAB,PA,PB,aa,bb,la,lb)
+        kmaxAB = -1
+
+        CALL getcoef(coefAB,PA,PB,aa,bb,la,lb+2)
         CALL getDk(coefAB,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
         bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,Dk,Ck,Ok,kmaxAB,EIJ,setl,aa,bb)
 
+!CCCCCCCCCC
+!        WRITE(*,*) "-----------"
+!        DEALLOCATE(coefAB)
+!        CYCLE !WORK NOTE - TESTING
+!CCCCCCCCCC
         !"sum" over c,d sets
         DO c=0,nset-1
           cc = set(c)                            !alpha c
@@ -266,7 +273,7 @@ PROGRAM int2e
         DO j=0,norb-1
           DO g=0,norb-1
             DO h=0,norb-1
-              WRITE(*,996) i+1,j+1,g+1,h+1,XX(i,j,g,h)
+              IF (XX(i,j,g,h) .NE. 0.0D0) WRITE(*,996) i+1,j+1,g+1,h+1,XX(i,j,g,h)
             END DO
           END DO
         END DO
@@ -359,7 +366,6 @@ PROGRAM int2e
       END DO
     END DO
 
-
     !loop over k'
     DO kp=0,kmaxCD
       foo = Ckp(kp)
@@ -397,10 +403,10 @@ PROGRAM int2e
     IMPLICIT NONE
 
     ! Values
-    ! XX		: 4D dp, 2e- integrals
-    ! II		: 3D dp, intermediate array
+    ! XX	: 4D dp, 2e- integrals
+    ! II	: 3D dp, intermediate array
     ! norb	: int, number of orbitals
-    ! Dk		: 1D dp, nonzero coeff.
+    ! Dk	: 1D dp, nonzero coeff.
     ! kmax	: int, max k for nonzero coef
     ! seta,b	: 1D int, setinfo for set a,b
     ! setl	: int, length of seta,setb
@@ -422,9 +428,24 @@ PROGRAM int2e
           i = Ok(2*k)
           j = Ok(2*k+1)
           XX(i,j,g,h) = XX(i,j,g,h) + Dk(k)*II(k,g,h)
+          IF (i .EQ. 0 ) THEN
+            WRITE(*,*) "i,j,g,h", i,j,g,h
+            WRITE(*,*) "II", II(k,g,h)
+          END IF 
         END DO 
+!        DO j=0,setb(0)-1
+!          orbb = setb(3+j)
+!          DO i=0,seta(0)-1
+!            orba = seta(3+i)
+!              DO k=0,kmax
+!                XX(orba,orbb,g,h) = XX(orba,orbb,g,h) + Dk(k)*II(k,g,h)
+!              END DO
+!          END DO
+!        END DO
       END DO
     END DO
+
+    WRITE(*,*) "---------"
 
   END SUBROUTINE clmXX
 

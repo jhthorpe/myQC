@@ -563,8 +563,9 @@ MODULE aux
     REAL(KIND=8) :: tol
     INTEGER :: N,L,M,Nmax,Lmax,Mmax,ori
     INTEGER :: i,j,orba,orbb
+    LOGICAL :: flag
    
-    tol = 0.2D-15
+    tol = 0.1D-15
  
     !go through orbitals of set a 
     DO i=0, seta(0)-1
@@ -599,11 +600,20 @@ MODULE aux
         Lmax = ll(1) + rr(1)
         Mmax = ll(2) + rr(2)
 
+       flag = .FALSE.
+
+        IF (orba .EQ. 0 .AND. orbb .EQ. 2) THEN
+          WRITE(*,*) "orb: 0,2"
+          flag = .TRUE.
+        END IF
         DO M=0,Mmax
+          IF (flag) WRITE(*,*) "m,coef",M,coef(2,M,ll(2),rr(2))
           IF (ABS(coef(2,M,ll(2),rr(2))) .LT. tol) CYCLE 
           DO L=0,Lmax
+            IF (flag) WRITE(*,*) "l,coef",L,coef(1,L,ll(1),rr(1))
             IF (ABS(coef(1,L,ll(1),rr(1))) .LT. tol) CYCLE
             DO N=0,Nmax
+              IF (flag) WRITE(*,*) "N,coef",N,coef(0,N,ll(0),rr(0))
               IF (ABS(coef(0,N,ll(0),rr(0))) .LT. tol) THEN
                 CYCLE
               ELSE
