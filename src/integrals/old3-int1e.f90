@@ -259,8 +259,6 @@ PROGRAM int1e
         END IF 
 
         kmax = -1
-
-        IF (options(7) .GE. 3) WRITE(*,*) "seta, setb", a, b
   
         CALL getcoef(coef,PA,PB,aa,bb,amax,bmax) 
         CALL getDk(coef,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
@@ -273,11 +271,9 @@ PROGRAM int1e
         CALL kinetic(F,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,coef,&
         setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ)
 
-        CALL coulomb(F,u,v,p,la,lb,PP,atoms,Dk,Ck,Ok,kmax)
-
-!        CALL OLD(F,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,PP,&
-!        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,&
-!        atoms,EIJ,coef,setl,setl,la,lb)
+        CALL coulomb(F,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,PP,&
+        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,&
+        atoms,EIJ,coef,setl,setl,la,lb)
 
         DEALLOCATE(coef)
 
@@ -344,68 +340,66 @@ PROGRAM int1e
     IMPLICIT NONE
 
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
-     ! Values
-     ! S         : 2D dp, overlap matrix
-     ! a,b       : int, set number we're on
-     ! la,lb     : 1D int, angular quantum numbers 
-     ! ta,tb     : int, tracking a and b
-     ! basa,basb : 1D dp, array of basis set weights for sets a and b
-     ! seta,setb : 1D int, array of setinfo for sets a and b
- 
-     ! Inout
-     REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S
-     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa, basb
-     INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo, seta, setb
-     REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
-     INTEGER, INTENT(IN) :: u, v, a, b
- 
-     ! internal
-     INTEGER, DIMENSION(0:2) :: la,lb
-     REAL(KIND=8) :: temp
-     INTEGER :: i,j,k,orba,orbb,ori,prima,primb
- 
-     !update each element in set
-     DO i=0,seta(0)-1 !go through set A
-       orba = seta(3+i) !id of orbital
- 
-       DO j=0,setb(0)-1 !go through set B
-         orbb = setb(3+j) !id of orbital
- 
-         ! get angular quantum numbers for each orbital 
-         ori = basinfo(1+5*orba+3)
-         !S-TYPE
-         IF (ori .EQ. -1) THEN
-           la = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)]
-         !P-TYPE
-         ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
-           la = [0, 0, 0]
-           la(ori) = basinfo(1+5*orba+2)
-         END IF
- 
-         ori = basinfo(1+5*orbb+3)
-         !S-TYPE
-         IF (ori .EQ. -1) THEN
-           lb = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)]
-         !P-TYPE
-         ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
-           lb = [0,0,0]
-           lb(ori) = basinfo(1+5*orbb+2)
-         END IF
- 
-         ! update Suv 
-         temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
-         temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
-         temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
-         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
-         
- 
-         S(orba,orbb) = S(orba,orbb) + temp
- 
 
-       END DO
-     END DO
+    ! Values
+    ! S		: 2D dp, overlap matrix
+    ! a,b	: int, set number we're on
+    ! la,lb	: 1D int, angular quantum numbers 
+    ! ta,tb	: int, tracking a and b
+    ! basa,basb	: 1D dp, array of basis set weights for sets a and b
+    ! seta,setb	: 1D int, array of setinfo for sets a and b
+    
+    ! Inout
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa, basb
+    INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo, seta, setb
+    REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
+    INTEGER, INTENT(IN) :: u, v, a, b
 
+    ! internal
+    INTEGER, DIMENSION(0:2) :: la,lb
+    REAL(KIND=8) :: temp
+    INTEGER :: i,j,k,orba,orbb,ori,prima,primb
+
+    !update each element in set
+    DO i=0,seta(0)-1 !go through set A
+      orba = seta(3+i) !id of orbital
+
+      DO j=0,setb(0)-1 !go through set B
+        orbb = setb(3+j) !id of orbital
+
+        ! get angular quantum numbers for each orbital 
+        ori = basinfo(1+5*orba+3)
+        !S-TYPE
+        IF (ori .EQ. -1) THEN  
+          la = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+          la = [0, 0, 0]
+          la(ori) = basinfo(1+5*orba+2)
+        END IF
+
+        ori = basinfo(1+5*orbb+3)
+        !S-TYPE
+        IF (ori .EQ. -1) THEN 
+          lb = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
+          lb = [0,0,0]
+          lb(ori) = basinfo(1+5*orbb+2)
+        END IF
+
+        ! update Suv 
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
+        temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
+        temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
+        temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
+
+        S(orba,orbb) = S(orba,orbb) + temp
+        
+      END DO 
+    END DO
 
   END SUBROUTINE overlap
 
@@ -500,7 +494,7 @@ PROGRAM int1e
 !---------------------------------------------------------------------
 !	Calculate the coulomb potential of a gaussian of two orbitals
 !---------------------------------------------------------------------
-  SUBROUTINE coulomb(F,u,v,ap,lmaxA,lmaxB,PP,atoms,Dk,Ck,Ok,kmax)
+  SUBROUTINE coulomb(F,u,v,a,b,ap,basa,basb,basinfo,PP,seta,setb,aa,bb,atoms,EIJ,coef,lenA,lenB,lmaxA,lmaxB)
     IMPLICIT NONE
     ! Values
     ! F		: 2D dp, Fock matrix 
@@ -518,15 +512,17 @@ PROGRAM int1e
     ! lenA,lenB	: int, length of sets in A and B
     ! lmaxA	: 1D int, max ang quantum number of set A, B
     ! basa,basb	: 1D dp, array of basis set weights
-    ! foo	: int, dummy
 
     ! inout
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: F
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP,Dk
-    INTEGER, DIMENSION(0:), INTENT(IN) :: atoms,lmaxA,lmaxB,Ck,Ok
-    REAL(KIND=8), INTENT(IN) :: ap
-    INTEGER, INTENT(IN) :: u,v,kmax 
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa,basb
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP
+    INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb, atoms, lmaxA, lmaxB
+    REAL(KIND=8), INTENT(IN) :: aa, bb, ap, EIJ
+    INTEGER, INTENT(IN) :: u, v, a, b, lenA, lenB
     
     !internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
@@ -535,10 +531,7 @@ PROGRAM int1e
     REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj,CP
     INTEGER, DIMENSION(0:2) :: na, nb
     REAL(KIND=8) :: temp,val,TT,hmm
-    INTEGER :: Nmax,Lmax,Mmax,nnuc,dummy,orba,orbb,foo
-    INTEGER :: c,p,i,j,k,N,L,M
-
-!    WRITE(*,*) "NEW..."
+    INTEGER :: c,p,i,j,k,N,L,M,Nmax,Lmax,Mmax,nnuc,dummy,ori,orba,orbb
 
     val = 0.0D0
     nnuc = SIZE(atoms)
@@ -583,129 +576,6 @@ PROGRAM int1e
          END DO
        END DO
      
-      ! WORK NOTE - check that below is correct 
-      DO i=0,Nmax
-        DO j=0,Lmax
-          DO k=0,Mmax
-            CALL RNLMj(-CP(0),-CP(1),-CP(2),i,j,k,0,ap,Fj,Rtab,Rbol)
-          END DO
-        END DO
-      END DO
-
-      temp = 0.0D0
-
-      !loop over nonzero coefficients
-      DO k=0,kmax
-        foo = Ck(k) 
-        N = foo/300
-        foo = foo - N*300
-        L = foo/20
-        M = foo - L*20
-        temp = atoms(c)*(2.0D0*Pi/ap)*Rtab(N,L,M,0)*Dk(k)
-        orba = Ok(2*k)
-        orbb = Ok(2*k+1)
-        F(orba,orbb) = F(orba,orbb) - temp
-!        WRITE(*,*) "orba, orbb", orba,orbb
-!        WRITE(*,*) "k,kmax", k,kmax
-!        WRITE(*,*) "N,M,L",N,L,M
-!        WRITE(*,*) "Dk", Dk(k)
-!        WRITE(*,*) "temp", temp
-      END DO
-    END DO                               ! end nuclei loop
-
-    DEALLOCATE(Fj)
-    DEALLOCATE(CP)
-    DEALLOCATE(Rtab)
-    DEALLOCATE(Rbol)
-    DEALLOCATE(nucpos)
-
-  END SUBROUTINE coulomb
-!---------------------------------------------------------------------
-  SUBROUTINE OLD(F,u,v,a,b,ap,basa,basb,basinfo,PP,seta,setb,aa,bb,atoms,EIJ,coef,lenA,lenB,lmaxA,lmaxB)
-    IMPLICIT NONE
-    ! Values
-    ! F         : 2D dp, Fock matrix 
-    ! T         : dp, input to RNLMj
-    ! ap        : dp, alpha of overlap gausian
-    ! Rtab      : 4D dp, table of RNLM values
-    ! Rbol      : 4D dp, table input to RNLMj
-    ! nb,na     : 1D int, angular momentum values for b and a, {n,l,m} 
-    ! nucpos    : 2D dp, list of nuclear positions
-    ! PP        : 1D dp, list of overlap x,y,z
-    ! CP        : 1D dp, line segment between nucleus C and overlap PP
-    ! Fj        : 1D dp, table of Boys integral 
-    ! EIJ       : dp, correction of combining two gaussians
-    ! coef      : 4D dp, table of guassian coefficients from overlap 
-    ! lenA,lenB : int, length of sets in A and B
-    ! lmaxA     : 1D int, max ang quantum number of set A, B
-    ! basa,basb : 1D dp, array of basis set weights
-
-    ! inout
-    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
-    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: F
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa,basb
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP
-    INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo
-    INTEGER, DIMENSION(0:), INTENT(IN) :: seta, setb, atoms, lmaxA, lmaxB
-    REAL(KIND=8), INTENT(IN) :: aa, bb, ap, EIJ
-    INTEGER, INTENT(IN) :: u, v, a, b, lenA, lenB
-
-    !internal
-    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
-    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: Rbol
-    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: nucpos
-    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Fj,CP
-    INTEGER, DIMENSION(0:2) :: na, nb
-    REAL(KIND=8) :: temp,val,TT,hmm
-    INTEGER :: c,p,i,j,k,N,L,M,Nmax,Lmax,Mmax,nnuc,dummy,ori,orba,orbb
-
-    WRITE(*,*) "-----------"
-    WRITE(*,*) "OLD..."
-
-    val = 0.0D0
-    nnuc = SIZE(atoms)
-
-    Nmax = lmaxA(0) + lmaxB(0)
-    Lmax = lmaxA(1) + lmaxB(1)
-    Mmax = lmaxA(2) + lmaxB(2)
-
-    ALLOCATE(Fj(0:Nmax+Lmax+Mmax))
-    ALLOCATE(CP(0:2))
-    ALLOCATE(Rtab(-2:Nmax,-2:Lmax,-2:Mmax,0:Nmax+Lmax+Mmax))
-    ALLOCATE(Rbol(-2:Nmax,-2:Lmax,-2:Mmax,0:Nmax+Lmax+Mmax))
-    ALLOCATE(nucpos(0:nnuc-1,0:2))
-
-    ! get nuclear positions
-    OPEN(unit=1,file='nucpos',status='old',access='sequential')
-    DO c=0,nnuc-1
-      READ(1,*) dummy, nucpos(c,0:2)
-    END DO
-    CLOSE(unit=1)
-
-    DO c=0,nnuc-1                         ! loop through atoms
-
-      DO i=0,2                            ! construct PC
-        CP(i) = nucpos(c,i) - PP(i)
-      END DO
-      TT = ap*(CP(0)**2.0D0 + CP(1)**2.0D0 + CP(2)**2.0D0)
-
-      DO i=0,Nmax+Lmax+Mmax               ! get Boys table
-        Fj(i) = 0.0D0
-      END DO
-      CALL Boys(Fj,Nmax+Lmax+Mmax,TT)
-
-       DO i=-2,Nmax
-         DO j=-2,Lmax
-           DO k=-2,Mmax
-             DO p=0,Nmax+Lmax+Mmax
-               Rtab(i,j,k,p) = 0.0D0
-               Rbol(i,j,k,p) = .FALSE.
-             END DO
-           END DO
-         END DO
-       END DO
-
       ! WORK NOTE - check that it is correct to use ABS here with the weird directions of the kinetic integrals
       DO i=0,Nmax
         DO j=0,Lmax
@@ -728,56 +598,44 @@ PROGRAM int1e
 
           temp = 0.0D0
           val = 0.0D0
-
+ 
           !get ang max for each orbital within set
-          ori = basinfo(1+5*orba+3)
+          ori = basinfo(1+5*orba+3) 
           !S-TYPE
-          IF (ori .EQ. -1) THEN
-           na = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)]
+          IF (ori .EQ. -1) THEN  
+           na = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)] 
           !P-TYPE
-          ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+          ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
             na = [0, 0, 0]
             na(ori) = basinfo(1+5*orba+2)
           END IF
 
           ori = basinfo(1+5*orbb+3)
           !S-TYPE
-          IF (ori .EQ. -1) THEN
-            nb = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)]
+          IF (ori .EQ. -1) THEN  
+            nb = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)] 
           !P-TYPE
-          ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+          ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN 
             nb = [0,0,0]
             nb(ori) = basinfo(1+5*orbb+2)
           END IF
-
-          WRITE(*,*) "orba, orbb", orba,orbb
 
           ! loop over all possible solutions
           DO N=0,na(0)+nb(0)
             DO L=0, na(1)+nb(1)
               DO M=0,na(2)+nb(2)
-                temp = Rtab(N,L,M,0) 
-                temp = temp * coef(0,N,na(0),nb(0))*coef(1,L,na(1),nb(1))*coef(2,M,na(2),nb(2))
-                temp = temp * (2.0D0*Pi/ap)                     !from Boys
-                temp = temp * basa(i)*basb(j)                   !basis set weights
-!                temp = temp * gtoD(basinfo(1+5*orba+2),aa)      !primative constants
-!                temp = temp * gtoD(basinfo(1+5*orbb+2),bb)      !primative constants
-                temp = temp * atoms(c)!*EIJ                      !proton number and overlap coefficient
-                IF (temp .NE. 0.0D0) THEN
-                  WRITE(*,*) "N,L,M", N,L,M 
-                  WRITE(*,*) "temp", temp
-                  WRITE(*,*) "-----"
-                END IF
+                temp = temp + coef(0,N,na(0),nb(0))*coef(1,L,na(1),nb(1))*coef(2,M,na(2),nb(2))*Rtab(N,L,M,0)
               END DO
             END DO
           END DO
 
-!          temp = temp * (2.0D0*Pi/ap)                     !from Boys
-!          temp = temp * basa(i)*basb(j)                   !basis set weights
-!          temp = temp * gtoD(basinfo(1+5*orba+2),aa)      !primative constants
-!          temp = temp * gtoD(basinfo(1+5*orbb+2),bb)      !primative constants
-!          temp = temp * atoms(c)*EIJ                      !proton number and overlap coefficient
-!          F(orba,orbb) = F(orba,orbb) - temp
+          temp = temp * (2.0D0*Pi/ap)                     !from Boys
+          temp = temp * basa(i)*basb(j)                   !basis set weights
+          temp = temp * gtoD(basinfo(1+5*orba+2),aa)      !primative constants
+          temp = temp * gtoD(basinfo(1+5*orbb+2),bb)      !primative constants
+          temp = temp * atoms(c)*EIJ                      !proton number and overlap coefficient
+          
+          F(orba,orbb) = F(orba,orbb) - temp
 
         END DO                           ! end loop over B
       END DO                             ! end loop over A
@@ -789,6 +647,7 @@ PROGRAM int1e
     DEALLOCATE(Rbol)
     DEALLOCATE(nucpos)
 
-  END SUBROUTINE OLD
+  END SUBROUTINE coulomb
+!---------------------------------------------------------------------
 
 END PROGRAM int1e

@@ -611,6 +611,7 @@ MODULE aux
                 Ck(kmax) = 300*N + 20*L + 1*M
                 Dk(kmax) = coef(0,N,ll(0),rr(0))*coef(1,L,ll(1),rr(1))*coef(2,M,ll(2),rr(2))
                 Dk(kmax) = Dk(kmax)*EIJ*gtoD(basinfo(1+5*orba+2),aa)*gtoD(basinfo(1+5*orbb+2),bb) 
+                Dk(kmax) = Dk(kmax)*basa(i)*basb(j)
                 Ok(2*kmax) = orba
                 Ok(2*kmax+1) = orbb
               END IF
