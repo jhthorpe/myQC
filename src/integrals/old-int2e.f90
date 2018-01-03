@@ -239,7 +239,7 @@ PROGRAM int2e
             END DO
    
             CALL clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,&
-            setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl),setl,Okp)
+            setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl),setl)
 
              DEALLOCATE(coefCD)
 
@@ -248,7 +248,7 @@ PROGRAM int2e
 
         !use XX to get II 
         CALL clmXX(XX,II,norb,Dk,kmaxAB,&
-        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),setl,Ok)
+        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),setl)
 
         DEALLOCATE(coefAB)
 
@@ -266,7 +266,7 @@ PROGRAM int2e
         DO j=0,norb-1
           DO g=0,norb-1
             DO h=0,norb-1
-              WRITE(*,996) i+1,j+1,g+1,h+1,XX(i,j,g,h)
+              WRITE(*,996) i,j,g,h,XX(i,j,g,h)
             END DO
           END DO
         END DO
@@ -296,7 +296,7 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 !		Generates intermediate II for electron repulsion	
 !---------------------------------------------------------------------
-  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,setc,setd,setl,Okp)
+  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,setc,setd,setl)
              
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -317,7 +317,7 @@ PROGRAM int2e
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(INOUT) :: II
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ, Dk,Dkp
-    INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,setc,setd,Okp 
+    INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,setc,setd 
     INTEGER, DIMENSION(0:), INTENT(IN) :: la,lb,lc,ld
     REAL(KIND=8), INTENT(IN) :: p,q
     INTEGER, INTENT(IN) :: kmaxAB,kmaxCD,setl
@@ -359,30 +359,37 @@ PROGRAM int2e
       END DO
     END DO
 
+    !setup the intermediate array
+    DO g=0,setc(0)-1
+      orbc = setc(3+g)
 
-    !loop over k'
-    DO kp=0,kmaxCD
-      foo = Ckp(kp)
-      Np = foo/300
-      foo = foo - Np*300
-      Lp = foo/20
-      Mp = foo - Lp*20
-      orbc = Okp(2*kp) 
-      orbd = Okp(2*kp+1)
+      DO h=0,setd(0)-1
+        orbd = setd(3+h)
 
-      DO k=0,kmaxAB
-        foo = Ck(k)
-        N = foo/300
-        foo = foo - N*300
-        L = foo/20
-        M = foo - L*20
+        !loop over k'
+        DO kp=0,kmaxCD
+          foo = Ckp(kp)
+          Np = foo/300
+          foo = foo - Np*300
+          Lp = foo/20
+          Mp = foo - Lp*20
+         
+          DO k=0,kmaxAB
+            foo = Ck(k)
+            N = foo/300
+            foo = foo - N*300
+            L = foo/20
+            M = foo - L*20
             
-        CALL RNLMj(PQ(0),PQ(1),PQ(2),N+Np,L+Lp,M+Mp,0,p*q/(p+q),Fj,Rtab,Rbol)
-        II(k,orbc,orbd) = II(k,orbc,orbd) + (-1)**(Np+Lp+Mp)*&
-        ll*Dkp(kp)*Rtab(N+Np,L+Lp,M+Mp,0)
+           CALL RNLMj(PQ(0),PQ(1),PQ(2),N+Np,L+Lp,M+Mp,0,p+q,Fj,Rtab,Rbol)
 
-      END DO                                        !end loop over k
-    END DO                                          !end loop over kp
+           II(k,orbc,orbd) = II(k,orbc,orbd) + (-1)**(Np+Lp+Mp)*&
+           ll*Dkp(kp)*Rtab(N+Np,L+Lp,M+Mp,0)
+
+          END DO                                        !end loop over k
+        END DO                                          !end loop over kp
+      END DO                                            !end loop over h
+    END DO                                              !end loop over g
 
     DEALLOCATE(Fj)
     DEALLOCATE(Rtab)
@@ -393,7 +400,7 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 !		Generates XX orbitals for electron repulsion	
 !---------------------------------------------------------------------
-  SUBROUTINE clmXX(XX,II,norb,Dk,kmax,seta,setb,setl,Ok)
+  SUBROUTINE clmXX(XX,II,norb,Dk,kmax,seta,setb,setl)
     IMPLICIT NONE
 
     ! Values
@@ -409,7 +416,7 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:), INTENT(INOUT) :: XX
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: II
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: Dk
-    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb,Ok
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb
     INTEGER, INTENT(IN) :: norb,setl,kmax
 
     !Internal
@@ -418,11 +425,15 @@ PROGRAM int2e
 
     DO h=0,norb-1
       DO g=0,norb-1
-        DO k=0,kmax
-          i = Ok(2*k)
-          j = Ok(2*k+1)
-          XX(i,j,g,h) = XX(i,j,g,h) + Dk(k)*II(k,g,h)
-        END DO 
+        DO j=0,setb(0)-1
+          orbb = setb(3+j)
+          DO i=0,seta(0)-1
+            orba = seta(3+i)
+            DO k=0,kmax
+              XX(orba,orbb,g,h) = XX(orba,orbb,g,h) + II(k,g,h)*Dk(k)
+            END DO
+          END DO
+        END DO
       END DO
     END DO
 

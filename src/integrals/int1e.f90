@@ -260,7 +260,7 @@ PROGRAM int1e
 
         kmax = -1
 
-        IF (options(7) .GE. 3) WRITE(*,*) "seta, setb", a, b
+!        IF (options(7) .GE. 3) WRITE(*,*) "seta, setb", a, b
   
         CALL getcoef(coef,PA,PB,aa,bb,amax,bmax) 
         CALL getDk(coef,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
