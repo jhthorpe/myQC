@@ -180,8 +180,6 @@ PROGRAM int2e
         v = setinfo(1+b*setl+3)
         lb(0:2) = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
 
-        WRITE(*,*) "seta,setb", a, b
-
         !zero II
         DO k=0,setK
           DO g=0,norb-1
@@ -202,15 +200,10 @@ PROGRAM int2e
 
         kmaxAB = -1
 
-        CALL getcoef(coefAB,PA,PB,aa,bb,la,lb+2)
+        CALL getcoef(coefAB,PA,PB,aa,bb,la,lb+2)  !I do not understand why this +2 is needed :)
         CALL getDk(coefAB,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
         bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,Dk,Ck,Ok,kmaxAB,EIJ,setl,aa,bb)
 
-!CCCCCCCCCC
-!        WRITE(*,*) "-----------"
-!        DEALLOCATE(coefAB)
-!        CYCLE !WORK NOTE - TESTING
-!CCCCCCCCCC
         !"sum" over c,d sets
         DO c=0,nset-1
           cc = set(c)                            !alpha c
@@ -236,13 +229,14 @@ PROGRAM int2e
      
             kmaxCD = -1
 
-            CALL getcoef(coefCD,QC,QD,cc,dd,lc,ld)
+            CALL getcoef(coefCD,QC,QD,cc,dd,lc,ld+2)  !Another black magic +2 
             CALL getDk(coefCD,setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl), &
             bas(c*OpS:(c+1)*Ops-1),bas(d*Ops:(d+1)*OpS-1),basinfo,Dkp,Ckp,Okp,kmaxCD,EGH,setl,cc,dd)
 
             ! get overlap of overlaps 
             DO i=0,2
               PQ(i) = PP(i) - QQ(i)
+!              PQ(i) = -(PP(i) - QQ(i))
             END DO
    
             CALL clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,&
@@ -428,24 +422,9 @@ PROGRAM int2e
           i = Ok(2*k)
           j = Ok(2*k+1)
           XX(i,j,g,h) = XX(i,j,g,h) + Dk(k)*II(k,g,h)
-          IF (i .EQ. 0 ) THEN
-            WRITE(*,*) "i,j,g,h", i,j,g,h
-            WRITE(*,*) "II", II(k,g,h)
-          END IF 
         END DO 
-!        DO j=0,setb(0)-1
-!          orbb = setb(3+j)
-!          DO i=0,seta(0)-1
-!            orba = seta(3+i)
-!              DO k=0,kmax
-!                XX(orba,orbb,g,h) = XX(orba,orbb,g,h) + Dk(k)*II(k,g,h)
-!              END DO
-!          END DO
-!        END DO
       END DO
     END DO
-
-    WRITE(*,*) "---------"
 
   END SUBROUTINE clmXX
 
