@@ -600,6 +600,7 @@ MODULE aux
         Mmax = ll(2) + rr(2)
 
         DO M=0,Mmax
+          IF (ABS(coef(2,M,ll(2),rr(2))) .LT. tol) CYCLE
           DO L=0,Lmax
             IF (ABS(coef(1,L,ll(1),rr(1))) .LT. tol) CYCLE
             DO N=0,Nmax
