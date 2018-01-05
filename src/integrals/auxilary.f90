@@ -342,5 +342,317 @@ MODULE aux
   END FUNCTION dfactR8
 
 !---------------------------------------------------------------------
+!               Calculate coefficients of overlap Gaussians 
+!---------------------------------------------------------------------
+  SUBROUTINE getcoef(M,PA,PB,aa,bb,amax,bmax)
+    IMPLICIT NONE
+
+    ! M         : 2D dp, coefficient matrix d_{i}^{j,k} = M(0,i,j,k)
+    ! PA        : 1D dp, (xa,ya,za) distance from central gaussian
+    ! PB        : 1D dp, (xb,yb,zb) distance from central gaussian
+    ! aa        : dp, coefficient of atom A 
+    ! bb        : dp, coefficient of atom B
+    ! amax      : 1D int, max angular quantum number of A needed
+    ! amax      : 1D int, max angular quantum number of B needed
+    ! nmax      : int, max total quantum number needed
+    ! nn        : int, total number of elements
+    ! fmat      : 3D dp, boolean array, tracks what has been calculated 
+
+    ! Inout
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:), INTENT(INOUT) :: M
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    INTEGER, DIMENSION(0:2), INTENT(IN) :: amax, bmax
+    REAL(KIND=8), INTENT(IN) :: aa,bb
+
+    ! Internal
+    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: fmat
+    INTEGER, DIMENSION(0:2) :: nmax,nn
+    REAL(KIND=8) :: pp
+    INTEGER :: l,i,j,k
+
+    pp = aa+bb
+    nmax = [amax(0)+bmax(0),amax(1)+bmax(1),amax(2)+bmax(2)]
+
+    ALLOCATE(M(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
+    ALLOCATE(fmat(0:2,-2:MAXVAL(amax)+MAXVAL(bmax),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
+
+    !initialize coefficient matrices
+    DO l=0,2
+      DO i=-2,MAXVAL(amax)+MAXVAL(bmax)
+        DO j=-2,MAXVAL(amax)+2
+          DO k=-2,MAXVAL(bmax)+2
+            M(l,i,j,k) = 0.0D0
+            fmat(l,i,j,k) = .FALSE.
+          END DO
+        END DO
+      END DO
+    END DO
+
+    ! call recursive function on top
+    DO l=0,2
+      CALL lrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
+      CALL rrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
+    END DO
+
+    DEALLOCATE (fmat)
+
+  END SUBROUTINE getcoef
+
+!---------------------------------------------------------------------
+!       Left side (A) recursion on coefficients Hermite Gaussians
+!---------------------------------------------------------------------
+  RECURSIVE SUBROUTINE lrec(M,l,i,j,k,PA,PB,pp,fmat)
+    IMPLICIT NONE
+
+    ! M         : 4D dp, matrix of coefficients
+    ! i,j,k     : int, index of coefficient we need. i=N,j=n,k=nbar
+    ! l         : int, coordinite of coefficient we need 0=x,1=y,2=z)
+    ! PA, PB    : 1D dp, list of x,y,z distances of atoms A,B from P
+    ! fmat      : 3D dp, list of which values we already have
+    ! pp        : dp, value of sum of coefficients
+
+    ! INOUT
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: M
+    LOGICAL, DIMENSION(0:,-2:,-2:,-2:),INTENT(INOUT) :: fmat
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    REAL(KIND=8), INTENT(IN) :: pp
+    INTEGER, INTENT(IN) :: i,j,k,l
+
+    ! 1) base cases
+    ! check if we've already seen this point 
+    IF (fmat(l,i,j,k)) THEN
+      RETURN
+    END IF
+    ! check for "bad" points
+    IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+      M(l,i,j,k) = 0.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ! check for d000 base case
+    ELSE IF (i .EQ. 0 .AND. j .EQ. 0 .AND. k .EQ. 0) THEN
+      M(l,i,j,k) = 1.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    END IF
+
+    ! 2) non-base case
+    IF (j .LE. k) THEN                        ! go right
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ELSE IF (j .GT. k) THEN                   ! go left
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ELSE
+      WRITE(*,*) "Somehow you broke this at:", i,j,k
+      STOP "error in lrec"
+    END IF
+
+  END SUBROUTINE lrec
+
+!---------------------------------------------------------------------
+!       Right side (B) recursion on coefficients of Hermite Gaussians
+!---------------------------------------------------------------------
+  RECURSIVE SUBROUTINE rrec(M,l,i,j,k,PA,PB,pp,fmat)
+    IMPLICIT NONE
+
+    ! M         : 4D dp, matrix of coefficients
+    ! i,j,k     : int, index of coefficient we need. i=N,j=n,k=nbar
+    ! l         : int, coordinate we need (0=x,1=y,2=z)
+    ! PA, PB    : 1D dp, list of x,y,z distances of atoms A,B from P
+    ! fmat      : 3D dp, list of which values we already have
+    ! pp        : dp, value of sum of coefficients
+
+    ! INOUT
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: M
+    LOGICAL, DIMENSION(0:,-2:,-2:,-2:), INTENT(INOUT) :: fmat
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    REAL(KIND=8), INTENT(IN) :: pp
+    INTEGER, INTENT(IN) :: i,j,k,l
+
+    ! 1) base cases
+    ! check if we've seen before 
+    IF (fmat(l,i,j,k)) THEN
+      RETURN
+    END IF
+    ! check for "bad" points 
+    IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+      M(l,i,j,k) = 0.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ! check for d000 base case
+    ELSE IF (i .EQ. 0 .AND. j .EQ. 0 .AND. k .EQ. 0) THEN
+      M(l,i,j,k) = 1.0D0
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    END IF
+
+    ! 2) non-base case 
+    IF (j .LE. k) THEN
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j,k-1)/(2.0D0*pp) + PB(l)*M(l,i,j,k-1) + (i+1)*M(l,i+1,j,k-1)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ! otherwise, lower j (doesn't really matter which way you do it)
+    ELSE IF (j .GT. k) THEN
+      CALL lrec(M,l,i-1,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i,j-1,k,PA,PB,pp,fmat)
+      CALL lrec(M,l,i+1,j-1,k,PA,PB,pp,fmat)
+      M(l,i,j,k) = M(l,i-1,j-1,k)/(2.0D0*pp) + PA(l)*M(l,i,j-1,k) + (i+1)*M(l,i+1,j-1,k)
+      CALL rrec(M,l,i-1,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i,j,k-1,PA,PB,pp,fmat)
+      CALL rrec(M,l,i+1,j,k-1,PA,PB,pp,fmat)
+      fmat(l,i,j,k) = .TRUE.
+      RETURN
+    ELSE
+      WRITE(*,*) "Somehow you broke this, i,j,k", i,j,k
+      STOP "error in rrec"
+    END IF
+
+  END SUBROUTINE rrec
+
+!---------------------------------------------------------------------
+!		Compute nonzero combinations of N,L,M in sets 
+!---------------------------------------------------------------------
+  SUBROUTINE getDk(coef,seta,setb,basa,basb,basinfo,Dk,Ck,Ok,kmax,EIJ,setl,aa,bb)
+    IMPLICIT NONE
+
+    !Values
+    ! coef	: 4D dp, matrix of coefficients
+    ! seta,b	: 1D int, setinfo for seta,setb
+    ! basa,b	: 1D dp, basis set weights for sets a,b 
+    ! basinfo	: 1D int, basinfo for sets a,b
+    ! Dk	: 1D dp, nonzero EIJ*Nk*Lk*Mk values
+    ! Ck	: 1D int, tracks Nk,Lk,Mk combinations 
+    ! Ok	: 1D int, gives orbs of the combination {left orb, right orb}
+    ! kmax	: int, max index of nonzero values
+    ! EIJ	: dp, preexponential value
+    ! setl	: int, length of set
+    ! ll,rr	: 1D int, left,right angular quantum numbers
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Dk
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa,basb
+    INTEGER, DIMENSION(0:), INTENT(INOUT) :: Ck,Ok
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb,basinfo
+    REAL(KIND=8), INTENT(IN) :: aa,bb,EIJ
+    INTEGER, INTENT(INOUT) :: kmax
+    INTEGER :: setl
+
+    !Internal
+    INTEGER, DIMENSION(0:2) :: ll,rr 
+    REAL(KIND=8) :: tol
+    INTEGER :: N,L,M,Nmax,Lmax,Mmax,ori
+    INTEGER :: i,j,orba,orbb
+   
+    tol = 0.1D-15
+ 
+    !go through orbitals of set a 
+    DO i=0, seta(0)-1
+      orba = seta(3+i)
+
+      ! get angular quantum numbers for each orbital 
+      ori = basinfo(1+5*orba+3)
+      !S-TYPE
+      IF (ori .EQ. -1) THEN
+        ll = [basinfo(1+5*orba+2),basinfo(1+5*orba+2),basinfo(1+5*orba+2)]
+      !P-TYPE
+      ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+        ll = [0, 0, 0]
+        ll(ori) = basinfo(1+5*orba+2)
+      END IF
+
+      !go through orbitals of set b
+      DO j=0, setb(0)-1
+        orbb = setb(3+j)
+
+        ori = basinfo(1+5*orbb+3)
+        !S-TYPE
+        IF (ori .EQ. -1) THEN
+          rr = [basinfo(1+5*orbb+2),basinfo(1+5*orbb+2),basinfo(1+5*orbb+2)]
+        !P-TYPE
+        ELSE IF (ori .GE. 0 .AND. ori .LE. 2) THEN
+          rr = [0,0,0]
+          rr(ori) = basinfo(1+5*orbb+2)
+        END IF
+
+        Nmax = ll(0) + rr(0)
+        Lmax = ll(1) + rr(1)
+        Mmax = ll(2) + rr(2)
+
+        DO M=0,Mmax
+          IF (ABS(coef(2,M,ll(2),rr(2))) .LT. tol) CYCLE
+          DO L=0,Lmax
+            IF (ABS(coef(1,L,ll(1),rr(1))) .LT. tol) CYCLE
+            DO N=0,Nmax
+              IF (ABS(coef(0,N,ll(0),rr(0))) .LT. tol) THEN
+                CYCLE
+              ELSE
+                kmax = kmax + 1
+                Ck(kmax) = 300*N + 20*L + 1*M
+                Dk(kmax) = coef(0,N,ll(0),rr(0))*coef(1,L,ll(1),rr(1))*coef(2,M,ll(2),rr(2))
+                Dk(kmax) = Dk(kmax)*EIJ*gtoD(basinfo(1+5*orba+2),aa)*gtoD(basinfo(1+5*orbb+2),bb) 
+                Dk(kmax) = Dk(kmax)*basa(i)*basb(j)
+                Ok(2*kmax) = orba
+                Ok(2*kmax+1) = orbb
+              END IF
+            END DO
+          END DO
+        END DO
+
+      END DO
+    END DO
+
+  END SUBROUTINE getDk
+
+!=====================================================================
+!                       FUNCTIONS
+
+!---------------------------------------------------------------------
+!       Generate coefficients of GTO basis sets 
+!---------------------------------------------------------------------
+  REAL(KIND=8) FUNCTION gtoD(l,a)
+    IMPLICIT NONE
+    
+    ! l         : int, angular momentum quantum number
+    ! a         : dp, coefficient
+    
+    ! Inout 
+    REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
+    REAL(KIND=8), INTENT(IN) :: a
+    INTEGER, INTENT(IN) :: l
+    
+    IF (l .EQ. 0) THEN
+      gtoD = (2.0D0*a/Pi)**(3.0D0/4.0D0)
+    ELSE IF (l .EQ. 1) THEN
+      gtoD = (128.0D0*(a**5.0D0)/(Pi**3.0D0))**(1.0D0/4.0D0)
+    ELSE IF (l .EQ. 2) THEN
+      gtoD = (2048.0D0*(a**7.0D0)/(9.0D0*Pi**(3.0D0)))**(1.0D0/4.0D0)
+    ELSE IF (l .GT. 2) THEN
+      WRITE(*,*) "this angular momentum not implimented yet"
+      STOP
+    END IF
+  
+  END FUNCTION gtoD
+!---------------------------------------------------------------------
 
 END MODULE aux

@@ -1,6 +1,6 @@
 
 STO-3G 				name of basis
-3  6  5  6			max sections, max coeficients, max orbitals, max sets
+3  6  5  9  3			max sections, max coeficients, max orbitals, max sets, max orbs per set
 2  1                            max principle QN, max angular QN
 
  H				atom
@@ -11,18 +11,18 @@ STO-3G 				name of basis
    0.4446345 0.1688554 2.0
 
  Li				atom
- 3 5 6				3 sections, 5 orbitals, 6 sets
+ 3 5 9				3 sections, 5 orbitals, 6 sets
  3 2 1 0 -1
    0.1543290 16.1195748 0.0
    0.5353281 2.9362007  1.0
    0.4446345 0.7946505  2.0
  3 2 2 0 -1
-   -0.0999672 0.6362897 0.0
-   0.3995128 0.1478601  1.0
-   0.7001155 0.0480887  2.0
+   -0.0999672 0.6362897 3.0
+   0.3995128 0.1478601  4.0
+   0.7001155 0.0480887  5.0
  3 2 2 1 2
-   0.1559163 0.6362897 0.0
-   0.6076837 0.1478601 1.0
-   0.3919574 0.0480887 2.0
+   0.1559163 0.6362897 6.0
+   0.6076837 0.1478601 7.0
+   0.3919574 0.0480887 8.0
 
 

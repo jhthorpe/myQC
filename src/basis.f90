@@ -73,7 +73,7 @@ MODULE basis
 999 FORMAT(2x,A8,2x,I2)
 998 FORMAT(2x,A6,2x,A2)
 997 FORMAT(4x,A4)
-996 FORMAT(4x,I2,1x,I2)
+996 FORMAT(4x,A2,I2,2x,A2,I2)
 995 FORMAT(4x,F15.8,1x,F15.8)
 
     IF (verb) WRITE(*,*) "getbasis called..."
@@ -120,7 +120,6 @@ MODULE basis
 
       IF (verb) WRITE(*,999) "Nuclei #", i+1
       IF (verb) WRITE(*,998) "Atom :", Aname
-      IF (verb) WRITE(*,997) "n l"
       
       !We are at atom, adjust basis stuff      
       READ(2,*) sec, orb, nset             !#sections, #orbitals, #sets
@@ -137,7 +136,7 @@ MODULE basis
         READ(2,*) func, coef, pri, ang, ori 
         ALLOCATE(val(0:coef-1))                        ! structure input array 
 
-        IF (verb) WRITE(*,996) pri, ang
+        IF (verb) WRITE(*,996) "n:",pri, "l:",ang
         
         !Primatives - Set updates
         DO k=0,func-1       

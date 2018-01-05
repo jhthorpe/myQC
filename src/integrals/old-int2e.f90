@@ -117,10 +117,10 @@ PROGRAM int2e
     INTEGER, DIMENSION(:), ALLOCATABLE :: Ck,Ckp,Ok,Okp
     INTEGER, DIMENSION(0:2) :: la,lb,lc,ld,na,nb,nc,nd
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
-    REAL(KIND=8) :: aa,bb,cc,dd,p,q,nn,mm
+    REAL(KIND=8) :: aa,bb,cc,dd,p,q
     INTEGER :: nset,setl,OpS,stat1,stat2,setK,kmaxAB,kmaxCD 
     INTEGER :: orba,orbb,orbc,orbd,norb
-    INTEGER :: a,b,c,d,g,h,i,j,k,s,t,u,v
+    INTEGER :: a,b,c,d,g,h,i,j,k,m,n,s,t,u,v
 
     CALL CPU_TIME(timeS)
 
@@ -173,12 +173,14 @@ PROGRAM int2e
       aa = set(a)                            !alpha a
       u = setinfo(1+a*setl+3)                !center number
       !max angular momentum
-      la(0:2) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
+      la(:) = [setinfo(1+a*setl+2),setinfo(1+a*setl+2),setinfo(1+a*setl+2)]
 
       DO b=0,nset-1      
         bb = set(b)                           !alpha b
         v = setinfo(1+b*setl+3)
-        lb(0:2) = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
+        lb = [setinfo(1+b*setl+2),setinfo(1+b*setl+2),setinfo(1+b*setl+2)] 
+
+        kmaxAB = -1
 
         !zero II
         DO k=0,setK
@@ -189,18 +191,16 @@ PROGRAM int2e
 
         !left overlap location
         p = aa + bb
-        mm = aa * bb
+        m = aa * bb
         DO i=0,2
           AB(i) = xyz(u,i) - xyz(v,i)
           PP(i) = (aa*xyz(u,i) + bb*xyz(v,i))/p
           PA(i) = PP(i) - xyz(u,i)
           PB(i) = PP(i) - xyz(v,i)
         END DO
-        EIJ = EXP(-mm*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p)
+        EIJ = EXP(-m*(AB(0)**2.0D0 + AB(1)**2.0D0 + AB(2)**2.0D0)/p)
 
-        kmaxAB = -1
-
-        CALL getcoef(coefAB,PA,PB,aa,bb,la+2,lb+2)  !I do not understand why this +2 is needed :)
+        CALL getcoef(coefAB,PA,PB,aa,bb,la,lb)
         CALL getDk(coefAB,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
         bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,Dk,Ck,Ok,kmaxAB,EIJ,setl,aa,bb)
 
@@ -208,37 +208,38 @@ PROGRAM int2e
         DO c=0,nset-1
           cc = set(c)                            !alpha c
           s = setinfo(1+c*setl+3)
-          lc(0:2) = [setinfo(1+c*setl+2),setinfo(1+c*setl+2),setinfo(1+c*setl+2)]
+          lc(:) = [setinfo(1+c*setl+2),setinfo(1+c*setl+2),setinfo(1+c*setl+2)]
 
           DO d=0,nset-1
             dd = set(d)                          !alpha d
             t = setinfo(1+d*setl+3)
-            ld(0:2) = [setinfo(1+d*setl+2),setinfo(1+d*setl+2),setinfo(1+d*setl+2)]
+            ld(:) = [setinfo(1+d*setl+2),setinfo(1+d*setl+2),setinfo(1+d*setl+2)]
 
             !Right overlap location
             q = cc + dd
-            nn = cc * dd
-            DO j=0,2
-              CD(j) = xyz(s,j) - xyz(t,j)
-              QQ(j) = (cc*xyz(s,j) + dd*xyz(t,j))/q
-              QC(j) = QQ(j) - xyz(s,j)
-              QD(j) = QQ(j) - xyz(t,j)
+            n = cc * dd
+            DO i=0,2
+              CD(i) = xyz(s,i) - xyz(t,i)
+              QQ(i) = (cc*xyz(s,i) + dd*xyz(t,i))/q
+              QC(i) = QQ(i) - xyz(s,i)
+              QD(i) = QQ(i) - xyz(t,i)
             END DO
-            EGH = EXP(-nn*(CD(0)**2.0D0 + CD(1)**2.0D0 + CD(2)**2.0D0)/q)
+            EGH = EXP(-n*(CD(0)**2.0D0 + CD(1)**2.0D0 + CD(2)**2.0D0)/q)
             IF (EGH * EIJ .LT. 1.0D-14) CYCLE    
      
             kmaxCD = -1
 
-            CALL getcoef(coefCD,QC,QD,cc,dd,lc+2,ld+2)  !Another black magic +2 
+            CALL getcoef(coefCD,QC,QD,cc,dd,lc,ld)
             CALL getDk(coefCD,setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl), &
             bas(c*OpS:(c+1)*Ops-1),bas(d*Ops:(d+1)*OpS-1),basinfo,Dkp,Ckp,Okp,kmaxCD,EGH,setl,cc,dd)
 
             ! get overlap of overlaps 
-            DO j=0,2
-              PQ(j) = PP(j) - QQ(j)
+            DO i=0,2
+              PQ(i) = PP(i) - QQ(i)
             END DO
    
-            CALL clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Okp)
+            CALL clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,&
+            setinfo(1+c*setl+1:1+(c+1)*setl),setinfo(1+d*setl+1:1+(d+1)*setl),setl)
 
              DEALLOCATE(coefCD)
 
@@ -247,7 +248,7 @@ PROGRAM int2e
 
         !use XX to get II 
         CALL clmXX(XX,II,norb,Dk,kmaxAB,&
-        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),setl,Ok)
+        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),setl)
 
         DEALLOCATE(coefAB)
 
@@ -265,7 +266,7 @@ PROGRAM int2e
         DO j=0,norb-1
           DO g=0,norb-1
             DO h=0,norb-1
-              IF (XX(i,j,g,h) .NE. 0.0D0) WRITE(*,996) i+1,j+1,g+1,h+1,XX(i,j,g,h)
+              WRITE(*,996) i,j,g,h,XX(i,j,g,h)
             END DO
           END DO
         END DO
@@ -283,7 +284,7 @@ PROGRAM int2e
 
     !reassign memory
     fmem = fmem + (norb**(4))*8.0/1.0E6
-    fmem = fmem + setK*norb*norb*8.0D0/1.0E6
+    fmem = fmem + (2*setK)*norb*norb*8.0D0/1.0E6
     CALL nmem(fmem)
 
     CALL CPU_TIME(timeF) 
@@ -295,7 +296,7 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 !		Generates intermediate II for electron repulsion	
 !---------------------------------------------------------------------
-  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Okp)
+  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,setc,setd,setl)
              
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -315,11 +316,11 @@ PROGRAM int2e
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(INOUT) :: II
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ,Dk,Dkp
-    INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,Okp 
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ, Dk,Dkp
+    INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,setc,setd 
     INTEGER, DIMENSION(0:), INTENT(IN) :: la,lb,lc,ld
     REAL(KIND=8), INTENT(IN) :: p,q
-    INTEGER, INTENT(IN) :: kmaxAB,kmaxCD
+    INTEGER, INTENT(IN) :: kmaxAB,kmaxCD,setl
 
     !Internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Rtab
@@ -339,7 +340,7 @@ PROGRAM int2e
     ALLOCATE(Rbol(-2:Nmax,-2:Lmax,-2:Mmax,0:Nmax+Lmax+Mmax))
  
     !new overlap values
-    ll = 2*Pi**(2.5D0)/(p*q*SQRT(p+q)) 
+    ll = 2*Pi**(5.0D0/2.0D0)/(p*q*(p+q)**(0.5D0)) 
     TT = p*q*(PQ(0)**2.0D0 + PQ(1)**2.0D0 + PQ(2)**2.0D0)/(p+q) 
 
     !get Boys Table
@@ -358,31 +359,37 @@ PROGRAM int2e
       END DO
     END DO
 
-    !loop over k'
-    DO kp=0,kmaxCD
-      foo = Ckp(kp)
-      Np = foo/300
-      foo = foo - Np*300
-      Lp = foo/20
-      Mp = foo - Lp*20
-      orbc = Okp(2*kp) 
-      orbd = Okp(2*kp+1)
+    !setup the intermediate array
+    DO g=0,setc(0)-1
+      orbc = setc(3+g)
 
-      !loop over k
-      DO k=0,kmaxAB
-        foo = Ck(k)
-        N = foo/300
-        foo = foo - N*300
-        L = foo/20
-        M = foo - L*20
-           
-        CALL RNLMj(PQ(0),PQ(1),PQ(2),N+Np,L+Lp,M+Mp,0,p*q/(p+q),Fj,Rtab,Rbol)
+      DO h=0,setd(0)-1
+        orbd = setd(3+h)
 
-        II(k,orbc,orbd) = II(k,orbc,orbd) + (-1)**(Np+Lp+Mp)*&
-        ll*Dkp(kp)*Rtab(N+Np,L+Lp,M+Mp,0)
+        !loop over k'
+        DO kp=0,kmaxCD
+          foo = Ckp(kp)
+          Np = foo/300
+          foo = foo - Np*300
+          Lp = foo/20
+          Mp = foo - Lp*20
+         
+          DO k=0,kmaxAB
+            foo = Ck(k)
+            N = foo/300
+            foo = foo - N*300
+            L = foo/20
+            M = foo - L*20
+            
+           CALL RNLMj(PQ(0),PQ(1),PQ(2),N+Np,L+Lp,M+Mp,0,p+q,Fj,Rtab,Rbol)
 
-      END DO                                        !end loop over k
-    END DO                                          !end loop over kp
+           II(k,orbc,orbd) = II(k,orbc,orbd) + (-1)**(Np+Lp+Mp)*&
+           ll*Dkp(kp)*Rtab(N+Np,L+Lp,M+Mp,0)
+
+          END DO                                        !end loop over k
+        END DO                                          !end loop over kp
+      END DO                                            !end loop over h
+    END DO                                              !end loop over g
 
     DEALLOCATE(Fj)
     DEALLOCATE(Rtab)
@@ -393,14 +400,14 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 !		Generates XX orbitals for electron repulsion	
 !---------------------------------------------------------------------
-  SUBROUTINE clmXX(XX,II,norb,Dk,kmax,seta,setb,setl,Ok)
+  SUBROUTINE clmXX(XX,II,norb,Dk,kmax,seta,setb,setl)
     IMPLICIT NONE
 
     ! Values
-    ! XX	: 4D dp, 2e- integrals
-    ! II	: 3D dp, intermediate array
+    ! XX		: 4D dp, 2e- integrals
+    ! II		: 3D dp, intermediate array
     ! norb	: int, number of orbitals
-    ! Dk	: 1D dp, nonzero coeff.
+    ! Dk		: 1D dp, nonzero coeff.
     ! kmax	: int, max k for nonzero coef
     ! seta,b	: 1D int, setinfo for set a,b
     ! setl	: int, length of seta,setb
@@ -409,7 +416,7 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:), INTENT(INOUT) :: XX
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: II
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: Dk
-    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb,Ok
+    INTEGER, DIMENSION(0:), INTENT(IN) :: seta,setb
     INTEGER, INTENT(IN) :: norb,setl,kmax
 
     !Internal
@@ -418,16 +425,21 @@ PROGRAM int2e
 
     DO h=0,norb-1
       DO g=0,norb-1
-        DO k=0,kmax
-          i = Ok(2*k)
-          j = Ok(2*k+1)
-          XX(i,j,g,h) = XX(i,j,g,h) + Dk(k)*II(k,g,h)
-        END DO 
+        DO j=0,setb(0)-1
+          orbb = setb(3+j)
+          DO i=0,seta(0)-1
+            orba = seta(3+i)
+            DO k=0,kmax
+              XX(orba,orbb,g,h) = XX(orba,orbb,g,h) + II(k,g,h)*Dk(k)
+            END DO
+          END DO
+        END DO
       END DO
     END DO
 
   END SUBROUTINE clmXX
 
-!---------------------------------------------------------------------
+!===================================================================
+!                       FUNCTIONS
 
 END PROGRAM int2e
