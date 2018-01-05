@@ -13,4 +13,4 @@ My crummy implementation of Hartree Fock
 - Current basis sets: STO-3G
 - Current systems: Atoms, Diatomics, cartesian molecules, closed shell only.
 
-Currently, all I can do is the one electron integrals 
+One electron integrals implimented, two electron integrals implimented, but slow.
