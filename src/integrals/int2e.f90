@@ -55,13 +55,10 @@ PROGRAM int2e
   CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,.FALSE.,maxN,maxL)
 
   ! check that Fock has been created 
-  INQUIRE(file='Fuv',EXIST=flag1)
- 
-  ! check that we need to do these calculations
-  INQUIRE(file='Fold',EXIST=flag2)
+  INQUIRE(file='XX',EXIST=flag1)
  
   ! logic gate
-  IF (flag1 .AND. flag2) THEN
+  IF (flag1) THEN 
     WRITE(*,*) "Reading two electron integrals from intermediate"
     !we aren't actually reading anything, but they don't need to know that ;)"
   ELSE
@@ -143,7 +140,7 @@ PROGRAM int2e
     ALLOCATE(Okp(0:2*setK+1))
 
     !Iuv will be my intermediate file for the integrals
-    OPEN(unit=42,file='Iuv',status='replace',access='sequential',form='unformatted') 
+    OPEN(unit=42,file='XX',status='replace',access='sequential',form='unformatted') 
  
     !allocate memory
     temp = (norb**(4))*8.0/1.0E6 
