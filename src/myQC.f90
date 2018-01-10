@@ -47,11 +47,17 @@ PROGRAM myQC
   INQUIRE(file='error', EXIST=ex)
   IF (ex) THEN
     WRITE(*,*) "Error from int2e, exiting"
-    STOP "Error from int1e"
+    STOP "Error from int2e"
   END IF
 
 !~~~~
 ! Variational Hartree Fock
+  CALL EXECUTE_COMMAND_LINE('scf')
+  INQUIRE (file='error',EXIST=ex)
+  IF (ex) THEN
+    WRITE(*,*) "Error from scf, exiting"
+    STOP "Error from scf"
+  END IF
 
 !~~~
 ! Output

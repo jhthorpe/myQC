@@ -30,12 +30,12 @@ PROGRAM int1e
   ! options	: 1D int, array of options
   ! S		: 2D dp, overlap matrix
   ! F		: 2D dp, Fock matrix
-  ! MOc		: 2D dp, molecular coefficients (u'th AO, i'th MO) 
+  ! Cui		: 2D dp, molecular coefficients (u'th AO, i'th MO) 
   ! set		: 2D dp, set of exponent coefficients on each nuclei
   ! setinfo	: 2D int, array of set information
 
   ! Variables  
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,Cui
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: bas,set
   INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo, setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
@@ -85,7 +85,7 @@ PROGRAM int1e
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
   WRITE(*,999) "Allocating space for MO coefficients (MB)  ", norb*norb*8/1.0E6
-  ALLOCATE(MOc(0:norb-1,0:norb-1),STAT=stat)
+  ALLOCATE(Cui(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
   fmem = fmem - norb*norb*8/1.0E6
   WRITE(*,*)
@@ -115,7 +115,7 @@ PROGRAM int1e
 
   ! 2) molecular orbital coefficients
   ! WORK NOTE : should be initialized with 1 electron Hamiltonian?
-!    CALL normS(S,MOc,norb,0)
+    CALL normS(S,Cui,norb,0)
   INQUIRE(file='Cui',EXIST=flag2)
   IF (flag2) THEN
     WRITE(*,*) "Reading MO coefficients from Cui"
@@ -123,10 +123,10 @@ PROGRAM int1e
     WRITE(*,*) "Calculating initial Cui guess"
     WRITE(*,*) "temporarily taking all MO coefficients as one"
     DO i=0,norb-1
-      MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
+      Cui(:,i) = (/ (1.0D0, j=0,norb-1) /)
     END DO
     OPEN(unit=1,file='Cui',status='replace',access='sequential')
-    WRITE(1,*) MOc(:,:)
+    WRITE(1,*) Cui(:,:)
     CLOSE(unit=1)
     WRITE(*,*) "MO coefficients written to Cui"
   END IF
@@ -134,7 +134,7 @@ PROGRAM int1e
 
   DEALLOCATE(F)
   DEALLOCATE(S)
-  DEALLOCATE(MOc)
+  DEALLOCATE(Cui)
   DEALLOCATE(bas)
   DEALLOCATE(set)
   DEALLOCATE(basinfo)
