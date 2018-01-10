@@ -30,7 +30,7 @@ PROGRAM int1e
   ! options	: 1D int, array of options
   ! S		: 2D dp, overlap matrix
   ! F		: 2D dp, Fock matrix
-  ! MOc		: 2D dp, molecular coefficients (u or v, ith MO) 
+  ! MOc		: 2D dp, molecular coefficients (u'th AO, i'th MO) 
   ! set		: 2D dp, set of exponent coefficients on each nuclei
   ! setinfo	: 2D int, array of set information
 
@@ -102,7 +102,7 @@ PROGRAM int1e
     WRITE(*,*)
   ELSE
     CALL EXECUTE_COMMAND_LINE('touch Sold')
-    CALL EXECUTE_COMMAND_LINE('touch Fold')    
+    CALL EXECUTE_COMMAND_LINE('touch Hold')    
     OPEN(unit=1,file='Suv',status='old',access='sequential')
     OPEN(unit=2,file='Huv',status='old',access='sequential')
     WRITE(*,*) "Reading overlap matrix from Suv"
@@ -116,19 +116,19 @@ PROGRAM int1e
   ! 2) molecular orbital coefficients
   ! WORK NOTE : should be initialized with 1 electron Hamiltonian?
 !    CALL normS(S,MOc,norb,0)
-  INQUIRE(file='Cuv',EXIST=flag2)
+  INQUIRE(file='Cui',EXIST=flag2)
   IF (flag2) THEN
-    WRITE(*,*) "Reading MO coefficients from Cuv"
+    WRITE(*,*) "Reading MO coefficients from Cui"
   ELSE
-    WRITE(*,*) "Calculating initial Cuv guess"
+    WRITE(*,*) "Calculating initial Cui guess"
     WRITE(*,*) "temporarily taking all MO coefficients as one"
     DO i=0,norb-1
       MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
     END DO
-    OPEN(unit=1,file='Cuv',status='replace',access='sequential')
+    OPEN(unit=1,file='Cui',status='replace',access='sequential')
     WRITE(1,*) MOc(:,:)
     CLOSE(unit=1)
-    WRITE(*,*) "MO coefficients written to Cuv"
+    WRITE(*,*) "MO coefficients written to Cui"
   END IF
   WRITE(*,*)
 
