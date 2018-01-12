@@ -10,4 +10,4 @@ REF= RHF
 PAR= none
 NODES= 1
 MEM= 1000
-VERB= 0
+VERB= 1

@@ -1,1 +1,1 @@
-gfortran -o ../../bin/scf scf.f90 ../env.f90
+gfortran -o ../../bin/scf -L/Users/jamesthorpe/LAPACK/lapack-3.7.0 -llapack -lblas scf.f90 ../env.f90 -g

@@ -62,7 +62,7 @@ PROGRAM myQC
 !~~~
 ! Output
   CALL CPU_TIME(timeF)
-
+  WRITE(*,*)
   WRITE(*,999) "myQC ran in (s)", (timeF - timeS)
 
 END PROGRAM myQC

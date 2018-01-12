@@ -262,7 +262,7 @@ PROGRAM int2e
         DO j=0,norb-1
           DO g=0,norb-1
             DO h=0,norb-1
-              IF (XX(i,j,g,h) .NE. 0.0D0) WRITE(*,996) i+1,j+1,g+1,h+1,XX(i,j,g,h)
+              IF (XX(i,j,g,h) .NE. 0.0D0) WRITE(*,996) i,j,g,h,XX(i,j,g,h)
             END DO
           END DO
         END DO
