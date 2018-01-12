@@ -132,7 +132,7 @@ PROGRAM scf
     !check if we have coefficients 
     INQUIRE(file='Cui',exist=ex)
     IF (.NOT. ex) THEN
-      CALL initRHF(norb,Cui,Suv,Huv,LWORK)
+      CALL initRHF(norb,Cui,Suv,Huv,LWORK,fmem)
 !      CALL EXECUTE_COMMAND_LINE('dens') 
     ELSE
       OPEN(unit=1,file='Cui',status='old',access='sequential')
@@ -209,7 +209,8 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !		Generate initial RHF MO coeffs 
 !---------------------------------------------------------------------
-  SUBROUTINE initRHF(norb,Cui,Suv,Huv,LWORK)
+  SUBROUTINE initRHF(norb,Cui,Suv,Huv,LWORK,fmem)
+    USE env
     IMPLICIT NONE
 
     !Values
@@ -222,19 +223,43 @@ PROGRAM scf
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Cui
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv, Huv
+    REAL(KIND=8), INTENT(INOUT) :: fmem
     INTEGER, INTENT(INOUT) :: LWORK
     INTEGER, INTENT(IN) :: norb
     
     !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: A,B
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: W,WORK
+    INTEGER :: INFO,stat1,stat2,stat3
     INTEGER :: i,j,k,u,v 
 
     WRITE(*,*)
     WRITE(*,*) "initRHF called"
     WRITE(*,*) "Generating Cui from core Hamiltonian." 
 
-    !use core hamiltonian to get initial guess at coefficients
+    ! setup arrays
+    ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(B(0:norb-1,0:norb-1),STAT=stat2)
+    ALLOCATE(W(0:norb-1),STAT=stat3)
+    fmem = fmem - (2*norb*norb*8.0/1.0E6 + norb*8.0/1.0E6)
+    IF (fmem .LT. 0.0E6 .OR. stat1+stat2+stat3 .NE. 0) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "scf:initRHF could not allocate enough memory"
+      STOP "scf:initRHF out of memory"
+    END IF 
+    CALL nmem(fmem)
+    DO v=0,norb-1
+
+    END DO
 
     !
+
+    !cleanup memory
+    DEALLOCATE(A)
+    DEALLOCATE(B)
+    DEALLOCATE(W)
+    fmem = fmem + (2*norb*norb*8.0/1.0E6 + norb*8.0/1.0E6)
+    CALL nmem(fmem)
 
   END SUBROUTINE initRHF
 
@@ -282,12 +307,8 @@ PROGRAM scf
 
     !put S into A
     DO v=0,norb-1
-      DO u=0,v-1
-        A(u,v) = 0.0E0
-      END DO 
-      DO u=v,norb-1
-        A(u,v) = Suv(u,v)
-      END DO
+      A(0:v-1,v) = (/ (0.0E6, u=0,v-1) /)
+      A(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
     END DO
 
     !get LWORK
@@ -311,7 +332,7 @@ PROGRAM scf
     END IF
     
     !get eigenvalues
-    CALL DSYEV('N','U',norb,A,norb,W,WORK,LWORK,INFO)
+    CALL DSYEV('N','L',norb,A,norb,W,WORK,LWORK,INFO)
     IF (INFO .GT. 0) THEN
       WRITE(*,*) "Warning: potential contamination of eigenvalues."
       WRITE(*,*) "Number of contaminents: ", INFO
