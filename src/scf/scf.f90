@@ -37,7 +37,7 @@ PROGRAM scf
 
   !redirect to scf subroutines
   IF (options(2) .EQ. 0) THEN        !RHF
-    CALL rhf(nnuc,nelc,atoms,fmem,options)
+    CALL RHF(nnuc,nelc,atoms,fmem,options)
   ELSE IF (options(2) .EQ. 1) THEN   !UHF
     CALL uhf(nnuc,nelc,atoms,fmem,options)
   ELSE
@@ -53,7 +53,7 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !               RHF SCF program 
 !---------------------------------------------------------------------
-  SUBROUTINE rhf(nnuc,nelc,atoms,fmem,options)
+  SUBROUTINE RHF(nnuc,nelc,atoms,fmem,options)
     IMPLICIT NONE
 
     ! Values
@@ -66,7 +66,6 @@ PROGRAM scf
     ! Cui       : 2D dp, molecular orbital coefficients (u'th AO, i'th MO)
     ! Da        : 2D dp, density matrix for alpha
     ! occ       : 1d int, list of occupied orbitals
-    ! Mord	: 1d int, list of MO in increasing energy
     ! LWORK	: int, best size for work arrays, for lapack
 
     !Inout
@@ -76,7 +75,6 @@ PROGRAM scf
 
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: Cui,Suv,Huv,Fuv,Guv,Da
-    INTEGER, ALLOCATABLE, DIMENSION(:) :: Mord
     INTEGER, DIMENSION(0:1) :: line
     REAL(KIND=8) :: timeS, timeF
     INTEGER :: LWORK
@@ -100,7 +98,7 @@ PROGRAM scf
  
     !Allocate memory
     fmem = fmem - (6*norb*norb*8/1.0E6 + norb*4/1.0E6)
-    WRITE(*,999) "Allocating memory for rhf (MB) ", (6*norb*norb*8/1.0E6 + norb*4/1.0E6)
+    WRITE(*,999) "Allocating memory for rhf (MB) ", (6*norb*norb*8/1.0E6 + norb*8/1.0E6)
     IF (fmem .GT. 0) THEN
       ALLOCATE(Cui(0:norb-1,0:norb-1),STAT=stat1)
       ALLOCATE(Suv(0:norb-1,0:norb-1),STAT=stat2)
@@ -108,8 +106,7 @@ PROGRAM scf
       ALLOCATE(Fuv(0:norb-1,0:norb-1),STAT=stat4)
       ALLOCATE(Guv(0:norb-1,0:norb-1),STAT=stat5)
       ALLOCATE(Da(0:norb-1,0:norb-1),STAT=stat6)
-      ALLOCATE(Mord(0:norb-1),STAT=stat7)
-      IF (stat1+stat2+stat3+stat4+stat5+stat6+stat7 .NE. 0) THEN
+      IF (stat1+stat2+stat3+stat4+stat5+stat6 .NE. 0) THEN
         WRITE(*,*) "rhf: couldn't allocate space for matrices"
         CALL EXECUTE_COMMAND_LINE('touch error')
         STOP
@@ -132,8 +129,8 @@ PROGRAM scf
     !check if we have coefficients 
     INQUIRE(file='Cui',exist=ex)
     IF (.NOT. ex) THEN
-      CALL initRHF(norb,Cui,Suv,Huv,LWORK,fmem)
-!      CALL EXECUTE_COMMAND_LINE('dens') 
+      CALL initRHF(norb,Cui,Suv,Huv,LWORK,fmem,options(7))
+      CALL EXECUTE_COMMAND_LINE('dens') 
     ELSE
       OPEN(unit=1,file='Cui',status='old',access='sequential')
       READ(1,*) Cui(:,:)
@@ -142,43 +139,42 @@ PROGRAM scf
       !check if we have density matrix 
       INQUIRE(file='Da',exist=flag)
       IF (.NOT. flag) THEN
-!        CALL EXECUTE_COMMAND_LINE('dens')
+        CALL EXECUTE_COMMAND_LINE('dens')
       END IF
     END IF
 
     !read in density matrix
-!    OPEN(unit=5,file='Da',access='sequential',status='old',form='unformatted')
-!    READ(5) Da(:,:)
-!    CLOSE(unit=5)
+    OPEN(unit=5,file='Da',access='sequential',status='old',form='unformatted')
+    READ(5) Da(:,:)
+    CLOSE(unit=5)
 
     !check eigenvalues of the overlap matrix
     CALL checkSuv(Suv,norb,fmem,options(7))
+    WRITE(*,*)
 
     ! RHF iterations
     DO WHILE (.NOT. conv)
       iter = iter + 1
-
       WRITE(*,*) "Starting scf iteration", iter 
-!      CALL rhfiter()
-
+!      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,norb,conv,options)
       !testing only
       IF (iter .GT. 2) conv = .TRUE.
-
     END DO
 
     DEALLOCATE(Cui)
+    DEALLOCATE(Suv)
     DEALLOCATE(Fuv)
     DEALLOCATE(Huv)
     DEALLOCATE(Guv)
     DEALLOCATE(Da)
 
-    fmem = fmem + (6*norb*norb*8/1.0E6 + norb*4/1.0E6)
+    fmem = fmem + (6*norb*norb*8/1.0E6 + norb*8.0/1.0E6)
     CALL nmem(fmem)
 
     CALL CPU_TIME(timeF)
     WRITE(*,997) "rhf ran in (s) :", (timeF - timeS)
     
-  END SUBROUTINE rhf
+  END SUBROUTINE RHF
 
 !---------------------------------------------------------------------
 !               UHF SCF program 
@@ -208,8 +204,9 @@ PROGRAM scf
 
 !---------------------------------------------------------------------
 !		Generate initial RHF MO coeffs 
+!WORK NOTE - should symm the overlap matrix beforehand?
 !---------------------------------------------------------------------
-  SUBROUTINE initRHF(norb,Cui,Suv,Huv,LWORK,fmem)
+  SUBROUTINE initRHF(norb,Cui,Suv,Huv,LWORK,fmem,verb)
     USE env
     IMPLICIT NONE
 
@@ -225,11 +222,12 @@ PROGRAM scf
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv, Huv
     REAL(KIND=8), INTENT(INOUT) :: fmem
     INTEGER, INTENT(INOUT) :: LWORK
-    INTEGER, INTENT(IN) :: norb
+    INTEGER, INTENT(IN) :: norb,verb
     
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: A,B
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: W,WORK
+    REAL(KIND=8) :: temp
     INTEGER :: INFO,stat1,stat2,stat3
     INTEGER :: i,j,k,u,v 
 
@@ -249,16 +247,65 @@ PROGRAM scf
     END IF 
     CALL nmem(fmem)
     DO v=0,norb-1
-
+      A(0:v-1,v) = (/ (0.0E6, u=0,v-1) /)
+      A(v:norb-1,v) = (/ (Huv(u,v), u=v,norb-1) /)
+      B(0:v-1,v) = (/ (0.0E6, u=0,v-1) /)
+      B(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
     END DO
 
-    !
+    !find LWORK
+    ALLOCATE(WORK(0:1))
+    LWORK=-1
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,W,WORK,LWORK,INFO)
+    LWORK = CEILING(WORK(0))
+    DEALLOCATE(WORK)
+    ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
+    fmem = fmem - LWORK*8/1.0E6 
+    IF (fmem .LT. 0.0E6 .OR. stat1 .NE. 0) THEN
+      fmem = fmem + LWORK*8/1.0E6
+      LWORK=norb
+      ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
+      fmem = fmem - LWORK*8/1.0E6 
+      IF (fmem .LT. 0.0E6 .OR. stat2 .NE. 0) THEN
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        WRITE(*,*) "scf:initRHF could not allocate memory"
+        STOP
+      END IF
+    END IF
+
+    !find initial Cui and order of orbitals
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,W,WORK,LWORK,INFO)
+    IF (INFO .GT. 0 .AND. INFO .LT. norb) THEN
+      WRITE(*,*) "Warning: potential contamination of eigenvalues."
+      WRITE(*,*) "Number of contaminents: ", INFO
+    ELSE IF (INFO .GT. norb) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "Leading minor of order i of B is not positive definite. i=",INFO-norb
+      STOP
+    END IF
+
+    !print if desired
+    IF (verb .GE. 3) THEN
+      WRITE(*,*) "Eigenvalues of core hamiltonian"
+      DO i=0,norb-1
+        WRITE(*,*) i, W(i)
+      END DO
+      WRITE(*,*)
+    END IF
+
+    !write to Cui
+    OPEN(unit=7,file='Cui',access='sequential',status='replace')
+    WRITE(7,*) A(:,:)
+    CLOSE(unit=7,status='keep')
+    Cui(:,:) = A(:,:)
 
     !cleanup memory
     DEALLOCATE(A)
     DEALLOCATE(B)
     DEALLOCATE(W)
+    DEALLOCATE(WORK)
     fmem = fmem + (2*norb*norb*8.0/1.0E6 + norb*8.0/1.0E6)
+    fmem = fmem + (LWORK*8/1.0E6)
     CALL nmem(fmem)
 
   END SUBROUTINE initRHF

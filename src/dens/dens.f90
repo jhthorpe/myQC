@@ -62,7 +62,6 @@ PROGRAM dens
     ! norb	: int, number of orbitals in molecule
     ! Cui	: 2D dp, molecular orbital coefficients (u'th AO, i'th MO)
     ! Da	: 2D dp, density matrix for alpha
-    ! occ	: 1d int, list of occupied orbitals
     
     !Inout
     INTEGER, DIMENSION(0:), INTENT(IN) :: atoms,options
@@ -71,7 +70,6 @@ PROGRAM dens
 
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: Cui, Da
-    INTEGER, DIMENSION(0:nelc/2-1) :: occ
     INTEGER, DIMENSION(0:1) :: line
     REAL(KIND=8) :: temp 
     INTEGER :: norb,stat1,stat2
@@ -107,11 +105,6 @@ PROGRAM dens
     READ(1,*) Cui(:,:) 
     CLOSE(unit=1)
 
-    !read in occupied orbials 
-    OPEN(unit=3,file='MOord',access='sequential',status='old')
-    READ(3,*) occ(:)
-    CLOSE(unit=3)
-
     !zero density matrix
     DO j=0,norb-1
       Da(:,j) = (/ (0.0D0, i=0,norb-1) /)
@@ -121,14 +114,21 @@ PROGRAM dens
     !loop over orbitals
     DO v=0,norb-1
       DO u=0,norb-1
-        !loop over occupied orbitals
+        !loop over occupied MO
         temp = 0.0D0 
         DO i=0,nelc/2-1
-          temp = temp + Cui(u,occ(i))*Cui(v,occ(i)) 
+          temp = temp + Cui(u,i)*Cui(v,i) 
         END DO
         Da(u,v) = temp * 2
       END DO
     END DO
+
+    IF (options(7) .GE. 3) THEN
+      WRITE(*,*) "Writing human readable density matrix to dens.txt"
+      OPEN(unit=1,file='dens.txt',access='sequential',status='replace')
+      WRITE(1,*) Da(:,:)
+      CLOSE(unit=1,status='keep')
+    END IF
 
     !write density matrix
     OPEN(unit=2,file='Da',access='sequential',status='replace',form='unformatted')
