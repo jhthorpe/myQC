@@ -67,8 +67,9 @@ PROGRAM scf
     ! Da        : 2D dp, density matrix for alpha
     ! occ       : 1d int, list of occupied orbitals
     ! LWORK	: int, best size for work arrays, for lapack
-    ! Eig	: orbital eigenvalues
-    
+    ! Eig	: 1d dp, orbital eigenvalues
+    ! Enr	: dp, nuclear repulsion energy
+    ! Etrk	: 1d dp, last couple total energies
 
     !Inout
     INTEGER, DIMENSION(0:), INTENT(IN) :: atoms,options
@@ -78,9 +79,9 @@ PROGRAM scf
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: Cui,Suv,Huv,Fuv,Guv,Da
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Eig
-    REAL(KIND=8), DIMENSION(1:3) :: Enr
+    REAL(KIND=8), DIMENSION(1:3) :: Etrk
     INTEGER, DIMENSION(0:1) :: line
-    REAL(KIND=8) :: timeS, timeF
+    REAL(KIND=8) :: timeS, timeF, Enr
     INTEGER :: LWORK
     INTEGER :: iter,stat1,stat2,stat3,stat4,stat5,stat6,stat7,norb
     LOGICAL :: conv,ex,flag 
@@ -93,7 +94,7 @@ PROGRAM scf
     iter = 0
     LWORK = -1
     conv = .FALSE.
-    Enr = [0.0D0, 0.0D0, 0.0D0]
+    Etrk = [0.0D0, 0.0D0, 0.0D0]
 
     !get number of orbitals
     OPEN(unit=1,file='basinfo',status='old',access='sequential')
@@ -123,6 +124,9 @@ PROGRAM scf
       CALL EXECUTE_COMMAND_LINE('touch error')
       STOP
     END IF
+
+    !get nuclear repulsion
+    CALL getEnr(xyz,atoms,Enr)
 
     !get data
     OPEN(unit=2,file='Huv',status='old',access='sequential')
@@ -155,8 +159,6 @@ PROGRAM scf
       WRITE(*,*) "Starting scf iteration", iter 
       CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,options)
 
-      !testing only
-      IF (iter .GT. 2) conv = .TRUE.
     END DO
 
     DEALLOCATE(Cui)
@@ -421,19 +423,22 @@ PROGRAM scf
     !Cui	: 2D dp, coefficients of MO
     !Da		: 2D dp, density matrix of AO 
     !Eig	: 1D dp, vector of orbital eigenvalues
-    !Enr	: 1D dp, list of last couple iteration energies 
+    !Enr	: dp, nuclear repulsion energy
     !iter	: int, iteration number
+    !Eelc	: dp, electronic energy
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Guv,Fuv,Cui,Da
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv,Huv
-    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig,Enr
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig
     INTEGER, DIMENSION(0:), INTENT(IN) :: options
     REAL(KIND=8), INTENT(INOUT) :: fmem
+    REAL(KIND=8), INTENT(IN) :: Enr
     LOGICAL, INTENT(INOUT) :: conv 
     INTEGER, INTENT(IN) :: norb,iter
 
     !Internal
+    REAL(KIND=8) :: Eelc
     INTEGER :: i,j,u,v
   
     !get new density matrix  
@@ -444,10 +449,67 @@ PROGRAM scf
 
     !get new Guv matrix
     CALL EXECUTE_COMMAND_LINE('RHFI2G')
-    OPEN(unit=9,file='Guv',access='sequential',status='old',form='unformatted')
-    READ(9) Guv(:,:)
-    CLOSE(unit=9) 
+    OPEN(unit=11,file='Guv',access='sequential',status='old',form='unformatted')
+    READ(11) Guv(:,:)
+    CLOSE(unit=11) 
+
+    !Create new fock matrix
+    Fuv = Huv + Guv
+
+    !Get new electronic energy
+    Eelc = 0.0D0
+    DO v=0,norb-1
+      DO u=0,norb-1
+        Eelc = Eelc + Da(u,v)*(Fuv(u,v)+Huv(u,v))
+      END DO
+    END DO
+    Eelc = 0.5D0*Eelc
+ 
+   WRITE(*,*) iter, Eelc+Enr
+
+    !check for convergece
+    IF (iter .GT. 2) conv=.TRUE.  !TESTING ONLY
+   
+   !get eigenvalues and vectors and whatnot if converged 
+    
+
 
   END SUBROUTINE RHFiter
+
+!---------------------------------------------------------------------
+!		Calculate nuclear repulsion energy			
+!---------------------------------------------------------------------
+  SUBROUTINE getEnr(xyz,atoms,Enr)
+    IMPLICIT NONE
+
+    !Values
+    ! xyz	: 2D dp, list of atom locations
+    ! atoms	: 1D int, list of atom id
+    ! Enr	: dp, nuclear repulsion energy
+    ! M		: int, number of atoms
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    INTEGER, DIMENSION(0:), INTENT(IN) :: atoms
+    REAL(KIND=8), INTENT(INOUT) :: Enr
+
+    !Internal
+    REAL(KIND=8) :: RAB
+    INTEGER :: A,B,M
+   
+    M = SIZE(atoms) 
+
+    Enr = 0.0D0
+
+    DO A=0,M-1
+      DO B=0,A-1
+        RAB = SQRT((xyz(A,0)-xyz(B,0))**2.0D0+(xyz(A,1)-xyz(B,1))**2.0D0+(xyz(A,2)-xyz(B,2))**2.0D0)
+        Enr = atoms(A)*atoms(B)/RAB
+      END DO
+    END DO 
+
+    WRITE(*,*) "Nuclear repulsion energy (hartrees) : ", Enr
+
+  END SUBROUTINE
 !---------------------------------------------------------------------
 END PROGRAM scf
