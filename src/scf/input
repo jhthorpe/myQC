@@ -9,5 +9,5 @@ REF= RHF
 PAR= none
 NODE= 1
 MEM= 1000
-VERB= 3
+VERB= 2
 

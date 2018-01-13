@@ -82,7 +82,7 @@ PROGRAM scf
     REAL(KIND=8), DIMENSION(1:3) :: Etrk
     INTEGER, DIMENSION(0:1) :: line
     REAL(KIND=8) :: timeS, timeF, Enr
-    INTEGER :: LWORK
+    INTEGER :: LWORK,i
     INTEGER :: iter,stat1,stat2,stat3,stat4,stat5,stat6,stat7,norb
     LOGICAL :: conv,ex,flag 
 
@@ -154,12 +154,23 @@ PROGRAM scf
     WRITE(*,*)
 
     ! RHF iterations
+    WRITE(*,*) "RHF calculation..."
+    WRITE(*,*) "Interation          Total Energy (hartrees)"
+    WRITE(*,*) "=============================================="
     DO WHILE (.NOT. conv)
       iter = iter + 1
-      WRITE(*,*) "Starting scf iteration", iter 
-      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,options)
-
+      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,LWORK,options)
     END DO
+    WRITE(*,*) "=============================================="
+
+    !Write output
+    WRITE(*,*) "Orbital eigenvalues"
+    WRITE(*,*) "=============================================="
+    DO i=0,norb-1
+      WRITE(*,*) i, Eig(i)
+    END DO
+    WRITE(*,*) "=============================================="
+    WRITE(*,*)
 
     DEALLOCATE(Cui)
     DEALLOCATE(Suv)
@@ -408,7 +419,7 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !			RHF iteration	
 !---------------------------------------------------------------------
-  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,options)
+  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,LWORK,options)
     IMPLICIT NONE
     
     !Values
@@ -426,6 +437,7 @@ PROGRAM scf
     !Enr	: dp, nuclear repulsion energy
     !iter	: int, iteration number
     !Eelc	: dp, electronic energy
+    !LWORK	: int, length of work array
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Guv,Fuv,Cui,Da
@@ -434,29 +446,33 @@ PROGRAM scf
     INTEGER, DIMENSION(0:), INTENT(IN) :: options
     REAL(KIND=8), INTENT(INOUT) :: fmem
     REAL(KIND=8), INTENT(IN) :: Enr
+    INTEGER, INTENT(INOUT) :: LWORK
     LOGICAL, INTENT(INOUT) :: conv 
     INTEGER, INTENT(IN) :: norb,iter
 
     !Internal
-    REAL(KIND=8) :: Eelc
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: A,B
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: WORK
+    REAL(KIND=8) :: Eelc,temp
+    INTEGER :: INFO,stat1,stat2,stat3
     INTEGER :: i,j,u,v
   
-    !get new density matrix  
+    !get Density matrix  
     CALL EXECUTE_COMMAND_LINE('dens')
     OPEN(unit=8,file='Da',access='sequential',status='old',form='unformatted')
     READ(8) Da(:,:) 
     CLOSE(unit=8)
 
-    !get new Guv matrix
+    !get Guv matrix
     CALL EXECUTE_COMMAND_LINE('RHFI2G')
     OPEN(unit=11,file='Guv',access='sequential',status='old',form='unformatted')
     READ(11) Guv(:,:)
     CLOSE(unit=11) 
 
-    !Create new fock matrix
+    !Create Fock matrix
     Fuv = Huv + Guv
 
-    !Get new electronic energy
+    !Get Electronic energy
     Eelc = 0.0D0
     DO v=0,norb-1
       DO u=0,norb-1
@@ -465,13 +481,110 @@ PROGRAM scf
     END DO
     Eelc = 0.5D0*Eelc
  
-   WRITE(*,*) iter, Eelc+Enr
+    !write output
+    !WORK NOTe - need better output
+    WRITE(*,*) iter, Eelc+Enr
+
+    !Get our coefficients and eigenvalues
+
+    ! setup arrays
+    ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(B(0:norb-1,0:norb-1),STAT=stat2)
+    fmem = fmem - (2*norb*norb*8.0/1.0D6) 
+    IF (fmem .LT. 0.0D6 .OR. stat1+stat2+stat3 .NE. 0) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "scf:RHFiter could not allocate enough memory"
+      STOP "scf:RHFiter out of memory"
+    END IF
+    CALL nmem(fmem)
+    DO v=0,norb-1
+      A(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      A(v:norb-1,v) = (/ (Fuv(u,v), u=v,norb-1) /)
+      B(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      B(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
+    END DO
+
+    !if first iteration...
+    IF (iter .EQ. 0) THEN
+      ALLOCATE(WORK(0:1))
+      LWORK=-1
+      CALL DSYGV(1,'V','L',norb,A,norb,B,norb,Eig,WORK,LWORK,INFO)
+      LWORK = CEILING(WORK(0))
+      DEALLOCATE(WORK)
+      ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
+      fmem = fmem - LWORK*8/1.0D6
+      IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+        fmem = fmem + LWORK*8/1.0D6
+        LWORK=norb
+        ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
+        fmem = fmem - LWORK*8/1.0D6
+        IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
+          CALL EXECUTE_COMMAND_LINE('touch error')
+          WRITE(*,*) "scf:initRHF could not allocate memory"
+          STOP
+        END IF
+      END IF
+
+    !if not...
+    ELSE
+      ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
+      fmem = fmem - LWORK*8/1.0D6
+      IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+        fmem = fmem + LWORK*8/1.0D6
+        LWORK=norb
+        ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
+        fmem = fmem - LWORK*8/1.0D6
+        IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
+          CALL EXECUTE_COMMAND_LINE('touch error')
+          WRITE(*,*) "scf:initRHF could not allocate memory"
+          STOP
+        END IF
+      END IF
+    END IF
+
+    !find initial Cui and order of orbitals
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,Eig,WORK,LWORK,INFO)
+    IF (INFO .GT. 0 .AND. INFO .LT. norb) THEN
+      WRITE(*,*) "Warning: potential contamination of eigenvalues."
+      WRITE(*,*) "Number of contaminents: ", INFO
+    ELSE IF (INFO .GT. norb) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "Leading minor of order i of B is not positive definite. i=",INFO-norb
+      STOP
+    END IF
+ 
+    !print if desired
+    IF (options(7) .GE. 3) THEN
+      WRITE(*,*) "Orbital eigenvalues..."
+      DO i=0,norb-1
+        WRITE(*,*) i, Eig(i)
+      END DO
+      WRITE(*,*) "---------------------------------------"
+    END IF
+ 
+    !write to Cui and Eig
+    OPEN(unit=7,file='Cui',access='sequential',status='replace')
+    WRITE(7,*) A(:,:)
+    CLOSE(unit=7,status='keep')
+    Cui(:,:) = A(:,:)
+ 
+    !cleanup memory
+    DEALLOCATE(A)
+    DEALLOCATE(B)
+    DEALLOCATE(WORK)
+    fmem = fmem + (2*norb*norb*8.0/1.0D6)
+    fmem = fmem + (LWORK*8/1.0D6)
+    CALL nmem(fmem)
 
     !check for convergece
-    IF (iter .GT. 2) conv=.TRUE.  !TESTING ONLY
-   
-   !get eigenvalues and vectors and whatnot if converged 
-    
+    IF (iter .GT. 20) conv=.TRUE.  !TESTING ONLY
+
+    IF (conv) THEN
+      WRITE(*,*) "SCF has converged!"
+      WRITE(*,*) 
+      WRITE(*,*) "Total SCF energy (a.u)", Eelc+Enr
+      WRITE(*,*)
+    END  IF
 
 
   END SUBROUTINE RHFiter
@@ -504,7 +617,7 @@ PROGRAM scf
     DO A=0,M-1
       DO B=0,A-1
         RAB = SQRT((xyz(A,0)-xyz(B,0))**2.0D0+(xyz(A,1)-xyz(B,1))**2.0D0+(xyz(A,2)-xyz(B,2))**2.0D0)
-        Enr = atoms(A)*atoms(B)/RAB
+        Enr = Enr + atoms(A)*atoms(B)/RAB
       END DO
     END DO 
 
