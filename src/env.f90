@@ -61,7 +61,7 @@ MODULE env
     
     ALLOCATE(atoms(0:nnuc-1))
     
-    ALLOCATE(xyz(0:nnuc-1,0:3)) 
+    ALLOCATE(xyz(0:nnuc-1,0:2)) 
     DO i=0,nnuc-1
       READ(2,*) atoms(i),  xyz(i,0), xyz(i,1), xyz(i,2)
     END DO

@@ -30,12 +30,11 @@ PROGRAM int1e
   ! options	: 1D int, array of options
   ! S		: 2D dp, overlap matrix
   ! F		: 2D dp, Fock matrix
-  ! MOc		: 2D dp, molecular coefficients (u or v, ith MO) 
   ! set		: 2D dp, set of exponent coefficients on each nuclei
   ! setinfo	: 2D int, array of set information
 
   ! Variables  
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F,MOc
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,S,F
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: bas,set
   INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo, setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
@@ -76,72 +75,50 @@ PROGRAM int1e
   WRITE(*,*) "Number of primatives  ", npri
   WRITE(*,*)
 
-  WRITE(*,999) "Allocating space for overlap matrix (MB)   ", norb*norb*8/1.0E6
+  WRITE(*,999) "Allocating space for overlap matrix (MB)   ", norb*norb*8/1.0D6
   ALLOCATE(S(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0E6
-  WRITE(*,999) "Allocating space for Fock matrix (MB)      ", norb*norb*8/1.0E6
+  fmem = fmem - norb*norb*8/1.0D6
+  WRITE(*,999) "Allocating space for Fock matrix (MB)      ", norb*norb*8/1.0D6
   ALLOCATE(F(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0E6
-  WRITE(*,999) "Allocating space for MO coefficients (MB)  ", norb*norb*8/1.0E6
-  ALLOCATE(MOc(0:norb-1,0:norb-1),STAT=stat)
-  IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0E6
+  fmem = fmem - norb*norb*8/1.0D6
   WRITE(*,*)
   CALL nmem(fmem)
 
   INQUIRE(file='Suv',EXIST=flag1)
-  INQUIRE(file='Fuv',EXIST=flag2)
+  INQUIRE(file='Huv',EXIST=flag2)
   flag = flag1 .AND. flag2
   IF (.NOT. flag) THEN
     !1) If not there, calculated Overlap and Fock 
     CALL proc1e(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb,set,setinfo)
     WRITE(*,*) "Overlap written to Suv"
-    WRITE(*,*) "One electron energy written to Fuv"
+    WRITE(*,*) "One electron energy written to Huv"
     WRITE(*,*)
   ELSE
     CALL EXECUTE_COMMAND_LINE('touch Sold')
-    CALL EXECUTE_COMMAND_LINE('touch Fold')    
+    CALL EXECUTE_COMMAND_LINE('touch Hold')    
     OPEN(unit=1,file='Suv',status='old',access='sequential')
-    OPEN(unit=2,file='Fuv',status='old',access='sequential')
+    OPEN(unit=2,file='Huv',status='old',access='sequential')
     WRITE(*,*) "Reading overlap matrix from Suv"
     READ(1,*) S(:,:)
-    WRITE(*,*) "Reading Fock matrix from Fuv"
+    WRITE(*,*) "Reading Fock matrix from Huv"
     READ(2,*) F(:,:)
     CLOSE(unit=2)
     CLOSE(unit=1)
   END IF
 
-  ! 2) molecular orbital coefficients
-  ! WORK NOTE : should be initialized with 1 electron Hamiltonian?
-!    CALL normS(S,MOc,norb,0)
-  INQUIRE(file='Cuv',EXIST=flag2)
-  IF (flag2) THEN
-    WRITE(*,*) "Reading MO coefficients from Cuv"
-  ELSE
-    WRITE(*,*) "Calculating initial Cuv guess"
-    WRITE(*,*) "temporarily taking all MO coefficients as one"
-    DO i=0,norb-1
-      MOc(:,i) = (/ (1.0D0, j=0,norb-1) /)
-    END DO
-    OPEN(unit=1,file='Cuv',status='replace',access='sequential')
-    WRITE(1,*) MOc(:,:)
-    CLOSE(unit=1)
-    WRITE(*,*) "MO coefficients written to Cuv"
-  END IF
   WRITE(*,*)
 
   DEALLOCATE(F)
   DEALLOCATE(S)
-  DEALLOCATE(MOc)
   DEALLOCATE(bas)
   DEALLOCATE(set)
   DEALLOCATE(basinfo)
   DEALLOCATE(setinfo)
 
 ! output
-  fmem = fmem + 3*norb*norb*8/1.0E6
+  fmem = fmem + 3*norb*norb*8/1.0D6
   CALL setenv(atoms,xyz,fmem,options)
   CALL CPU_TIME(timeF)
   WRITE(*,997) "int1e ran in (s) :", (timeF - timeS) 
@@ -284,7 +261,7 @@ PROGRAM int1e
       WRITE(1,*) S(:,:)    
     CLOSE(unit=1)
  
-    OPEN(unit=1,file='Fuv',status='replace',access='sequential')
+    OPEN(unit=1,file='Huv',status='replace',access='sequential')
       WRITE(1,*) F(:,:)
     CLOSE(unit=1)
 

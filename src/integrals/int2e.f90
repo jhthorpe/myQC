@@ -55,13 +55,10 @@ PROGRAM int2e
   CALL buildBasis(options(2),atoms,bas,basinfo,set,setinfo,.FALSE.,maxN,maxL)
 
   ! check that Fock has been created 
-  INQUIRE(file='Fuv',EXIST=flag1)
- 
-  ! check that we need to do these calculations
-  INQUIRE(file='Fold',EXIST=flag2)
+  INQUIRE(file='XX',EXIST=flag1)
  
   ! logic gate
-  IF (flag1 .AND. flag2) THEN
+  IF (flag1) THEN 
     WRITE(*,*) "Reading two electron integrals from intermediate"
     !we aren't actually reading anything, but they don't need to know that ;)"
   ELSE
@@ -143,11 +140,11 @@ PROGRAM int2e
     ALLOCATE(Okp(0:2*setK+1))
 
     !Iuv will be my intermediate file for the integrals
-    OPEN(unit=42,file='Iuv',status='replace',access='sequential',form='unformatted') 
+    OPEN(unit=42,file='XX',status='replace',access='sequential',form='unformatted') 
  
     !allocate memory
-    temp = (norb**(4))*8.0/1.0E6 
-    temp = temp + setK*norb*norb*8.0D0/1.0E6
+    temp = (norb**(4))*8.0/1.0D6 
+    temp = temp + setK*norb*norb*8.0D0/1.0D6
     WRITE(*,998) "Allocating space for intermediate matrices (MB)", temp 
     ALLOCATE(XX(0:norb-1,0:norb-1,0:norb-1,0:norb-1),STAT=stat1)
     ALLOCATE(II(0:setK,0:norb-1,0:norb-1),STAT=stat2)
@@ -265,7 +262,7 @@ PROGRAM int2e
         DO j=0,norb-1
           DO g=0,norb-1
             DO h=0,norb-1
-              IF (XX(i,j,g,h) .NE. 0.0D0) WRITE(*,996) i+1,j+1,g+1,h+1,XX(i,j,g,h)
+              IF (XX(i,j,g,h) .NE. 0.0D0) WRITE(*,996) i,j,g,h,XX(i,j,g,h)
             END DO
           END DO
         END DO
@@ -282,8 +279,8 @@ PROGRAM int2e
     DEALLOCATE(Okp)
 
     !reassign memory
-    fmem = fmem + (norb**(4))*8.0/1.0E6
-    fmem = fmem + setK*norb*norb*8.0D0/1.0E6
+    fmem = fmem + (norb**(4))*8.0/1.0D6
+    fmem = fmem + setK*norb*norb*8.0D0/1.0D6
     CALL nmem(fmem)
 
     CALL CPU_TIME(timeF) 

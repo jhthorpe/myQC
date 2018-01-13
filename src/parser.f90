@@ -43,6 +43,8 @@ PROGRAM parser
   INTEGER :: i,nnuc
   LOGICAL :: flag
 
+999 FORMAT(1x,A19,F8.5)
+
   CALL CPU_TIME(timeS)
 
   i = 0
@@ -162,7 +164,7 @@ PROGRAM parser
 
   CALL CPU_TIME(timeF)
 
-  WRITE(*,*) "parse ran in (s) : ", (timeF - timeS)
+  WRITE(*,999) "parse ran in (s) : ", (timeF - timeS)
 
   CONTAINS
 
