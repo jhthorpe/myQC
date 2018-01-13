@@ -143,8 +143,8 @@ PROGRAM int2e
     OPEN(unit=42,file='XX',status='replace',access='sequential',form='unformatted') 
  
     !allocate memory
-    temp = (norb**(4))*8.0/1.0E6 
-    temp = temp + setK*norb*norb*8.0D0/1.0E6
+    temp = (norb**(4))*8.0/1.0D6 
+    temp = temp + setK*norb*norb*8.0D0/1.0D6
     WRITE(*,998) "Allocating space for intermediate matrices (MB)", temp 
     ALLOCATE(XX(0:norb-1,0:norb-1,0:norb-1,0:norb-1),STAT=stat1)
     ALLOCATE(II(0:setK,0:norb-1,0:norb-1),STAT=stat2)
@@ -279,8 +279,8 @@ PROGRAM int2e
     DEALLOCATE(Okp)
 
     !reassign memory
-    fmem = fmem + (norb**(4))*8.0/1.0E6
-    fmem = fmem + setK*norb*norb*8.0D0/1.0E6
+    fmem = fmem + (norb**(4))*8.0/1.0D6
+    fmem = fmem + setK*norb*norb*8.0D0/1.0D6
     CALL nmem(fmem)
 
     CALL CPU_TIME(timeF) 

@@ -84,7 +84,7 @@ PROGRAM dens
     CLOSE(unit=1) 
 
     !Allocate memory
-    fmem = fmem - 2*norb*norb*8/1.0E6 - norb*4/1.0E6
+    fmem = fmem - 2*norb*norb*8/1.0D6 - norb*4/1.0D6
     IF (fmem .GT. 0) THEN
       ALLOCATE(Cui(0:norb-1,0:norb-1),STAT=stat1)
       ALLOCATE(Da(0:norb-1,0:norb-1),STAT=stat2)
@@ -138,7 +138,7 @@ PROGRAM dens
     DEALLOCATE(Cui) 
     DEALLOCATE(Da)
 
-    fmem = fmem + 2*norb*norb*8/1.0E6 + norb*4/1.0E6 
+    fmem = fmem + 2*norb*norb*8/1.0D6 + norb*4/1.0D6 
     CALL nmem(fmem)
 
   END SUBROUTINE densRHF

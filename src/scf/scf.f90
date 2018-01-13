@@ -93,7 +93,7 @@ PROGRAM scf
     iter = 0
     LWORK = -1
     conv = .FALSE.
-    Enr = [0.0E6, 0.0E6, 0.0E6]
+    Enr = [0.0D0, 0.0D0, 0.0D0]
 
     !get number of orbitals
     OPEN(unit=1,file='basinfo',status='old',access='sequential')
@@ -102,8 +102,8 @@ PROGRAM scf
     CLOSE(unit=1)
  
     !check we will have enough memory
-    fmem = fmem - (6*norb*norb*8/1.0E6 + norb*8/1.0E6)
-    WRITE(*,999) "Allocating memory for rhf (MB) ", (6*norb*norb*8/1.0E6 + norb*8/1.0E6)
+    fmem = fmem - (6*norb*norb*8/1.0D6 + norb*8/1.0D6)
+    WRITE(*,999) "Allocating memory for rhf (MB) ", (6*norb*norb*8/1.0D6 + norb*8/1.0D6)
     IF (fmem .GT. 0) THEN
       ALLOCATE(Cui(0:norb-1,0:norb-1),STAT=stat1)
       ALLOCATE(Suv(0:norb-1,0:norb-1),STAT=stat2)
@@ -167,7 +167,7 @@ PROGRAM scf
     DEALLOCATE(Da)
     DEALLOCATE(Eig)
 
-    fmem = fmem + (6*norb*norb*8/1.0E6 + norb*8.0/1.0E6)
+    fmem = fmem + (6*norb*norb*8/1.0D6 + norb*8.0/1.0D6)
     CALL nmem(fmem)
 
     CALL CPU_TIME(timeF)
@@ -238,17 +238,17 @@ PROGRAM scf
     ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
     ALLOCATE(B(0:norb-1,0:norb-1),STAT=stat2)
     ALLOCATE(W(0:norb-1),STAT=stat3)
-    fmem = fmem - (2*norb*norb*8.0/1.0E6 + norb*8.0/1.0E6)
-    IF (fmem .LT. 0.0E6 .OR. stat1+stat2+stat3 .NE. 0) THEN
+    fmem = fmem - (2*norb*norb*8.0/1.0D6 + norb*8.0/1.0D6)
+    IF (fmem .LT. 0.0D6 .OR. stat1+stat2+stat3 .NE. 0) THEN
       CALL EXECUTE_COMMAND_LINE('touch error')
       WRITE(*,*) "scf:initRHF could not allocate enough memory"
       STOP "scf:initRHF out of memory"
     END IF 
     CALL nmem(fmem)
     DO v=0,norb-1
-      A(0:v-1,v) = (/ (0.0E6, u=0,v-1) /)
+      A(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
       A(v:norb-1,v) = (/ (Huv(u,v), u=v,norb-1) /)
-      B(0:v-1,v) = (/ (0.0E6, u=0,v-1) /)
+      B(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
       B(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
     END DO
 
@@ -259,13 +259,13 @@ PROGRAM scf
     LWORK = CEILING(WORK(0))
     DEALLOCATE(WORK)
     ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
-    fmem = fmem - LWORK*8/1.0E6 
-    IF (fmem .LT. 0.0E6 .OR. stat1 .NE. 0) THEN
-      fmem = fmem + LWORK*8/1.0E6
+    fmem = fmem - LWORK*8/1.0D6 
+    IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+      fmem = fmem + LWORK*8/1.0D6
       LWORK=norb
       ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
-      fmem = fmem - LWORK*8/1.0E6 
-      IF (fmem .LT. 0.0E6 .OR. stat2 .NE. 0) THEN
+      fmem = fmem - LWORK*8/1.0D6 
+      IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
         CALL EXECUTE_COMMAND_LINE('touch error')
         WRITE(*,*) "scf:initRHF could not allocate memory"
         STOP
@@ -303,8 +303,8 @@ PROGRAM scf
     DEALLOCATE(B)
     DEALLOCATE(W)
     DEALLOCATE(WORK)
-    fmem = fmem + (2*norb*norb*8.0/1.0E6 + norb*8.0/1.0E6)
-    fmem = fmem + (LWORK*8/1.0E6)
+    fmem = fmem + (2*norb*norb*8.0/1.0D6 + norb*8.0/1.0D6)
+    fmem = fmem + (LWORK*8/1.0D6)
     CALL nmem(fmem)
 
   END SUBROUTINE initRHF
@@ -343,7 +343,7 @@ PROGRAM scf
 
     ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
     ALLOCATE(W(0:norb-1),STAT=stat2)
-    fmem = fmem - (norb*norb*8/1.0E6 + norb*8/1.0E6) 
+    fmem = fmem - (norb*norb*8/1.0D6 + norb*8/1.0D6) 
     IF (fmem .LT. 0.0D0 .OR. stat1+stat2 .NE. 0) THEN
       CALL EXECUTE_COMMAND_LINE('touch error')
       WRITE(*,*) "scf:checkSuv could not allocate memory"
@@ -353,7 +353,7 @@ PROGRAM scf
 
     !put S into A
     DO v=0,norb-1
-      A(0:v-1,v) = (/ (0.0E6, u=0,v-1) /)
+      A(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
       A(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
     END DO
 
@@ -364,13 +364,13 @@ PROGRAM scf
     LWORK = CEILING(WORK(0))
     DEALLOCATE(WORK)
     ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
-    fmem = fmem - LWORK*8/1.0E6 
-    IF (fmem .LT. 0.0E6 .OR. stat1 .NE. 0) THEN
-      fmem = fmem + LWORK*8/1.0E6
+    fmem = fmem - LWORK*8/1.0D6 
+    IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+      fmem = fmem + LWORK*8/1.0D6
       LWORK=norb
       ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
-      fmem = fmem - LWORK*8/1.0E6 
-      IF (fmem .LT. 0.0E6 .OR. stat2 .NE. 0) THEN
+      fmem = fmem - LWORK*8/1.0D6 
+      IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
         CALL EXECUTE_COMMAND_LINE('touch error')
         WRITE(*,*) "scf:checkSuv could not allocate memory"
         STOP
@@ -397,8 +397,8 @@ PROGRAM scf
     DEALLOCATE(W)
     DEALLOCATE(WORK)
 
-    fmem = fmem + (norb*norb*8/1.0E6 + norb*8/1.0E6) 
-    fmem = fmem + (LWORK*8/1.0E6)
+    fmem = fmem + (norb*norb*8/1.0D6 + norb*8/1.0D6) 
+    fmem = fmem + (LWORK*8/1.0D6)
     CALL nmem(fmem)
 
   END SUBROUTINE checkSuv
@@ -428,8 +428,8 @@ PROGRAM scf
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Guv,Fuv,Cui,Da
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv,Huv
     REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig,Enr
-    REAL(KIND=8), INTENT(INOUT) :: fmem
     INTEGER, DIMENSION(0:), INTENT(IN) :: options
+    REAL(KIND=8), INTENT(INOUT) :: fmem
     LOGICAL, INTENT(INOUT) :: conv 
     INTEGER, INTENT(IN) :: norb,iter
 
@@ -443,7 +443,7 @@ PROGRAM scf
     CLOSE(unit=8)
 
     !get new Guv matrix
-    CALL EXECUTE_COMMAND_LINE('RHFI2F')
+    CALL EXECUTE_COMMAND_LINE('RHFI2G')
     OPEN(unit=9,file='Guv',access='sequential',status='old',form='unformatted')
     READ(9) Guv(:,:)
     CLOSE(unit=9) 

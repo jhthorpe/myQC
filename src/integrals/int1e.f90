@@ -75,14 +75,14 @@ PROGRAM int1e
   WRITE(*,*) "Number of primatives  ", npri
   WRITE(*,*)
 
-  WRITE(*,999) "Allocating space for overlap matrix (MB)   ", norb*norb*8/1.0E6
+  WRITE(*,999) "Allocating space for overlap matrix (MB)   ", norb*norb*8/1.0D6
   ALLOCATE(S(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0E6
-  WRITE(*,999) "Allocating space for Fock matrix (MB)      ", norb*norb*8/1.0E6
+  fmem = fmem - norb*norb*8/1.0D6
+  WRITE(*,999) "Allocating space for Fock matrix (MB)      ", norb*norb*8/1.0D6
   ALLOCATE(F(0:norb-1,0:norb-1),STAT=stat)
   IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0E6
+  fmem = fmem - norb*norb*8/1.0D6
   WRITE(*,*)
   CALL nmem(fmem)
 
@@ -118,7 +118,7 @@ PROGRAM int1e
   DEALLOCATE(setinfo)
 
 ! output
-  fmem = fmem + 3*norb*norb*8/1.0E6
+  fmem = fmem + 3*norb*norb*8/1.0D6
   CALL setenv(atoms,xyz,fmem,options)
   CALL CPU_TIME(timeF)
   WRITE(*,997) "int1e ran in (s) :", (timeF - timeS) 
