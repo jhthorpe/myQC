@@ -67,6 +67,8 @@ PROGRAM scf
     ! Da        : 2D dp, density matrix for alpha
     ! occ       : 1d int, list of occupied orbitals
     ! LWORK	: int, best size for work arrays, for lapack
+    ! Eig	: orbital eigenvalues
+    
 
     !Inout
     INTEGER, DIMENSION(0:), INTENT(IN) :: atoms,options
@@ -75,6 +77,8 @@ PROGRAM scf
 
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: Cui,Suv,Huv,Fuv,Guv,Da
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Eig
+    REAL(KIND=8), DIMENSION(1:3) :: Enr
     INTEGER, DIMENSION(0:1) :: line
     REAL(KIND=8) :: timeS, timeF
     INTEGER :: LWORK
@@ -89,6 +93,7 @@ PROGRAM scf
     iter = 0
     LWORK = -1
     conv = .FALSE.
+    Enr = [0.0E6, 0.0E6, 0.0E6]
 
     !get number of orbitals
     OPEN(unit=1,file='basinfo',status='old',access='sequential')
@@ -96,8 +101,8 @@ PROGRAM scf
     norb = line(1)
     CLOSE(unit=1)
  
-    !Allocate memory
-    fmem = fmem - (6*norb*norb*8/1.0E6 + norb*4/1.0E6)
+    !check we will have enough memory
+    fmem = fmem - (6*norb*norb*8/1.0E6 + norb*8/1.0E6)
     WRITE(*,999) "Allocating memory for rhf (MB) ", (6*norb*norb*8/1.0E6 + norb*8/1.0E6)
     IF (fmem .GT. 0) THEN
       ALLOCATE(Cui(0:norb-1,0:norb-1),STAT=stat1)
@@ -106,6 +111,7 @@ PROGRAM scf
       ALLOCATE(Fuv(0:norb-1,0:norb-1),STAT=stat4)
       ALLOCATE(Guv(0:norb-1,0:norb-1),STAT=stat5)
       ALLOCATE(Da(0:norb-1,0:norb-1),STAT=stat6)
+      ALLOCATE(Eig(0:norb-1),STAT=stat7)
       IF (stat1+stat2+stat3+stat4+stat5+stat6 .NE. 0) THEN
         WRITE(*,*) "rhf: couldn't allocate space for matrices"
         CALL EXECUTE_COMMAND_LINE('touch error')
@@ -132,21 +138,12 @@ PROGRAM scf
       CALL initRHF(norb,Cui,Suv,Huv,LWORK,fmem,options(7))
       CALL EXECUTE_COMMAND_LINE('dens') 
     ELSE
-      OPEN(unit=1,file='Cui',status='old',access='sequential')
-      READ(1,*) Cui(:,:)
-      CLOSE(unit=1)
-      
       !check if we have density matrix 
       INQUIRE(file='Da',exist=flag)
       IF (.NOT. flag) THEN
         CALL EXECUTE_COMMAND_LINE('dens')
       END IF
     END IF
-
-    !read in density matrix
-    OPEN(unit=5,file='Da',access='sequential',status='old',form='unformatted')
-    READ(5) Da(:,:)
-    CLOSE(unit=5)
 
     !check eigenvalues of the overlap matrix
     CALL checkSuv(Suv,norb,fmem,options(7))
@@ -156,7 +153,8 @@ PROGRAM scf
     DO WHILE (.NOT. conv)
       iter = iter + 1
       WRITE(*,*) "Starting scf iteration", iter 
-!      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,norb,conv,options)
+      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,options)
+
       !testing only
       IF (iter .GT. 2) conv = .TRUE.
     END DO
@@ -167,6 +165,7 @@ PROGRAM scf
     DEALLOCATE(Huv)
     DEALLOCATE(Guv)
     DEALLOCATE(Da)
+    DEALLOCATE(Eig)
 
     fmem = fmem + (6*norb*norb*8/1.0E6 + norb*8.0/1.0E6)
     CALL nmem(fmem)
@@ -403,5 +402,52 @@ PROGRAM scf
     CALL nmem(fmem)
 
   END SUBROUTINE checkSuv
+
+!---------------------------------------------------------------------
+!			RHF iteration	
+!---------------------------------------------------------------------
+  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,options)
+    IMPLICIT NONE
+    
+    !Values
+    !norb	: int, number of orbitals
+    !conv	: bool, have we converged?
+    !fmem	: dp, memory remaining, MB
+    !options	: 1D int, list of input options
+    !Suv	: 2D dp, overlap matrix of AO
+    !Huv	: 2D dp, core hamiltonian matrix of AO
+    !Guv	: 2D dp, 2e- hamiltonian matrix of AO
+    !Fuv	: 2D dp, Fock matrix AO 
+    !Cui	: 2D dp, coefficients of MO
+    !Da		: 2D dp, density matrix of AO 
+    !Eig	: 1D dp, vector of orbital eigenvalues
+    !Enr	: 1D dp, list of last couple iteration energies 
+    !iter	: int, iteration number
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Guv,Fuv,Cui,Da
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv,Huv
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig,Enr
+    REAL(KIND=8), INTENT(INOUT) :: fmem
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options
+    LOGICAL, INTENT(INOUT) :: conv 
+    INTEGER, INTENT(IN) :: norb,iter
+
+    !Internal
+    INTEGER :: i,j,u,v
+  
+    !get new density matrix  
+    CALL EXECUTE_COMMAND_LINE('dens')
+    OPEN(unit=8,file='Da',access='sequential',status='old',form='unformatted')
+    READ(8) Da(:,:) 
+    CLOSE(unit=8)
+
+    !get new Guv matrix
+    CALL EXECUTE_COMMAND_LINE('RHFI2F')
+    OPEN(unit=9,file='Guv',access='sequential',status='old',form='unformatted')
+    READ(9) Guv(:,:)
+    CLOSE(unit=9) 
+
+  END SUBROUTINE RHFiter
 !---------------------------------------------------------------------
 END PROGRAM scf
