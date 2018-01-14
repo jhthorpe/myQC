@@ -661,16 +661,15 @@ PROGRAM scf
     REAL(KIND=8), DIMENSION(0:11) :: lim
     INTEGER :: i 
 
-    !These go up to 11
-    lim = [1.0D0,1.0D-1,1.0D-2,1.0D-3,1.0D-4,1.0D-5,1.0D-6,1.0D-7,1.0D-8,1.0D-9,1.0D-10,1.0D-11]
-    
+    !These go to 11
     i = options(8)
+    lim = [1.0D0,1.0D-1,1.0D-2,1.0D-3,1.0D-4,1.0D-5,1.0D-6,1.0D-7,1.0D-8,1.0D-9,1.0D-10,1.0D-11]
 
-!    IF (Etrk(0)-Etrk(1) .LT. lim(i) .AND. Etrk(1)-Etrk(2) .LT. lim(i)) THEN
     IF (Etrk(1)-Etrk(2) .LT. lim(i)) THEN
       conv = .TRUE.
     END IF 
 
   END SUBROUTINE
+
 !---------------------------------------------------------------------
 END PROGRAM scf
