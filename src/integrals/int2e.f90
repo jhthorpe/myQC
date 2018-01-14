@@ -66,6 +66,7 @@ PROGRAM int2e
     CALL proc2e(bas,basinfo,atoms,options,fmem,nnuc,xyz,set,setinfo,maxL)
   END IF
 
+  CALL setenv(atoms,xyz,fmem,options) 
 
   CONTAINS
 !===================================================================

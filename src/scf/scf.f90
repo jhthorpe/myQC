@@ -155,19 +155,23 @@ PROGRAM scf
 
     ! RHF iterations
     WRITE(*,*) "RHF calculation..."
-    WRITE(*,*) "Interation          Total Energy (hartrees)"
+    WRITE(*,*) "Interation   Total Energy (hartrees)   Ediff"
     WRITE(*,*) "=============================================="
     DO WHILE (.NOT. conv)
       iter = iter + 1
-      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,LWORK,options)
+      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
     END DO
     WRITE(*,*) "=============================================="
 
     !Write output
     WRITE(*,*) "Orbital eigenvalues"
     WRITE(*,*) "=============================================="
-    DO i=0,norb-1
-      WRITE(*,*) i, Eig(i)
+    WRITE(*,*) 1, Eig(0)
+    DO i=1,norb-1
+      IF (Eig(i) .GT. 0.0D0 .AND. Eig(i-1) .LT. 0.0D0) THEN
+        WRITE(*,*) "----------------------------------------------"
+      END IF 
+      WRITE(*,*) i+1, Eig(i)
     END DO
     WRITE(*,*) "=============================================="
     WRITE(*,*)
@@ -400,9 +404,9 @@ PROGRAM scf
     !print eigenvalues
     DO i=0,norb-1
       IF (W(i) .LT. 1.0E-4) THEN
-        WRITE(*,997) i, W(i), "WARNING"
+        WRITE(*,997) i+1, W(i), "WARNING"
       ELSE IF (verb .GE. 1) THEN
-        WRITE(*,999) i, W(i)
+        WRITE(*,999) i+1, W(i)
       END IF
     END DO
     
@@ -419,7 +423,7 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !			RHF iteration	
 !---------------------------------------------------------------------
-  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,norb,conv,fmem,iter,LWORK,options)
+  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
     IMPLICIT NONE
     
     !Values
@@ -435,6 +439,7 @@ PROGRAM scf
     !Da		: 2D dp, density matrix of AO 
     !Eig	: 1D dp, vector of orbital eigenvalues
     !Enr	: dp, nuclear repulsion energy
+    !Etrk	: 1D dp, list of latest energies
     !iter	: int, iteration number
     !Eelc	: dp, electronic energy
     !LWORK	: int, length of work array
@@ -442,7 +447,7 @@ PROGRAM scf
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Guv,Fuv,Cui,Da
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv,Huv
-    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig,Etrk
     INTEGER, DIMENSION(0:), INTENT(IN) :: options
     REAL(KIND=8), INTENT(INOUT) :: fmem
     REAL(KIND=8), INTENT(IN) :: Enr
@@ -483,7 +488,7 @@ PROGRAM scf
  
     !write output
     !WORK NOTe - need better output
-    WRITE(*,*) iter, Eelc+Enr
+    WRITE(*,*) iter, Eelc+Enr, Eelc+Enr-Etrk(2)
 
     !Get our coefficients and eigenvalues
 
@@ -577,7 +582,19 @@ PROGRAM scf
     CALL nmem(fmem)
 
     !check for convergece
-    IF (iter .GT. 20) conv=.TRUE.  !TESTING ONLY
+    Etrk(0) = Etrk(1)
+    Etrk(1) = Etrk(2)
+    Etrk(2) = Eelc + Enr
+
+
+    IF (iter .GT. 2) THEN
+      CALL checkConv(Etrk,options,conv)
+    END IF
+
+    IF (iter .GT. 300) THEN
+      WRITE(*,*) "SCF failed to converge"
+      WRITE(*,*)  
+    END IF 
 
     IF (conv) THEN
       WRITE(*,*) "SCF has converged!"
@@ -611,7 +628,6 @@ PROGRAM scf
     INTEGER :: A,B,M
    
     M = SIZE(atoms) 
-
     Enr = 0.0D0
 
     DO A=0,M-1
@@ -622,6 +638,38 @@ PROGRAM scf
     END DO 
 
     WRITE(*,*) "Nuclear repulsion energy (hartrees) : ", Enr
+
+  END SUBROUTINE
+
+!---------------------------------------------------------------------
+!		Check for convergence	
+!---------------------------------------------------------------------
+  SUBROUTINE checkConv(Etrk,options,conv)
+    IMPLICIT NONE
+
+    !Value
+    !Etrk	: 1D dp, list of 3 last energies
+    !options	: 1D int, options array
+    !conv	: bool, converged or not
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: Etrk
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options
+    LOGICAL, INTENT(INOUT) :: conv
+
+    !Internal
+    REAL(KIND=8), DIMENSION(0:11) :: lim
+    INTEGER :: i 
+
+    !These go up to 11
+    lim = [1.0D0,1.0D-1,1.0D-2,1.0D-3,1.0D-4,1.0D-5,1.0D-6,1.0D-7,1.0D-8,1.0D-9,1.0D-10,1.0D-11]
+    
+    i = options(8)
+
+!    IF (Etrk(0)-Etrk(1) .LT. lim(i) .AND. Etrk(1)-Etrk(2) .LT. lim(i)) THEN
+    IF (Etrk(1)-Etrk(2) .LT. lim(i)) THEN
+      conv = .TRUE.
+    END IF 
 
   END SUBROUTINE
 !---------------------------------------------------------------------

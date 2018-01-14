@@ -14,7 +14,6 @@ My crummy implementation of Hartree Fock
 - Current basis sets: STO-3G
 - Current systems: Atoms, Diatomics, cartesian molecules, closed shell only.
 - Convergence of SCF not implimented yet
-- There appears to be a problem in parser with the xyz coordinates...
 - Save considerable time by keeping the intermediate 'XX' file, which contains the two electron integrals.
 
 One electron integrals implimented, two electron integrals implimented, but slow.
