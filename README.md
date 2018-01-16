@@ -7,7 +7,7 @@ My crummy implementation of Hartree Fock
 3) Copy 'mybasis' and 'Ftab' (temporary fix) from bin into current directory.
 4) In same directory, create or copy 'input'.
 5) Call calculation with the 'myQC' executable.
-6) Run 'clean' to remove intermediate files
+6) Run 'clean' to remove intermediate files, if desired.
 
 ====  NOTES and BUGS  ===
 - Current atoms: All 1st and 2nd row elements 
@@ -15,6 +15,7 @@ My crummy implementation of Hartree Fock
 - Current systems: Atoms, Diatomics, cartesian molecules, closed shell only.
 - Convergence of SCF not implimented yet
 - Save considerable time by keeping the intermediate 'XX' file, which contains the two electron integrals.
+- Two electron integrals need a more stringent incomplete error function evaluation, as there are some numerical problems with MO eigenvalues that should be degenerate.
 
 One electron integrals implimented, two electron integrals implimented, but slow.
-RHF SCF implimented, but missing convergence criteria. 
+RHF SCF implimented. 
