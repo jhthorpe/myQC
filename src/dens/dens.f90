@@ -132,7 +132,7 @@ PROGRAM dens
 
     !write density matrix
     OPEN(unit=2,file='Da',access='sequential',status='replace',form='unformatted')
-    WRITE(2) Da
+    WRITE(2) Da(:,:)
     CLOSE(unit=2,status='keep')
 
     DEALLOCATE(Cui) 

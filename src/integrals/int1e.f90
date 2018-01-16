@@ -39,7 +39,7 @@ PROGRAM int1e
   INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo, setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
-  INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat, maxN,maxL
+  INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat1,stat2,maxN,maxL
   LOGICAL :: flag1,flag2,flag
 
 ! input managment 
@@ -51,7 +51,7 @@ PROGRAM int1e
   IF (flag) STOP
 
 !format stuff
-999 FORMAT(1x,A43,F8.5)
+999 FORMAT(1x,A31,F8.5)
 998 FORMAT(1x,A21,2x,I4)
 997 FORMAT(1x,A18,F8.5)
 
@@ -74,15 +74,24 @@ PROGRAM int1e
   WRITE(*,*) "Number of orbitals    ", norb
   WRITE(*,*) "Number of primatives  ", npri
   WRITE(*,*)
+  WRITE(*,*) "          STARTING ELECTRON INTEGRALS                    " 
+  WRITE(*,*) "------------------------------------------------------------"
 
-  WRITE(*,999) "Allocating space for overlap matrix (MB)   ", norb*norb*8/1.0D6
-  ALLOCATE(S(0:norb-1,0:norb-1),STAT=stat)
-  IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0D6
-  WRITE(*,999) "Allocating space for Fock matrix (MB)      ", norb*norb*8/1.0D6
-  ALLOCATE(F(0:norb-1,0:norb-1),STAT=stat)
-  IF (stat .NE. 0) STOP "int1e: max memory reached, exiting"
-  fmem = fmem - norb*norb*8/1.0D6
+  WRITE(*,999) "Allocating space for int1e (MB)", 2*norb*norb*8/1.0D6
+  fmem = fmem - 2*norb*norb*8.0/1.D6
+  IF (fmem .LT. 0.0D0) THEN
+    CALL EXECUTE_COMMAND_LINE('touch error')
+    WRITE(*,*) "int1e: max memory reached"
+    STOP
+  ELSE
+    ALLOCATE(S(0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(F(0:norb-1,0:norb-1),STAT=stat2)
+    IF(stat1+stat2 .NE. 0) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "int1e: could not allocate memory"
+      STOP
+    END IF
+  END IF
   WRITE(*,*)
   CALL nmem(fmem)
 
@@ -93,19 +102,12 @@ PROGRAM int1e
     !1) If not there, calculated Overlap and Fock 
     CALL proc1e(S,F,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb,set,setinfo)
     WRITE(*,*) "Overlap written to Suv"
-    WRITE(*,*) "One electron energy written to Huv"
-    WRITE(*,*)
+    WRITE(*,*) "One electron integrals written to Huv"
   ELSE
     CALL EXECUTE_COMMAND_LINE('touch Sold')
     CALL EXECUTE_COMMAND_LINE('touch Hold')    
-    OPEN(unit=1,file='Suv',status='old',access='sequential')
-    OPEN(unit=2,file='Huv',status='old',access='sequential')
     WRITE(*,*) "Reading overlap matrix from Suv"
-    READ(1,*) S(:,:)
     WRITE(*,*) "Reading Fock matrix from Huv"
-    READ(2,*) F(:,:)
-    CLOSE(unit=2)
-    CLOSE(unit=1)
   END IF
 
   WRITE(*,*)
@@ -118,7 +120,7 @@ PROGRAM int1e
   DEALLOCATE(setinfo)
 
 ! output
-  fmem = fmem + 3*norb*norb*8/1.0D6
+  fmem = fmem + 2*norb*norb*8/1.0D6
   CALL setenv(atoms,xyz,fmem,options)
   CALL CPU_TIME(timeF)
   WRITE(*,997) "int1e ran in (s) :", (timeF - timeS) 

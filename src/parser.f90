@@ -28,12 +28,13 @@ PROGRAM parser
   ! 5) number of procs  : number
   ! 6) memory           : number in MB
   ! 7) verbosity        : 0 - none, 1 - some, 2 - all, 3 - wtf
+  ! 8) SCF_CONV		: 1.0D-<0-11>
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:7) :: options 
+  INTEGER(KIND=8),DIMENSION(0:8) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
@@ -143,6 +144,8 @@ PROGRAM parser
   options(6) = getmem(line(1))
   READ(1,*) line
   options(7) = getverb(line(1)) 
+  READ(1,*) line
+  options(8) = getSCF_Conv(line(1)) 
   !~~~~~~~~~~~~~~
     
   IF (options(0) .NE. 5) THEN
@@ -338,6 +341,26 @@ PROGRAM parser
     WRITE(*,*) "Memory per CPU (MB) : ", val
     getmem = val
   END FUNCTION getmem
+
+!~~~~~~~~~~
+  ! Function to get SCF_CONV criteria 
+  INTEGER FUNCTION getSCF_Conv(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20), INTENT(IN) :: chr
+    INTEGER :: val
+    READ (chr,'(I8)') val 
+    !WRITE(*,*) val 
+    !WRITE(*,*) "Memory per CPU (MB) : ", FLOOR(val*1.0D0*1000.0D0)
+    !getmem = FLOOR(val*1.0D0*1000.0D0)
+    IF (val .GT. 11 .OR. val .LT. 0) THEN
+      WRITE(*,*) "SCF Convergence (default) :", 7
+    ELSE IF( val .EQ. 11) THEN
+      WRITE(*,*) "SCF Convergence (these go to..) : ", val
+    ELSE
+      WRITE(*,*) "SCF Convergence : ", val
+    END IF
+    getSCF_CONV = val
+  END FUNCTION getSCF_Conv
 
 !~~~~~~~~~~
   ! Function to return the calculation option value
