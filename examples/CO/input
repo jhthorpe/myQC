@@ -10,3 +10,4 @@ PAR= none
 NODES= 1
 MEMORY= 1000
 VERB= 1
+SCF_Conv= 7

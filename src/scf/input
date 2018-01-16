@@ -10,5 +10,5 @@ PAR= none
 NODE= 1
 MEM= 1000
 VERB= 2
-SCF_Conv= 7
+SCF_Conv= 3
 

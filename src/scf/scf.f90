@@ -29,8 +29,9 @@ PROGRAM scf
   LOGICAL :: flag
 
   WRITE(*,*) ""
-  WRITE(*,*) "          STARTING SCF          "
-
+  WRITE(*,*) "                      STARTING SCF"
+  !the length is 60
+  WRITE(*,*) "------------------------------------------------------------"
   CALL getenv(nnuc,nelc,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
@@ -140,15 +141,16 @@ PROGRAM scf
     INQUIRE(file='Cui',exist=ex)
     IF (.NOT. ex) THEN
       CALL initRHF(norb,Cui,Suv,Huv,LWORK,fmem,options(7))
-      CALL EXECUTE_COMMAND_LINE('dens') 
     ELSE
-      !check if we have density matrix 
-      INQUIRE(file='Da',exist=flag)
-      IF (.NOT. flag) THEN
-        CALL EXECUTE_COMMAND_LINE('dens')
-      END IF
+      WRITE(*,*) "Reading MO coef from Cui"
+      OPEN(unit=7,file='Cui',status='old',access='sequential')
+      READ(7,*) Cui(:,:)
+      CLOSE(unit=7)
     END IF
 
+    CALL EXECUTE_COMMAND_LINE('dens')
+    CALL EXECUTE_COMMAND_LINE('RHFI2G')
+   
     !check eigenvalues of the overlap matrix
     CALL checkSuv(Suv,norb,fmem,options(7))
     WRITE(*,*)
@@ -156,24 +158,29 @@ PROGRAM scf
     ! RHF iterations
     WRITE(*,*) "RHF calculation..."
     WRITE(*,*) "Interation   Total Energy (hartrees)   Ediff"
-    WRITE(*,*) "=============================================="
+    WRITE(*,*) "============================================================"
     DO WHILE (.NOT. conv)
-      iter = iter + 1
       CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+      iter = iter + 1
+      IF (iter .GE. 300) THEN
+        WRITE(*,*) "SCF failed to converge."
+        EXIT
+      END IF
     END DO
-    WRITE(*,*) "=============================================="
+    WRITE(*,*) "============================================================"
 
+998 FORMAT(15x,I3,4x,F20.15)
     !Write output
-    WRITE(*,*) "Orbital eigenvalues"
-    WRITE(*,*) "=============================================="
-    WRITE(*,*) 1, Eig(0)
+    WRITE(*,*) "Orbital eigenvalues (a.u.)"
+    WRITE(*,*) "============================================================"
+    WRITE(*,998) 1, Eig(0)
     DO i=1,norb-1
       IF (Eig(i) .GT. 0.0D0 .AND. Eig(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "----------------------------------------------"
+        WRITE(*,*) "------------------------------------------------------------"
       END IF 
-      WRITE(*,*) i+1, Eig(i)
+      WRITE(*,998) i+1, Eig(i)
     END DO
-    WRITE(*,*) "=============================================="
+    WRITE(*,*) "============================================================"
     WRITE(*,*)
 
     DEALLOCATE(Cui)
@@ -349,8 +356,8 @@ PROGRAM scf
     INTEGER :: INFO,LWORK,stat1,stat2
     INTEGER :: i,j,u,v
 
-999 FORMAT(1x,I3,2x,E15.8)
-997 FORMAT(1x,I3,2x,E15.5,2x,A7)
+999 FORMAT(1x,I3,2x,ES15.8)
+997 FORMAT(1x,I3,2x,ES15.5,2x,A7)
     WRITE(*,*)
     IF (verb .GE. 1) THEN
       WRITE(*,*) "Eigenvalues of the overlap integrals"
@@ -461,15 +468,15 @@ PROGRAM scf
     REAL(KIND=8) :: Eelc,temp
     INTEGER :: INFO,stat1,stat2,stat3
     INTEGER :: i,j,u,v
+    LOGICAL :: ex
   
-    !get Density matrix  
-    CALL EXECUTE_COMMAND_LINE('dens')
+    !write Density matrix  
     OPEN(unit=8,file='Da',access='sequential',status='old',form='unformatted')
     READ(8) Da(:,:) 
     CLOSE(unit=8)
 
+
     !get Guv matrix
-    CALL EXECUTE_COMMAND_LINE('RHFI2G')
     OPEN(unit=11,file='Guv',access='sequential',status='old',form='unformatted')
     READ(11) Guv(:,:)
     CLOSE(unit=11) 
@@ -486,9 +493,11 @@ PROGRAM scf
     END DO
     Eelc = 0.5D0*Eelc
  
+999 FORMAT(4x,I3,4x,F20.15,8x,ES15.8)
+
     !write output
     !WORK NOTe - need better output
-    WRITE(*,*) iter, Eelc+Enr, Eelc+Enr-Etrk(2)
+    WRITE(*,999) iter+1, Eelc+Enr, Eelc+Enr-Etrk(2)
 
     !Get our coefficients and eigenvalues
 
@@ -560,18 +569,22 @@ PROGRAM scf
  
     !print if desired
     IF (options(7) .GE. 3) THEN
-      WRITE(*,*) "Orbital eigenvalues..."
+      WRITE(*,*) "Orbital eigenvalues (a.u.)"
       DO i=0,norb-1
         WRITE(*,*) i, Eig(i)
       END DO
       WRITE(*,*) "---------------------------------------"
     END IF
  
-    !write to Cui and Eig
+    !write MO 
     OPEN(unit=7,file='Cui',access='sequential',status='replace')
     WRITE(7,*) A(:,:)
     CLOSE(unit=7,status='keep')
     Cui(:,:) = A(:,:)
+
+    !write new dens and Guv
+    CALL EXECUTE_COMMAND_LINE('dens')
+    CALL EXECUTE_COMMAND_LINE('RHFI2G')
  
     !cleanup memory
     DEALLOCATE(A)
@@ -586,15 +599,9 @@ PROGRAM scf
     Etrk(1) = Etrk(2)
     Etrk(2) = Eelc + Enr
 
-
-    IF (iter .GT. 2) THEN
+    IF (iter .GT. 0) THEN
       CALL checkConv(Etrk,options,conv)
     END IF
-
-    IF (iter .GT. 300) THEN
-      WRITE(*,*) "SCF failed to converge"
-      WRITE(*,*)  
-    END IF 
 
     IF (conv) THEN
       WRITE(*,*) "SCF has converged!"
@@ -602,7 +609,6 @@ PROGRAM scf
       WRITE(*,*) "Total SCF energy (a.u)", Eelc+Enr
       WRITE(*,*)
     END  IF
-
 
   END SUBROUTINE RHFiter
 
@@ -665,7 +671,7 @@ PROGRAM scf
     i = options(8)
     lim = [1.0D0,1.0D-1,1.0D-2,1.0D-3,1.0D-4,1.0D-5,1.0D-6,1.0D-7,1.0D-8,1.0D-9,1.0D-10,1.0D-11]
 
-    IF (Etrk(1)-Etrk(2) .LT. lim(i)) THEN
+    IF (Etrk(1)-Etrk(2) .LT. lim(i) .AND. Etrk(2) .LE. Etrk(1)) THEN
       conv = .TRUE.
     END IF 
 

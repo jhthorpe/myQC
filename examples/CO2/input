@@ -9,5 +9,6 @@ BASIS= STO-3G
 REF= RHF
 PAR= none
 NODES= 1
-MEM= 1000
+MEM= 1 
 VERB= 1
+SCF_Conv= 11

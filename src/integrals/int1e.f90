@@ -51,7 +51,7 @@ PROGRAM int1e
   IF (flag) STOP
 
 !format stuff
-999 FORMAT(1x,A43,F8.5)
+999 FORMAT(1x,A31,F8.5)
 998 FORMAT(1x,A21,2x,I4)
 997 FORMAT(1x,A18,F8.5)
 
@@ -74,9 +74,10 @@ PROGRAM int1e
   WRITE(*,*) "Number of orbitals    ", norb
   WRITE(*,*) "Number of primatives  ", npri
   WRITE(*,*)
-  WRITE(*,*) "                STARTING ONE ELECTRON INTEGRALS                    " 
+  WRITE(*,*) "          STARTING ELECTRON INTEGRALS                    " 
+  WRITE(*,*) "------------------------------------------------------------"
 
-  WRITE(*,999) "Allocating space for int1e (MB) ", 2*norb*norb*8/1.0D6
+  WRITE(*,999) "Allocating space for int1e (MB)", 2*norb*norb*8/1.0D6
   fmem = fmem - 2*norb*norb*8.0/1.D6
   IF (fmem .LT. 0.0D0) THEN
     CALL EXECUTE_COMMAND_LINE('touch error')

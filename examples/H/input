@@ -9,3 +9,4 @@ PAR= none
 NODE= 1
 MEM= 1000
 VERB= 1
+SCF_Conv= 7
