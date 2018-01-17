@@ -22,7 +22,7 @@ PROGRAM int1e
   ! atoms	: 1D int, array of which atom is which
   ! fmem	: dp, free memory left in MB
   ! nnuc	: int, number of nuclii
-  ! nelc	: int, number of electrons
+  ! nelcA,B	: int, number of electrons of spin A,B
   ! norb	: int, number of orbitals in molecule
   ! npri	: int, number of primatives
   ! bas		: 2D dp, basis for each atom: atom : orbital : [d,a]
@@ -39,14 +39,14 @@ PROGRAM int1e
   INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo, setinfo
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms,options 
   REAL(KIND=8) :: timeS, timeF, fmem
-  INTEGER :: nnuc,nelc,i,j,k,norb,npri,stat1,stat2,maxN,maxL
+  INTEGER :: nnuc,nelcA,nelcB,i,j,k,norb,npri,stat1,stat2,maxN,maxL
   LOGICAL :: flag1,flag2,flag
 
 ! input managment 
   CALL CPU_TIME(timeS)
   WRITE(*,*)
   WRITE(*,*) "int1e called"
-  CALL getenv(nnuc,nelc,xyz,atoms,fmem,options)
+  CALL getenv(nnuc,nelcA,nelcB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
 
@@ -74,7 +74,7 @@ PROGRAM int1e
   WRITE(*,*) "Number of orbitals    ", norb
   WRITE(*,*) "Number of primatives  ", npri
   WRITE(*,*)
-  WRITE(*,*) "          STARTING ELECTRON INTEGRALS                    " 
+  WRITE(*,*) "               STARTING ELECTRON INTEGRALS" 
   WRITE(*,*) "------------------------------------------------------------"
 
   WRITE(*,999) "Allocating space for int1e (MB)", 2*norb*norb*8/1.0D6
@@ -110,8 +110,6 @@ PROGRAM int1e
     WRITE(*,*) "Reading Fock matrix from Huv"
   END IF
 
-  WRITE(*,*)
-
   DEALLOCATE(F)
   DEALLOCATE(S)
   DEALLOCATE(bas)
@@ -123,7 +121,6 @@ PROGRAM int1e
   fmem = fmem + 2*norb*norb*8/1.0D6
   CALL setenv(atoms,xyz,fmem,options)
   CALL CPU_TIME(timeF)
-  WRITE(*,997) "int1e ran in (s) :", (timeF - timeS) 
 
   CONTAINS 
 !=====================================================================

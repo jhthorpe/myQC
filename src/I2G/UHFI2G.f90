@@ -1,5 +1,5 @@
 !//////////////////////////////////////////////////////////////////
-!//          Constructs Guv(2e-) Matrix for RHF system 
+!//          Constructs Guv(2e-) Matrix for UHF system 
 !//
 !//              James H Thorpe, in Group of John Stanton
 !//              The University of Florida
@@ -12,7 +12,7 @@
 !=====================================================================
 !                       MAIN 
 
-PROGRAM RHFI2G
+PROGRAM UHFI2G
   USE env
   IMPLICIT NONE
 
@@ -23,26 +23,23 @@ PROGRAM RHFI2G
   ! nnuc        : int, number of nuclii
   ! nelcA,nelcB : int, number of electrons of spin A,B
   ! options     : 1D int, array of options
-  ! Guv		: 2D dp, 2e- part of matrix
-  ! Da		: 2D dp, density matrix 
+  ! GuvA,B	: 2D dp, 2e- part of matrix of spin A,B
+  ! Da		: 2D dp, density matrix of spin A,B
   ! XX		: 4D dp, 2e- AO integral matrix
 
   ! Internal
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:) :: XX 
-  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,Guv,Da
+  REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz,GuvA,GuvB,Da,Db
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms, options
   INTEGER, DIMENSION(0:1) :: line
-  REAL(KIND=8) :: fmem,timeS,timeF,temp
-  INTEGER :: nnuc,nelcA,nelcB,nelc,dummy,norb,stat1,stat2,stat3
+  REAL(KIND=8) :: fmem,timeS,timeF,tempA,tempB
+  INTEGER :: nnuc,nelcA,nelcB,nelc,dummy,norb,stat1,stat2,stat3,stat4
   INTEGER :: i,j,k,l
   LOGICAL :: flag
 
   CALL getenv(nnuc,nelcA,nelcB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
-
-  !Sum electrons
-  nelc = nelcA + nelcB
 
   !get number of orbitals
   OPEN(unit=1,file='basinfo',status='old',access='sequential')
@@ -51,12 +48,14 @@ PROGRAM RHFI2G
   CLOSE(unit=1)
 
   !Allocate memory
-  fmem = fmem - (norb**4.0D0 + 2*norb*norb)*8.0/1.0D6
+  fmem = fmem - (norb**4.0D0 + 4*norb*norb)*8.0/1.0D6
   IF (fmem .GT. 0) THEN
-    ALLOCATE(Guv(0:norb-1,0:norb-1),STAT=stat1)
-    ALLOCATE(Da(0:norb-1,0:norb-1),STAT=stat2)
+    ALLOCATE(GuvA(0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(GuvB(0:norb-1,0:norb-1),STAT=stat2)
+    ALLOCATE(Da(0:norb-1,0:norb-1),STAT=stat3)
+    ALLOCATE(Db(0:norb-1,0:norb-1),STAT=stat4)
     ALLOCATE(XX(0:norb-1,0:norb-1,0:norb-1,0:norb-1),STAT=stat3)
-    IF (stat1+stat2+stat3 .NE. 0) THEN
+    IF (stat1+stat2+stat3+stat4 .NE. 0) THEN
       CALL EXECUTE_COMMAND_LINE('touch error')
       WRITE(*,*) "I2G:RHFI2G failed to allocate memory"
       STOP
@@ -74,31 +73,39 @@ PROGRAM RHFI2G
   CLOSE(unit=9)
   OPEN(unit=10,file='Da',status='old',access='sequential',form='unformatted')
   READ(10) Da(:,:)
+  READ(10) Db(:,:)
   CLOSE(unit=10)
 
   !my INCREDIBLY dumb implimentation
   DO j=0,norb-1
     DO i=0,norb-1
-      temp = 0
+      tempA = 0.0D0
+      tempB = 0.0D0
       DO l=0,norb-1
         DO k=0,norb-1
-          temp = temp + Da(k,l)*(XX(i,j,k,l) - 0.25D0*XX(i,k,j,l) - 0.25D0*XX(i,l,j,k)) 
+          tempA = tempA + (Da(k,l)+Db(k,l))*XX(i,j,k,l) - Da(k,l)*XX(i,k,j,l)
+          tempB = tempB + (Da(k,l)+Db(k,l))*XX(i,j,k,l) - Db(k,l)*XX(i,k,j,l)
         END DO
       END DO
-      Guv(i,j) = temp
+      GuvA(i,j) = tempA
+      GuvB(i,j) = tempB
     END DO
   END DO
   
   !once we have it, write out Guv
   OPEN(unit=11,file='Guv',status='replace',access='sequential',form='unformatted')
-  WRITE(11) Guv(:,:)
+  WRITE(11) GuvA(:,:)
+  WRITE(11) GuvB(:,:)
   CLOSE(unit=11)
 
   !Free memory
-  DEALLOCATE(Guv)
+  DEALLOCATE(GuvA)
+  DEALLOCATE(GuvB)
   DEALLOCATE(Da)
+  DEALLOCATE(Db)
   DEALLOCATE(XX)
-  fmem = fmem - (norb**4.0D0 + 2.0D0*norb*norb)*8.0/1.0D6
+
+  fmem = fmem - (norb**4.0D0 + 4.0D0*norb*norb)*8.0/1.0D6
   CALL nmem(fmem)
 
-END PROGRAM RHFI2G
+END PROGRAM UHFI2G

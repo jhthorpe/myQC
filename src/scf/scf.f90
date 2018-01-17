@@ -18,29 +18,29 @@ PROGRAM scf
   ! atoms       : 1D int, array of which atom is which
   ! fmem        : dp, free memory left in MB
   ! nnuc        : int, number of nuclii
-  ! nelc        : int, number of electrons
+  ! nelcA,nelcB : int, number of electrons of spin A,B
   ! options     : 1D int, array of options
 
   ! Internal
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms, options
   REAL(KIND=8) :: fmem, timeS, timeF
-  INTEGER :: nnuc, nelc, dummy
+  INTEGER :: nnuc, nelcA, nelcB, dummy
   LOGICAL :: flag
 
   WRITE(*,*) ""
   WRITE(*,*) "                      STARTING SCF"
   !the length is 60
   WRITE(*,*) "------------------------------------------------------------"
-  CALL getenv(nnuc,nelc,xyz,atoms,fmem,options)
+  CALL getenv(nnuc,nelcA,nelcB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
 
   !redirect to scf subroutines
-  IF (options(2) .EQ. 0) THEN        !RHF
-    CALL RHF(nnuc,nelc,atoms,fmem,options)
-  ELSE IF (options(2) .EQ. 1) THEN   !UHF
-    CALL uhf(nnuc,nelc,atoms,fmem,options)
+  IF (options(3) .EQ. 0) THEN        !RHF
+    CALL RHF(nnuc,nelcA+nelcB,atoms,fmem,options)
+  ELSE IF (options(3) .EQ. 1) THEN   !UHF
+    CALL UHF(nnuc,nelcA,nelcB,atoms,fmem,options)
   ELSE
     WRITE(*,*) "scf: sorry, that method is not implimented yet"
     STOP "bad method in scf"
@@ -91,6 +91,8 @@ PROGRAM scf
 997 FORMAT(1x,A16,F8.5)
 
     CALL CPU_TIME(timeS)
+
+    WRITE(*,*) "rhf called"
 
     iter = 0
     LWORK = -1
@@ -202,12 +204,12 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !               UHF SCF program 
 !---------------------------------------------------------------------
-  SUBROUTINE uhf(nnuc,nelc,atoms,fmem,options)
+  SUBROUTINE UHF(nnuc,nelcA,nelcB,atoms,fmem,options)
     IMPLICIT NONE
 
     ! Values
     ! nnuc      : int, number of nuclii
-    ! nelc      : int, number of electrons
+    ! nelcA,B   : int, number of electrons of spin A,B
     ! atoms     : 1D int array of atoms
     ! options   : 1D int, options of program
     ! fmem      : dp, free memory left in MB
@@ -219,11 +221,159 @@ PROGRAM scf
     !Inout
     INTEGER, DIMENSION(0:), INTENT(IN) :: atoms,options
     REAL(KIND=8), INTENT(INOUT) :: fmem
-    INTEGER, INTENT(IN) :: nnuc,nelc
+    INTEGER, INTENT(IN) :: nnuc,nelcA,nelcB
 
-    STOP "uhf not implimented yet"
+    !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: CuiA,CuiB,Suv,Huv,FuvA,FuvB
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: GuvA,GuvB,Da,Db
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: EigA,EigB
+    REAL(KIND=8), DIMENSION(1:3) :: Etrk
+    INTEGER, DIMENSION(0:11) :: stat
+    INTEGER, DIMENSION(0:1) :: line
+    REAL(KIND=8) :: timeS, timeF, Enr
+    INTEGER :: LWORK,i
+    INTEGER :: iter,norb
+    LOGICAL :: conv,ex,flag 
 
-  END SUBROUTINE uhf
+999 FORMAT(1x,A30,F8.5)
+997 FORMAT(1x,A16,F8.5)
+
+    CALL CPU_TIME(timeS)
+
+    WRITE(*,*) "uhf called"
+
+    iter = 0
+    LWORK = -1
+    conv = .FALSE.
+    Etrk = [0.0D0, 0.0D0, 0.0D0]
+    stat = [0,0,0,0,0,0,0,0,0,0,0,0]
+
+    !get number of orbitals
+    OPEN(unit=1,file='basinfo',status='old',access='sequential')
+    READ(1,*) line
+    norb = line(1)
+    CLOSE(unit=1)
+ 
+    !check we will have enough memory
+    fmem = fmem - (10*norb*norb*8/1.0D6 + 2.0D0*norb*8/1.0D6)
+    WRITE(*,999) "Allocating memory for uhf (MB) ", (10*norb*norb*8/1.0D6 + 2*norb*8/1.0D6)
+    IF (fmem .GT. 0) THEN
+      ALLOCATE(CuiA(0:norb-1,0:norb-1),STAT=stat(0))
+      ALLOCATE(CuiB(0:norb-1,0:norb-1),STAT=stat(1))
+      ALLOCATE(Suv(0:norb-1,0:norb-1),STAT=stat(2))
+      ALLOCATE(Huv(0:norb-1,0:norb-1),STAT=stat(3))
+      ALLOCATE(FuvA(0:norb-1,0:norb-1),STAT=stat(4))
+      ALLOCATE(FuvB(0:norb-1,0:norb-1),STAT=stat(5))
+      ALLOCATE(GuvA(0:norb-1,0:norb-1),STAT=stat(6))
+      ALLOCATE(GuvB(0:norb-1,0:norb-1),STAT=stat(7))
+      ALLOCATE(Da(0:norb-1,0:norb-1),STAT=stat(8))
+      ALLOCATE(Db(0:norb-1,0:norb-1),STAT=stat(9))
+      ALLOCATE(EigA(0:norb-1),STAT=stat(10))
+      ALLOCATE(EigB(0:norb-1),STAT=stat(11))
+      IF (SUM(stat(0:11)) .NE. 0) THEN
+        WRITE(*,*) "uhf: couldn't allocate space for matrices"
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        STOP
+      END IF
+      CALL nmem(fmem)
+    ELSE
+      WRITE(*,*) "uhf: max memory reached, exiting"
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      STOP
+    END IF
+
+    !get nuclear repulsion
+    CALL getEnr(xyz,atoms,Enr)
+
+    !get data
+    OPEN(unit=2,file='Huv',status='old',access='sequential')
+    READ(2,*) Huv(:,:)
+    CLOSE(unit=2)
+    OPEN(unit=3,file='Suv',status='old',access='sequential')
+    READ(3,*) Suv(:,:)
+    CLOSE(unit=3)
+
+    !check if we have coefficients 
+    INQUIRE(file='Cui',exist=ex)
+    IF (.NOT. ex) THEN
+      CALL initUHF(norb,CuiA,CuiB,Suv,Huv,LWORK,fmem,options(7))
+    ELSE
+      WRITE(*,*) "Reading MO coef from Cui"
+      OPEN(unit=7,file='Cui',status='old',access='sequential')
+      READ(7,*) CuiA(:,:)
+      READ(7,*) CuiB(:,:)
+      CLOSE(unit=7)
+    END IF
+
+    CALL EXECUTE_COMMAND_LINE('dens')
+    CALL EXECUTE_COMMAND_LINE('UHFI2G')
+   
+    !check eigenvalues of the overlap matrix
+    CALL checkSuv(Suv,norb,fmem,options(7))
+    WRITE(*,*)
+
+    ! UHF iterations
+    WRITE(*,*) "UHF calculation..."
+    WRITE(*,*) "Interation   Total Energy (hartrees)   Ediff"
+    WRITE(*,*) "============================================================"
+    DO WHILE (.NOT. conv)
+      CALL UHFiter(Suv,Huv,GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db,EigA,EigB,&
+      Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+      iter = iter + 1
+      IF (iter .GE. 300) THEN
+        WRITE(*,*) "SCF failed to converge."
+        EXIT
+      END IF
+    END DO
+  
+    WRITE(*,*)
+
+    !Write orbitals
+998 FORMAT(15x,I3,4x,F20.15)
+    WRITE(*,*) "============================================================"
+    WRITE(*,*) "Orbital eigenvalues of Alpha (a.u.)"
+    WRITE(*,*) "============================================================"
+    WRITE(*,998) 1, EigA(0)
+    DO i=1,norb-1
+      IF (EigA(i) .GT. 0.0D0 .AND. EigA(i-1) .LT. 0.0D0) THEN
+        WRITE(*,*) "------------------------------------------------------------"
+      END IF 
+      WRITE(*,998) i+1, EigA(i)
+    END DO
+    WRITE(*,*) "============================================================"
+    WRITE(*,*)
+    WRITE(*,*) "============================================================"
+    WRITE(*,*) "Orbital eigenvalues of Beta (a.u.)"
+    WRITE(*,*) "============================================================"
+    WRITE(*,998) 1, EigB(0)
+    DO i=1,norb-1
+      IF (EigB(i) .GT. 0.0D0 .AND. EigB(i-1) .LT. 0.0D0) THEN
+        WRITE(*,*) "------------------------------------------------------------"
+      END IF 
+      WRITE(*,998) i+1, EigB(i)
+    END DO
+    WRITE(*,*) "============================================================"
+
+    DEALLOCATE(CuiA)
+    DEALLOCATE(CuiB)
+    DEALLOCATE(Suv)
+    DEALLOCATE(FuvA)
+    DEALLOCATE(FuvB)
+    DEALLOCATE(Huv)
+    DEALLOCATE(GuvA)
+    DEALLOCATE(GuvB)
+    DEALLOCATE(Da)
+    DEALLOCATE(Db)
+    DEALLOCATE(EigA)
+    DEALLOCATE(EigB)
+
+    fmem = fmem + (10*norb*norb*8/1.0D6 + 2*norb*8.0/1.0D6)
+    CALL nmem(fmem)
+
+    CALL CPU_TIME(timeF)
+    WRITE(*,997) "uhf ran in (s) :", (timeF - timeS)
+    
+  END SUBROUTINE UHF
 
 !---------------------------------------------------------------------
 !		Generate initial RHF MO coeffs 
@@ -333,6 +483,115 @@ PROGRAM scf
 
   END SUBROUTINE initRHF
 
+!---------------------------------------------------------------------
+!		Generate initial UHF MO coeffs 
+!WORK NOTE - should symm the overlap matrix beforehand?
+!---------------------------------------------------------------------
+  SUBROUTINE initUHF(norb,CuiA,CuiB,Suv,Huv,LWORK,fmem,verb)
+    USE env
+    IMPLICIT NONE
+
+    !Values
+    ! norb	: int, number of orbitals
+    ! Cui	: 2D dp, array of MO coefficients
+    ! Suv	: 2D dp, array of AO overlaps
+    ! Huv	: 2D dp, array of 1e- AO integrals
+    ! Da	: 2D dp, array of AO densities
+   
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: CuiA,CuiB
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv, Huv
+    REAL(KIND=8), INTENT(INOUT) :: fmem
+    INTEGER, INTENT(INOUT) :: LWORK
+    INTEGER, INTENT(IN) :: norb,verb
+    
+    !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: A,B
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: W,WORK
+    REAL(KIND=8) :: temp
+    INTEGER :: INFO,stat1,stat2,stat3
+    INTEGER :: i,j,k,u,v 
+
+    WRITE(*,*)
+    WRITE(*,*) "initUHF called"
+    WRITE(*,*) "Generating Cui from core Hamiltonian." 
+
+    ! setup arrays
+    ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(B(0:norb-1,0:norb-1),STAT=stat2)
+    ALLOCATE(W(0:norb-1),STAT=stat3)
+    fmem = fmem - (2*norb*norb*8.0/1.0D6 + norb*8.0/1.0D6)
+    IF (fmem .LT. 0.0D6 .OR. stat1+stat2+stat3 .NE. 0) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "scf:initUHF could not allocate enough memory"
+      STOP "scf:initUHF out of memory"
+    END IF 
+    CALL nmem(fmem)
+    DO v=0,norb-1
+      A(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      A(v:norb-1,v) = (/ (Huv(u,v), u=v,norb-1) /)
+      B(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      B(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
+    END DO
+
+    !find LWORK
+    ALLOCATE(WORK(0:1))
+    LWORK=-1
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,W,WORK,LWORK,INFO)
+    LWORK = CEILING(WORK(0))
+    DEALLOCATE(WORK)
+    ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
+    fmem = fmem - LWORK*8/1.0D6 
+    IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+      fmem = fmem + LWORK*8/1.0D6
+      LWORK=norb
+      ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
+      fmem = fmem - LWORK*8/1.0D6 
+      IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        WRITE(*,*) "scf:initRHF could not allocate memory"
+        STOP
+      END IF
+    END IF
+
+    !find initial Cui and order of orbitals
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,W,WORK,LWORK,INFO)
+    IF (INFO .GT. 0 .AND. INFO .LT. norb) THEN
+      WRITE(*,*) "Warning: potential contamination of eigenvalues."
+      WRITE(*,*) "Number of contaminents: ", INFO
+    ELSE IF (INFO .GT. norb) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "Leading minor of order i of B is not positive definite. i=",INFO-norb
+      STOP
+    END IF
+
+    !print if desired
+    IF (verb .GE. 3) THEN
+      WRITE(*,*) "Eigenvalues of core hamiltonian"
+      DO i=0,norb-1
+        WRITE(*,*) i, W(i)
+      END DO
+      WRITE(*,*)
+    END IF
+
+    !write to Cui
+    OPEN(unit=7,file='Cui',access='sequential',status='replace')
+    WRITE(7,*) A(:,:)
+    WRITE(7,*) A(:,:)
+    CLOSE(unit=7,status='keep')
+    CuiA(:,:) = A(:,:)
+    CuiB(:,:) = A(:,:)
+
+    !cleanup memory
+    DEALLOCATE(A)
+    DEALLOCATE(B)
+    DEALLOCATE(W)
+    DEALLOCATE(WORK)
+    fmem = fmem + (2*norb*norb*8.0/1.0D6 + norb*8.0/1.0D6)
+    fmem = fmem + (LWORK*8/1.0D6)
+    CALL nmem(fmem)
+
+  END SUBROUTINE initUHF
 !---------------------------------------------------------------------
 !		Check eigenvalues of the overlap matrix	
 !---------------------------------------------------------------------
@@ -556,7 +815,7 @@ PROGRAM scf
       END IF
     END IF
 
-    !find initial Cui and order of orbitals
+    !find Cui 
     CALL DSYGV(1,'V','L',norb,A,norb,B,norb,Eig,WORK,LWORK,INFO)
     IF (INFO .GT. 0 .AND. INFO .LT. norb) THEN
       WRITE(*,*) "Warning: potential contamination of eigenvalues."
@@ -611,6 +870,214 @@ PROGRAM scf
     END  IF
 
   END SUBROUTINE RHFiter
+
+!---------------------------------------------------------------------
+!			UHF iteration	
+!---------------------------------------------------------------------
+  SUBROUTINE UHFiter(Suv,Huv,GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db,EigA,EigB,&
+  Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+    IMPLICIT NONE
+    
+    !Values
+    !norb	: int, number of orbitals
+    !conv	: bool, have we converged?
+    !fmem	: dp, memory remaining, MB
+    !options	: 1D int, list of input options
+    !Suv	: 2D dp, overlap matrix of AO
+    !Huv	: 2D dp, core hamiltonian matrix of AO
+    !GuvA,B	: 2D dp, 2e- hamiltonian matrix of AO spin A,B
+    !FuvA,B	: 2D dp, Fock matrix AO spin A,B 
+    !CuiA,B	: 2D dp, coefficients of MO spin A,B
+    !Da,b	: 2D dp, density matrix of AO spin A,B
+    !EigA,B	: 1D dp, vector of orbital eigenvalues spin A,B
+    !Enr	: dp, nuclear repulsion energy
+    !Etrk	: 1D dp, list of latest energies
+    !iter	: int, iteration number
+    !Eelc	: dp, electronic energy
+    !LWORK	: int, length of work array
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv,Huv
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: EigA,EigB,Etrk
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options
+    REAL(KIND=8), INTENT(INOUT) :: fmem
+    REAL(KIND=8), INTENT(IN) :: Enr
+    INTEGER, INTENT(INOUT) :: LWORK
+    LOGICAL, INTENT(INOUT) :: conv 
+    INTEGER, INTENT(IN) :: norb,iter
+
+    !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: A,B
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: WORK
+    REAL(KIND=8) :: Eelc,temp
+    INTEGER :: INFO,stat1,stat2,stat3
+    INTEGER :: i,j,u,v
+    LOGICAL :: ex
+  
+
+    !write Density matrix  
+    OPEN(unit=8,file='Da',access='sequential',status='old',form='unformatted')
+    READ(8) Da(:,:) 
+    READ(8) Db(:,:)
+    CLOSE(unit=8)
+
+    !get Guv matrix
+    OPEN(unit=11,file='Guv',access='sequential',status='old',form='unformatted')
+    READ(11) GuvA(:,:)
+    READ(11) GuvB(:,:)
+    CLOSE(unit=11) 
+
+    !Create Fock matrix
+    FuvA = Huv + GuvA
+    FuvB = Huv + GuvB
+
+    !Get Electronic energy
+    Eelc = 0.0D0
+    DO v=0,norb-1
+      DO u=0,norb-1
+        Eelc = Eelc + Da(u,v)*(FuvA(u,v)+Huv(u,v)) + Db(u,v)*(FuvB(u,v)+Huv(u,v))
+      END DO
+    END DO
+    Eelc = 0.5D0*Eelc
+ 
+999 FORMAT(4x,I3,4x,F20.15,8x,ES15.8)
+
+    !write energy output
+    WRITE(*,999) iter+1, Eelc+Enr, Eelc+Enr-Etrk(2)
+
+    !Get our new coefficients and eigenvalues
+
+    ! setup arrays
+    ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
+    ALLOCATE(B(0:norb-1,0:norb-1),STAT=stat2)
+    fmem = fmem - (2*norb*norb*8.0/1.0D6) 
+    IF (fmem .LT. 0.0D6 .OR. stat1+stat2+stat3 .NE. 0) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "scf:UHFiter could not allocate enough memory"
+      STOP "scf:UHFiter out of memory"
+    END IF
+    CALL nmem(fmem)
+
+    !---  Spin case ALPHA  ---!
+    DO v=0,norb-1
+      A(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      A(v:norb-1,v) = (/ (FuvA(u,v), u=v,norb-1) /)
+      B(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      B(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
+    END DO
+
+    !if first iteration...
+    IF (iter .EQ. 0) THEN
+      ALLOCATE(WORK(0:1))
+      LWORK=-1
+      CALL DSYGV(1,'V','L',norb,A,norb,B,norb,EigA,WORK,LWORK,INFO)
+      LWORK = CEILING(WORK(0))
+      DEALLOCATE(WORK)
+      ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
+      fmem = fmem - LWORK*8/1.0D6
+      IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+        fmem = fmem + LWORK*8/1.0D6
+        LWORK=norb
+        ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
+        fmem = fmem - LWORK*8/1.0D6
+        IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
+          CALL EXECUTE_COMMAND_LINE('touch error')
+          WRITE(*,*) "scf:initUHF could not allocate memory"
+          STOP
+        END IF
+      END IF
+
+    !if not...
+    ELSE
+      ALLOCATE(WORK(0:LWORK-1),STAT=stat1)
+      fmem = fmem - LWORK*8/1.0D6
+      IF (fmem .LT. 0.0D0 .OR. stat1 .NE. 0) THEN
+        fmem = fmem + LWORK*8/1.0D6
+        LWORK=norb
+        ALLOCATE(WORK(0:LWORK-1),STAT=stat2)
+        fmem = fmem - LWORK*8/1.0D6
+        IF (fmem .LT. 0.0D0 .OR. stat2 .NE. 0) THEN
+          CALL EXECUTE_COMMAND_LINE('touch error')
+          WRITE(*,*) "scf:initUHF could not allocate memory"
+          STOP
+        END IF
+      END IF
+    END IF
+
+    !find Cui for Alpha 
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,EigA,WORK,LWORK,INFO)
+    IF (INFO .GT. 0 .AND. INFO .LT. norb) THEN
+      WRITE(*,*) "Warning: potential contamination of eigenvalues."
+      WRITE(*,*) "Number of contaminents: ", INFO
+    ELSE IF (INFO .GT. norb) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "Leading minor of order i of B is not positive definite. i=",INFO-norb
+      STOP
+    END IF
+
+    !assign coefficients for Alpha
+    CuiA(:,:) = A(:,:)
+
+    !---  Spin case BETA  ---!
+    DO v=0,norb-1
+      A(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      A(v:norb-1,v) = (/ (FuvB(u,v), u=v,norb-1) /)
+      B(0:v-1,v) = (/ (0.0D0, u=0,v-1) /)
+      B(v:norb-1,v) = (/ (Suv(u,v), u=v,norb-1) /)
+    END DO
+
+    !find Cui for Beta 
+    CALL DSYGV(1,'V','L',norb,A,norb,B,norb,EigB,WORK,LWORK,INFO)
+    IF (INFO .GT. 0 .AND. INFO .LT. norb) THEN
+      WRITE(*,*) "Warning: potential contamination of eigenvalues."
+      WRITE(*,*) "Number of contaminents: ", INFO
+    ELSE IF (INFO .GT. norb) THEN
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      WRITE(*,*) "Leading minor of order i of B is not positive definite. i=",INFO-norb
+      STOP
+    END IF
+
+    !assign coefficients for Beta 
+    CuiB(:,:) = A(:,:)
+ 
+    !---  Both spins  ---!
+
+    !write MO 
+    OPEN(unit=7,file='Cui',access='sequential',status='replace')
+    WRITE(7,*) CuiA(:,:)
+    WRITE(7,*) CuiB(:,:)
+    CLOSE(unit=7,status='keep')
+
+    !write new dens and Guv
+    CALL EXECUTE_COMMAND_LINE('dens')
+    CALL EXECUTE_COMMAND_LINE('UHFI2G')
+ 
+    !cleanup memory
+    DEALLOCATE(A)
+    DEALLOCATE(B)
+    DEALLOCATE(WORK)
+    fmem = fmem + (2*norb*norb*8.0/1.0D6)
+    fmem = fmem + (LWORK*8/1.0D6)
+    CALL nmem(fmem)
+
+    !check for convergece
+    Etrk(0) = Etrk(1)
+    Etrk(1) = Etrk(2)
+    Etrk(2) = Eelc + Enr
+
+    IF (iter .GT. 0) THEN
+      CALL checkConv(Etrk,options,conv)
+    END IF
+
+    IF (conv) THEN
+      WRITE(*,*) "SCF has converged!"
+      WRITE(*,*) 
+      WRITE(*,*) "Total SCF energy (a.u)", Eelc+Enr
+      WRITE(*,*)
+    END  IF
+
+  END SUBROUTINE UHFiter
 
 !---------------------------------------------------------------------
 !		Calculate nuclear repulsion energy			

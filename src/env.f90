@@ -13,12 +13,12 @@ MODULE env
 
 !~~~~~~
 ! Get enviromental setup
-  SUBROUTINE getenv(nnuc,nelc,xyz,atoms,fmem,options)
+  SUBROUTINE getenv(nnuc,nelcA,nelcB,xyz,atoms,fmem,options)
     IMPLICIT NONE
 
     ! Parameters
     ! nnuc	: int, number of nuclii
-    ! nelc	: int, number of electrons
+    ! nelcA,B	: int, number of electrons in orbitals A,B
     ! xyz	: 2D dp, array of nuclear locations (bohr)
     ! atoms	: 1D int, array of atoms
     ! fmem	: dp, MB of free memory left
@@ -28,7 +28,7 @@ MODULE env
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:), INTENT(INOUT) :: xyz
     INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms, options
     REAL(KIND=8), INTENT(INOUT) :: fmem
-    INTEGER, INTENT(INOUT) :: nnuc, nelc
+    INTEGER, INTENT(INOUT) :: nnuc, nelcA,nelcB
 
     ! Internal
     INTEGER :: i,j,ios
@@ -54,7 +54,7 @@ MODULE env
 
     READ(3,*) fmem
     READ(1,*) nnuc
-    READ(1,*) nelc 
+    READ(1,*) nelcA, nelcB 
     READ(1,*) j
     ALLOCATE(options(0:j-1))
     READ(1,*) options
