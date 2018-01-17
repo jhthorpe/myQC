@@ -29,12 +29,14 @@ PROGRAM parser
   ! 6) memory           : number in MB
   ! 7) verbosity        : 0 - none, 1 - some, 2 - all, 3 - wtf
   ! 8) SCF_CONV		: 1.0D-<0-11>
+  ! 9) charge		: int
+  !10) multiplicity	: int
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:8) :: options 
+  INTEGER(KIND=8),DIMENSION(0:10) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
@@ -134,6 +136,10 @@ PROGRAM parser
   options(1) = getcalc(line(1)) 
   READ(1,*) line
   options(2) = getbasis(line(1))
+  READ(1,*) line
+  options(9) = getcharge(line(1)) 
+  READ(1,*) line
+  options(10) = getmulti(line(1)) 
   READ(1,*) line
   options(3) = getref(line(1))
   READ(1,*) line
@@ -283,15 +289,13 @@ PROGRAM parser
     ! WORK NOTE : ugly - impliment dictionary?
     getref = 2
     IF (chr .EQ. 'RHF') THEN
-      getref = 1
+      getref = 0
       WRITE(*,*) "Ref : RHF"
     ELSE IF (chr .EQ. 'UHF') THEN
-      getref = 2
+      getref = 1
       WRITE(*,*) "Ref : UHF"
-      WRITE(*,*) "Sorry, this reference is not implimented yet. Exiting..."
-      STOP 'bad ref'
     ELSE IF (chr .EQ. 'ROHF') THEN
-      getref = 3
+      getref = 2
       WRITE(*,*) "Ref : ROHF"
       WRITE(*,*) "Sorry, this reference is not implimented yet. Exiting..."
       STOP 'bad ref'
@@ -335,9 +339,6 @@ PROGRAM parser
     CHARACTER(LEN=20), INTENT(IN) :: chr
     INTEGER :: val
     READ (chr,'(I8)') val 
-    !WRITE(*,*) val 
-    !WRITE(*,*) "Memory per CPU (MB) : ", FLOOR(val*1.0D0*1000.0D0)
-    !getmem = FLOOR(val*1.0D0*1000.0D0)
     WRITE(*,*) "Memory per CPU (MB) : ", val
     getmem = val
   END FUNCTION getmem
@@ -349,9 +350,6 @@ PROGRAM parser
     CHARACTER(LEN=20), INTENT(IN) :: chr
     INTEGER :: val
     READ (chr,'(I8)') val 
-    !WRITE(*,*) val 
-    !WRITE(*,*) "Memory per CPU (MB) : ", FLOOR(val*1.0D0*1000.0D0)
-    !getmem = FLOOR(val*1.0D0*1000.0D0)
     IF (val .GT. 11 .OR. val .LT. 0) THEN
       WRITE(*,*) "SCF Convergence (default) :", 7
     ELSE IF( val .EQ. 11) THEN
@@ -361,6 +359,34 @@ PROGRAM parser
     END IF
     getSCF_CONV = val
   END FUNCTION getSCF_Conv
+
+!~~~~~~~~~~
+  ! Function to get charge 
+  INTEGER FUNCTION getcharge(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20), INTENT(IN) :: chr
+    INTEGER :: val
+    READ (chr,'(I8)') val 
+    WRITE(*,*) "Charge : ", val
+    getcharge = val
+  END FUNCTION getcharge
+
+!~~~~~~~~~~
+  ! Function to get charge 
+  INTEGER FUNCTION getmulti(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20), INTENT(IN) :: chr
+    INTEGER :: val
+    READ (chr,'(I8)') val 
+    IF (val .GT. 0) THEN
+      WRITE(*,*) "Multiplicity : ", val
+    ELSE
+      WRITE(*,*) "bad value for multiplicity, exiting."
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      STOP
+    END IF
+    getmulti = val
+  END FUNCTION getmulti
 
 !~~~~~~~~~~
   ! Function to return the calculation option value
@@ -398,7 +424,7 @@ PROGRAM parser
     REAL(KIND=8), DIMENSION(0:2) :: COM
     REAL(KIND=8), DIMENSION(1:10) :: mass
     REAL(KIND=8) :: temp
-    INTEGER :: i,j,nnuc
+    INTEGER :: i,j,nnuc,nelc,nelcA,nelcB,charge,unpr
 
     nnuc = SIZE(atoms)
 
@@ -445,10 +471,34 @@ PROGRAM parser
       WRITE(2,*) r*A2b
     END DO
 
-    !WORK NOTE - hardcoded
     !write to enviroment file
     WRITE(3,*) nnuc        !number of nuclei
-    WRITE(3,*) SUM(atoms)  !number of electrons, currently assuming closed shell 
+
+    !charge
+    charge = options(9)
+    unpr = options(10)-1
+    nelc = SUM(atoms)-charge
+    nelcA = (nelc-unpr)/2
+    nelcB = (nelc-unpr)/2
+    
+    !multiplicity
+    nelcA = nelcA + unpr
+
+    !checking
+    IF (nelcA + nelcB .NE. nelc) THEN
+      WRITE(*,*) "That charge and multiplicity is not allowed."
+      CALL EXECUTE_COMMAND_LINE('touch error')
+    END IF
+    IF (nelc .LT. 0 .OR. nelcA .LT. 0 .OR. nelcB .LT. 0) THEN
+      WRITE(*,*) "You have less than 0 electrons. :)"
+      CALL EXECUTE_COMMAND_LINE('touch error')
+    END IF 
+    IF (nelcA .NE. nelcB .AND. options(3) .EQ. 0) THEN
+      WRITE(*,*) "You cannot use RHF for open shell molecules!"
+      CALL EXECUTE_COMMAND_LINE('touch error')
+    END IF
+    
+    WRITE(3,*) nelcA,nelcB
     WRITE(3,*) SIZE(options)
     WRITE(3,*) options
     WRITE(3,*) 
