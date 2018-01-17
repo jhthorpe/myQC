@@ -11,7 +11,8 @@ PROGRAM parser
 
   IMPLICIT NONE
 
-  REAL(KIND=8), PARAMETER :: A2b=(1.8897161646320724D0)
+  !angstrom to borh conversion
+  REAL(KIND=8), PARAMETER :: A2B=(1.8897161646320724D0)
 
   !WORK NOTE : hardcoded, needs fixing
 

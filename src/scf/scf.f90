@@ -4,6 +4,10 @@
 !//              James H Thorpe, in Group of John Stanton
 !//              The University of Florida
 !//             
+!//  WORK NOTE - it should be noted that the general eigenvalue call
+!//    I use to LAPACK produces Cui (and therefor densities) that
+!//    are NOT in the orthogonal basis (which is good), but ARE
+!//    normalized to Sum(u,v) Cui(u,i)*S(u,v)*Cui(v,i) = 1
 !///////////////////////////////////////////////////////////////////
 
 !=====================================================================
@@ -228,7 +232,7 @@ PROGRAM scf
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: GuvA,GuvB,Da,Db
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: EigA,EigB
     REAL(KIND=8), DIMENSION(1:3) :: Etrk
-    INTEGER, DIMENSION(0:11) :: stat
+    INTEGER, DIMENSION(0:13) :: stat
     INTEGER, DIMENSION(0:1) :: line
     REAL(KIND=8) :: timeS, timeF, Enr
     INTEGER :: LWORK,i
@@ -246,7 +250,7 @@ PROGRAM scf
     LWORK = -1
     conv = .FALSE.
     Etrk = [0.0D0, 0.0D0, 0.0D0]
-    stat = [0,0,0,0,0,0,0,0,0,0,0,0]
+    stat = [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
     !get number of orbitals
     OPEN(unit=1,file='basinfo',status='old',access='sequential')
@@ -354,9 +358,7 @@ PROGRAM scf
     END DO
     WRITE(*,*) "============================================================"
 
-    DEALLOCATE(CuiA)
-    DEALLOCATE(CuiB)
-    DEALLOCATE(Suv)
+    !free the memory we are done with
     DEALLOCATE(FuvA)
     DEALLOCATE(FuvB)
     DEALLOCATE(Huv)
@@ -367,6 +369,13 @@ PROGRAM scf
     DEALLOCATE(EigA)
     DEALLOCATE(EigB)
 
+    WRITE(*,*)
+    CALL getSpinCont(norb,nelcA,nelcB,CuiA,CuiB,Suv)
+
+    !free last bits of memory
+    DEALLOCATE(CuiA)
+    DEALLOCATE(CuiB)
+    DEALLOCATE(Suv)
     fmem = fmem + (10*norb*norb*8/1.0D6 + 2*norb*8.0/1.0D6)
     CALL nmem(fmem)
 
@@ -951,8 +960,8 @@ PROGRAM scf
     ! setup arrays
     ALLOCATE(A(0:norb-1,0:norb-1),STAT=stat1)
     ALLOCATE(B(0:norb-1,0:norb-1),STAT=stat2)
-    fmem = fmem - (2*norb*norb*8.0/1.0D6) 
-    IF (fmem .LT. 0.0D6 .OR. stat1+stat2+stat3 .NE. 0) THEN
+    fmem = fmem - (norb*norb*8.0/1.0D6) 
+    IF (fmem .LT. 0.0D6 .OR. stat1+stat2 .NE. 0) THEN
       CALL EXECUTE_COMMAND_LINE('touch error')
       WRITE(*,*) "scf:UHFiter could not allocate enough memory"
       STOP "scf:UHFiter out of memory"
@@ -1055,9 +1064,8 @@ PROGRAM scf
  
     !cleanup memory
     DEALLOCATE(A)
-    DEALLOCATE(B)
     DEALLOCATE(WORK)
-    fmem = fmem + (2*norb*norb*8.0/1.0D6)
+    fmem = fmem + (norb*norb*8.0/1.0D6)
     fmem = fmem + (LWORK*8/1.0D6)
     CALL nmem(fmem)
 
@@ -1143,6 +1151,77 @@ PROGRAM scf
     END IF 
 
   END SUBROUTINE
+
+!---------------------------------------------------------------------
+!		Get expectation value of S^2 
+!---------------------------------------------------------------------
+  SUBROUTINE getSpinCont(norb,nelcA,nelcB,CuiA,CuiB,Suv)
+    IMPLICIT NONE
+
+    !Values
+    !nelcA,B	: int, number of Alpha,Beta electrons
+    !CuiA,B	: 2D dp, MO coeff in orthonormal basis
+    !Suv	: 2D dp atomic overlap integrals
+    !Arr1,Arr2	: 2D dp, dummy arrays
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: CuiA,CuiB,Suv
+    INTEGER, INTENT(IN) :: norb,nelcA,nelcB
+
+    !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: Arr1,Arr2
+    REAL(KIND=8) ::S,Ssqr,temp
+    INTEGER :: i,j,u,v
+
+999 FORMAT(1x,A14,2x,F8.5)
+998 FORMAT(1x,A14,2x,F8.5)
+
+    !no need to check memory here, we freed more than enough memory before this
+    ALLOCATE(Arr1(0:norb-1,0:norb-1))
+    ALLOCATE(Arr2(0:norb-1,0:norb-1))
+
+    WRITE(*,*) "Spin Analysis"
+
+    !exact
+    S = 0.5D0*(nelcA - nelcB)
+    WRITE(*,999) "<S^2> exact  :", S*(S+1)
+
+    Ssqr = S*(S+1) + nelcB
+
+     !this is how cfour does it, but I've not accounted for occupied orbitals
+!    CALL DGEMM('N','N',norb,norb,norb,1.0D0,Suv,norb,CuiB,norb,0.0D0,Arr1,norb) !Suv is symmetric
+!    CALL DGEMM('T','N',norb,norb,norb,1.0D0,CuiA,norb,Arr1,norb,0.0D0,Arr2,norb)
+    !SHOULD call blas function here, but linker is acting strange...
+!    DO i=0,norb-1
+!      ssqr = ssqr - DDOT(norb,Arr2(i,:),1,Arr2(i,:),1)
+!    END DO
+!     DO i=0,nelcB-1
+!     temp = 0
+!       DO j=0,nelcB-1
+!         temp = temp + Arr2(i,j)*Arr2(i,j)
+!       END DO
+!       Ssqr = Ssqr - temp 
+!     END DO
+
+    DO i=0,nelcA-1
+      DO j=0,nelcB-1
+        temp = 0.0D0
+        DO u=0,norb-1
+          DO v=0,norb-1
+            temp = temp + CuiA(u,i)*Suv(u,v)*CuiB(v,j) 
+          END DO
+        END DO
+        Ssqr = Ssqr - (temp)**2.0
+      END DO
+    END DO
+
+    WRITE(*,998) "<S^2> actual :", Ssqr
+    WRITE(*,*)
+
+    DEALLOCATE(Arr1)
+    DEALLOCATE(Arr2)
+
+  END SUBROUTINE getSpinCont
 
 !---------------------------------------------------------------------
 END PROGRAM scf
