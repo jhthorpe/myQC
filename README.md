@@ -18,4 +18,4 @@ My crummy implementation of Hartree Fock
 - Two electron integrals need a more stringent incomplete error function evaluation, as there are some numerical problems with MO eigenvalues that should be degenerate.
 
 One electron integrals implimented, two electron integrals implimented, but slow.
-RHF SCF implimented. 
+RHF and UHF SCF implimented. 
