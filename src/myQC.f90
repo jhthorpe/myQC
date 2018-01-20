@@ -19,7 +19,7 @@ PROGRAM myQC
   LOGICAL :: ex
 
   CALL CPU_TIME(timeS)
-  WRITE(*,*) "Starting myQC"  
+  WRITE(*,*) "                 Starting myQC"  
   ex = .FALSE.
 
 999 FORMAT(1x,A15,2x,F8.4)

@@ -221,7 +221,7 @@ MODULE basis
     CLOSE (unit=3,status='keep')
     CLOSE (unit=2,status="keep")
 
-    IF (verb) WRITE(*,*) "=================================="
+    IF (verb) WRITE(*,*) "==========================================="
 
   END SUBROUTINE buildBasis
 

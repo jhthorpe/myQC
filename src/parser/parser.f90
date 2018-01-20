@@ -21,7 +21,7 @@ PROGRAM parser
   ! options	: 1D in, list of calculation options
 
   !options currently:
-  ! 0) geometry type    : 1 - atom, 2 - diatomic, 3 - linear, 4- internal, 5- cartesian 
+  ! 0) geometry type    : 0- internal, 1- cartesian 
   ! 1) calculation type : 0 - SCF 
   ! 2) basis set        : 0 - STO-3G
   ! 3) referecnce       : 0 - RHF, 1 - UHF, 2 - ROHF
@@ -29,33 +29,38 @@ PROGRAM parser
   ! 5) number of procs  : number
   ! 6) memory           : number in MB
   ! 7) verbosity        : 0 - none, 1 - some, 2 - all, 3 - wtf
-  ! 8) SCF_CONV		: 1.0D-<0-11>
+  ! 8) SCF_Conv		: 10^-x, x:[0-12]
   ! 9) charge		: int
   !10) multiplicity	: int
+  !11) units		: 0-angstrom,1-bohr
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:10) :: options 
+  INTEGER(KIND=8),DIMENSION(0:11) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
   CHARACTER(LEN=20) :: str
   CHARACTER(LEN=2) :: id
-  REAL(KIND=8) :: val, timeS, timeF
-  INTEGER :: i,nnuc
+  REAL(KIND=8) :: val
+  INTEGER :: i,nnuc,fline,nline
   LOGICAL :: flag
 
 999 FORMAT(1x,A19,F8.5)
 
-  CALL CPU_TIME(timeS)
-
   i = 0
 
-  WRITE(*,*) "parse called"
-  WRITE(*,*) "=================================="
+  !defaults
+  options = [0,0,0,0,0,1,1000,1,7,0,1,0]
+
+  WRITE(*,*) ""
   WRITE(*,*) "Input parameters"
+
+  !get number of lines in file
+  CALL getfline(flag,fline) 
+  IF (flag) STOP "parser encountered an error"
 
   OPEN (unit=1,file="input",status="old",access="sequential")
   
@@ -63,118 +68,30 @@ PROGRAM parser
   READ(1,*) str       !read what type of molecule we have
   options(0) = getsys(str)
 
-  !~~~~~~~~~~~~~~
-  ! Read the atoms/geometry
-  ! atom read
-  IF (options(0) .EQ. 1) THEN
-    ALLOCATE(atoms(0:0))
-    ALLOCATE(radii(0:0))
-    ALLOCATE(xyz(0:0,0:0))
-    READ(1,*) str
-    atoms(0) = getelem(str) 
-    READ(1,*) 
-
-  !Diatomic read
-  ELSE IF (options(0) .EQ. 2) THEN
-    !get atoms
-    ALLOCATE(atoms(0:1))
-    ALLOCATE(radii(0:0))
-    ALLOCATE(xyz(0:1,0:2))
-    DO i=0,1
-      READ(1,*) str
-      atoms(i) = getelem(str)
-    END DO
-    READ(1,*)
-    !get radii
-    READ(1,*) radii(0)
-    READ(1,*)
-
-  ! Cartesian Read
-  ELSE IF (options(0) .EQ. 5) THEN
-    flag = .TRUE.
-    nnuc = 0
-
-    ! get number of atoms
-    DO WHILE (flag) 
-      READ(1,*) str
-      IF (str .EQ. 'END') THEN
-        flag = .FALSE.
-      ELSE
-        nnuc = nnuc + 1
-      END IF
-    END DO
-    
-    IF (nnuc .LE. 0 ) STOP "No atoms in system"
-    ALLOCATE(atoms(0:nnuc-1))
-    ALLOCATE(xyz(0:nnuc-1,0:2))
-    ALLOCATE(radii(0:0))
-
-    REWIND(1)
-    READ(1,*)
-
-    !construct molecule
-    DO i=0,nnuc-1
-      READ(1,*) id, xyz(i,:)
-      WRITE(*,*) id, xyz(i,:)
-      atoms(i) = getelem(id)
-    END DO
- 
-    !check it isn't crap
-    IF (.NOT. checkgeom(xyz,nnuc)) STOP 'atoms too close'
-    READ(1,*)
-   
-  !Not implimented yet 
+  !read in geometry
+  IF (options(0) .EQ. 0) THEN
+    CALL cartesian(fline,nline,nnuc,atoms,xyz)
   ELSE
-    WRITE(*,*) "Sorry, that system type not implimented yet. Exiting parser."
-    STOP 'bad system'
-
-  END IF 
-
-  ! WORK NOTE : this is currently hardcoded for dev. improve later
-  !~~~~~~~~~~~~~~
-  ! Read the options 
-  READ(1,*) line
-  options(1) = getcalc(line(1)) 
-  READ(1,*) line
-  options(2) = getbasis(line(1))
-  READ(1,*) line
-  options(9) = getcharge(line(1)) 
-  READ(1,*) line
-  options(10) = getmulti(line(1)) 
-  READ(1,*) line
-  options(3) = getref(line(1))
-  READ(1,*) line
-  options(4) = getpar(line(1))
-  READ(1,*) line
-  options(5) = getnode(line(1)) 
-  READ(1,*) line
-  options(6) = getmem(line(1))
-  READ(1,*) line
-  options(7) = getverb(line(1)) 
-  READ(1,*) line
-  options(8) = getSCF_Conv(line(1)) 
-  !~~~~~~~~~~~~~~
-    
-  IF (options(0) .NE. 5) THEN
-    WRITE(*,*) "Atom array" 
-    WRITE(*,*) atoms
-    WRITE(*,*) "Radii array"
-    WRITE(*,*) radii
+    WRITE(*,*) "Sorry, that input style not supported yet"
+    CALL EXECUTE_COMMAND_LINE('touch error')
+    STOP
   END IF
 
+  !read in options
+  IF (nline .LT. fline) CALL read_options(fline-nline-1,options)
+  CLOSE(unit=1)
 
+  !build molecule
   CALL build(atoms,radii,options,xyz)
 
   CLOSE (unit=1, status="keep")
-  WRITE(*,*) "=================================="
+  WRITE(*,*) "==========================================="
 
-  IF (options(0) .NE. 1) DEALLOCATE(radii)
+  !if requested, print options
+  CALL print_options(options)
+
   DEALLOCATE(atoms)
   DEALLOCATE(xyz)
-
-  CALL CPU_TIME(timeF)
-
-  WRITE(*,999) "parse ran in (s) : ", (timeF - timeS)
 
   CONTAINS
 
@@ -184,8 +101,7 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=2),INTENT(IN) :: chr
     ! WORK NOTES : ugly - impliment dictionary?
-    IF (options(0) .NE. 5) WRITE(*,*) chr
-    getelem = 1
+    getelem = -1
     IF (chr .EQ. 'H') THEN
       getelem = 1
     ELSE IF (chr .EQ. 'He') THEN
@@ -219,22 +135,13 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=9),INTENT(IN) :: chr
     ! WORK NOTE : ugly - impliment a dictionary?
-    getsys = 3
-    IF (chr .EQ. 'ATOM') THEN
-      getsys = 1
-      WRITE(*,*) "System Type :  ATOM" 
-    ELSE IF (chr .EQ. 'DIATOMIC') THEN
-      getsys = 2
-      WRITE(*,*) "System Type :  DIATOMIC" 
-    ELSE IF (chr .EQ. 'LINEAR') THEN
-      getsys = 3
-      WRITE(*,*) "System Type :  LINEAR" 
-    ELSE IF (chr .EQ. 'MOLECULE') THEN
-      getsys = 4
-      WRITE(*,*) "System Type :  INTERNAL" 
-    ELSE IF (chr .EQ. 'CARTESIAN') THEN
-      getsys = 5
+    getsys = 0
+    IF (chr .EQ. 'CARTESIAN') THEN
+      getsys = 0
       WRITE(*,*) "System Type : CARTESIAN"
+    ELSE IF (chr .EQ. 'INTERNAL') THEN
+      getsys = 1
+      WRITE(*,*) "System Type : INTERNAL"
     ELSE
       WRITE(*,*) "Bad system type input. Exiting..."
       STOP 'bad system'
@@ -340,8 +247,13 @@ PROGRAM parser
     CHARACTER(LEN=20), INTENT(IN) :: chr
     INTEGER :: val
     READ (chr,'(I8)') val 
-    WRITE(*,*) "Memory per CPU (MB) : ", val
-    getmem = val
+    IF (val .LT. 0) THEN
+      WRITE(*,*) "You specificed a memory less than zero."
+      getmem = 1000
+    ELSE
+      WRITE(*,*) "Memory per CPU (MB) : ", val
+      getmem = val
+    END IF
   END FUNCTION getmem
 
 !~~~~~~~~~~
@@ -354,7 +266,7 @@ PROGRAM parser
     IF (val .GT. 11 .OR. val .LT. 0) THEN
       WRITE(*,*) "SCF Convergence (default) :", 7
     ELSE IF( val .EQ. 11) THEN
-      WRITE(*,*) "SCF Convergence (these go to..) : ", val
+      WRITE(*,*) "SCF Convergence (these go to...) : ", val
     ELSE
       WRITE(*,*) "SCF Convergence : ", val
     END IF
@@ -389,8 +301,9 @@ PROGRAM parser
     getmulti = val
   END FUNCTION getmulti
 
-!~~~~~~~~~~
-  ! Function to return the calculation option value
+!---------------------------------------------------------------------
+!			Get verbosity level	
+!---------------------------------------------------------------------
   INTEGER FUNCTION getverb(chr)
     IMPLICIT NONE
     CHARACTER(LEN=20),INTENT(IN) :: chr
@@ -406,11 +319,27 @@ PROGRAM parser
       getverb = 3
       WRITE(*,*) "Verbosity : 3 (wtf)"
     ELSE
-      WRITE(*,*) "Verbosity : 0 (basic)"
+      WRITE(*,*) "Verbosity : 0 (none)"
     END IF
     END FUNCTION getverb
-!~~~~~~~~~~
-! Subroutine that actually build the xyz and radii files 
+
+!---------------------------------------------------------------------
+!			Get verbosity level	
+!---------------------------------------------------------------------
+  INTEGER FUNCTION getunits(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20),INTENT(IN) :: chr
+    IF (chr .EQ. 'Bohr') THEN
+      getunits = 1
+      WRITE(*,*) "Units : Bohr"
+    ELSE
+      getunits = 0
+      WRITE(*,*) "Units : Angstrom"
+    END IF
+  END FUNCTION getunits
+!---------------------------------------------------------------------
+!		Build the molecule (nucpos and envdat files)	
+!---------------------------------------------------------------------
   SUBROUTINE build(atoms, radii, options, xyz)
     IMPLICIT NONE
 
@@ -429,22 +358,19 @@ PROGRAM parser
 
     nnuc = SIZE(atoms)
 
+    IF (.NOT. checkgeom(xyz,nnuc,options(11))) THEN 
+      CALL EXECUTE_COMMAND_LINE('touch error')
+    END IF
+
     ALLOCATE(r(0:nnuc-1))
     COM = [0.0D0, 0.0D0, 0.0D0] 
     mass = [1.000, 4.000, 7.000, 9.000, 11.000, 12.000, 14.000, 16.000, 19.000, 20.000]
 
     !write xyz file
     OPEN(unit=1,file='nucpos',status='replace',access='sequential') 
-    OPEN(unit=2,file='radii',status='replace',access='sequential')
+!    OPEN(unit=2,file='radii',status='replace',access='sequential')
     OPEN(unit=3,file='envdat',status='replace',access='sequential')
     OPEN(unit=4,file='fmem',status='replace',access='sequential')
-
-    !WORK NOTE - currently hardcoded, only works for linear molecules
-    IF (options(0) .EQ. 1) THEN
-      DO i=1,nnuc-1 
-        xyz(i,:) = [0.0D0, 0.0D0, radii(i-1)*A2b]
-      END DO
-    END IF
 
     !get COM 
     DO i=0,nnuc-1
@@ -458,22 +384,24 @@ PROGRAM parser
 
     !recenter
     DO i=0,nnuc-1
-      xyz(i,0) = (xyz(i,0) - COM(0))*A2B 
-      xyz(i,1) = (xyz(i,1) - COM(1))*A2B 
-      xyz(i,2) = (xyz(i,2) - COM(2))*A2B 
+      xyz(i,0) = (xyz(i,0) - COM(0))
+      xyz(i,1) = (xyz(i,1) - COM(1)) 
+      xyz(i,2) = (xyz(i,2) - COM(2)) 
       WRITE(1,*) atoms(i), xyz(i,:)
     END DO
 
-    !write radii file
-    DO i=0,nnuc-1 
-      r = (/ (SQRT((xyz(i,0) - xyz(j,0))**2.0D0 &
-       + (xyz(i,1) - xyz(j,1))**2.0D0 &
-       + (xyz(i,2) - xyz(j,2))**2.0D0 ), j=0,nnuc-1) /)  
-      WRITE(2,*) r*A2b
-    END DO
+    !adjust for input units
+    IF (options(11) .EQ. 0) THEN
+      xyz(:,:) = xyz(:,:)*A2B
+    END IF
 
-    !write to enviroment file
-    WRITE(3,*) nnuc        !number of nuclei
+    !write radii file
+!    DO i=0,nnuc-1 
+!      r = (/ (SQRT((xyz(i,0) - xyz(j,0))**2.0D0 &
+!       + (xyz(i,1) - xyz(j,1))**2.0D0 &
+!       + (xyz(i,2) - xyz(j,2))**2.0D0 ), j=0,nnuc-1) /)  
+!      WRITE(2,*) r*A2b
+!    END DO
 
     !charge
     charge = options(9)
@@ -499,6 +427,8 @@ PROGRAM parser
       CALL EXECUTE_COMMAND_LINE('touch error')
     END IF
     
+    !write to enviroment file
+    WRITE(3,*) nnuc        !number of nuclei
     WRITE(3,*) nelcA,nelcB
     WRITE(3,*) SIZE(options)
     WRITE(3,*) options
@@ -512,7 +442,7 @@ PROGRAM parser
     WRITE(4,*) options(6) 
 
     CLOSE(unit=1)
-    CLOSE(unit=2)
+!    CLOSE(unit=2)
     CLOSE(unit=3)
     CLOSE(unit=4)
 
@@ -520,34 +450,205 @@ PROGRAM parser
 
   END SUBROUTINE build
   
-!~~~~~~~~~~
+!---------------------------------------------------------------------
+!			Check if atoms are too close	
+! 			Returns false if the geom is good
+!---------------------------------------------------------------------
   ! function that returns false if the geom is good
-  LOGICAL FUNCTION checkgeom(xyz,nnuc)
+  LOGICAL FUNCTION checkgeom(xyz,nnuc,units)
     IMPLICIT NONE
+    REAL(KIND=8), PARAMETER :: A2B=(1.8897161646320724D0)
  
     ! inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    INTEGER(KIND=8), INTENT(IN) :: units
     INTEGER, INTENT(IN) :: nnuc
 
     ! internal
     REAL(KIND=8) :: r, tol
     INTEGER :: i,j
+    LOGICAL :: flag
 
-    checkgeom = .TRUE.
+    flag = .TRUE.
 
     DO i=0, nnuc-1
       DO j=i+1,nnuc-1
         r = (xyz(i,0)-xyz(j,0))**2.0D0 
         r = r + (xyz(i,1)-xyz(j,1))**2.0D0
         r = r + (xyz(i,2)-xyz(j,2))**2.0D0
-        IF (SQRT(r) .LT. 0.20D0) THEN
+        IF (units == 0 .AND. SQRT(r) .LT. 0.20D0) THEN
           WRITE(*,*) "These atoms are too close (r < 0.2 A) :", i,j
-          checkgeom = .FALSE.
+          flag = .FALSE.
+        ELSE IF (units == 1 .AND. SQRT(r) .LT. 0.2D0*A2B) THEN
+          WRITE(*,*) "These atroms are too close (r < 0.2A) :", i,j 
+          flag = .FALSE. 
         END IF
       END DO
     END DO    
 
+    checkgeom = flag
+
   END FUNCTION checkgeom
-!~~~~~~~~~~
+
+!---------------------------------------------------------------------
+!		Check if file exists and get number of lines	
+!---------------------------------------------------------------------
+  SUBROUTINE getfline(flag,fline)
+    IMPLICIT NONE
+    !Inout
+    INTEGER, INTENT(INOUT) :: fline
+    LOGICAL, INTENT(INOUT) :: flag
+    !Internal
+    INTEGER :: io
+    LOGICAL :: ex
+    flag = .FALSE. 
+    INQUIRE(file='input',EXIST=ex)
+    IF (.NOT. ex) THEN
+      WRITE(*,*) "You need to create the input file : 'input'"
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      flag = .TRUE. 
+      fline = -1
+      RETURN 
+    END IF
+    fline = 0
+    io = 0
+    OPEN(unit=1,file='input',status='old',access='sequential')
+    DO WHILE (io .EQ. 0)
+      READ(1,*,iostat=io)
+      IF (io .EQ. 0) fline = fline + 1
+    END DO
+    CLOSE(unit=1)
+  END SUBROUTINE getfline
+
+!---------------------------------------------------------------------
+!			Read in cartesian style input		
+!---------------------------------------------------------------------
+  SUBROUTINE cartesian(fline,nline,nnuc,atoms,xyz)
+    IMPLICIT NONE
+
+    !Inout
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:), INTENT(INOUT) :: xyz
+    INTEGER, ALLOCATABLE, DIMENSION(:), INTENT(INOUT) :: atoms
+    INTEGER, INTENT(INOUT) :: nline, nnuc
+    INTEGER, INTENT(IN) :: fline
+
+    !Internal
+    CHARACTER(LEN=2) :: id
+    INTEGER :: i
+    LOGICAL :: flag
+    
+    flag = .TRUE.
+    nnuc = 0
+    i = 0
+    nline = 0
+
+    !get number of nuclei
+    DO WHILE (flag) 
+      i = i + 1
+      IF (i .GT. fline) THEN
+        WRITE(*,*) "You need to put 'END' marker in input"
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        RETURN 
+      END IF
+      READ(1,*) str
+      IF (str .EQ. 'END') THEN
+        flag = .FALSE.
+      ELSE
+        nnuc = nnuc + 1
+      END IF
+    END DO
+   
+    !allocate memory 
+    IF (nnuc .LE. 0 ) STOP "No atoms in system"
+    ALLOCATE(atoms(0:nnuc-1))
+    ALLOCATE(xyz(0:nnuc-1,0:2))
+    REWIND(1)
+    READ(1,*)
+    nline = nline + 1
+
+    !read in the molecule
+    DO i=0,nnuc-1
+      READ(1,*) id, xyz(i,:)
+      WRITE(*,*) id, xyz(i,:)
+      atoms(i) = getelem(id)
+      nline = nline + 1
+    END DO
+ 
+    !extra lines
+    nline = nline + 1
+    WRITE(*,*)
+    READ(1,*) 
+ 
+  END SUBROUTINE cartesian
+
+!---------------------------------------------------------------------
+!			Read remaining options	
+!---------------------------------------------------------------------
+  SUBROUTINE read_options(rline,options)
+    IMPLICIT NONE
+
+    !Inout
+    INTEGER(KIND=8),DIMENSION(0:), INTENT(INOUT) :: options
+    INTEGER, INTENT(IN) :: rline
+
+    !Internal
+    CHARACTER(LEN=20),DIMENSION(0:1) :: line
+    INTEGER :: i
+
+    READ(1,*)
+
+    DO i=0, rline-1
+      READ(1,*) line
+      IF (line(0) == 'CALC=') THEN
+        options(1) = getcalc(line(1))
+      ELSE IF (line(0) == 'BASIS=') THEN
+        options(2) = getbasis(line(1))
+      ELSE IF (line(0) == 'CHARGE=') THEN
+        options(9) = getcharge(line(1))
+      ELSE IF (line(0) == 'MULTI=') THEN
+        options(10) = getmulti(line(1))
+      ELSE IF (line(0) == 'REF=') THEN
+        options(3) = getref(line(1))
+      ELSE IF (line(0) == 'PAR=') THEN
+        options(4) = getpar(line(1))
+      ELSE IF (line(0) == 'NODES=') THEN
+        options(5) = getnode(line(1))
+      ELSE IF (line(0) == 'MEMORY=') THEN
+        options(6) = getmem(line(1))
+      ELSE IF (line(0) == 'VERB=') THEN
+        options(7) = getverb(line(1))
+      ELSE IF (line(0) == 'SCF_Conv=') THEN
+        options(8) = getSCF_Conv(line(1))
+      ELSE IF (line(0) == 'UNITS=') THEN
+        options(11) = getunits(line(1))
+      ELSE
+        WRITE(*,*) "parser could not understand options line ", i
+      END IF
+    END DO
+
+  END SUBROUTINE read_options
+
+!---------------------------------------------------------------------
+!			Print options	
+!---------------------------------------------------------------------
+  SUBROUTINE print_options(options)
+    IMPLICIT NONE
+    INTEGER(KIND=8), DIMENSION(0:), INTENT(IN) ::  options
+999 FORMAT(1x,A22,I8)
+    WRITE(*,*) "Options"
+    WRITE(*,*) "Basis               : ",options(2)
+    WRITE(*,*) "Calculation         : ",options(1)
+    WRITE(*,*) "Charge              : ",options(9)
+    WRITE(*,*) "Memory (MB)         : ",options(6)
+    WRITE(*,*) "Multiplicity        : ",options(10)
+    WRITE(*,*) "Nodes               : ",options(5)
+    WRITE(*,*) "Parallel Algorithm  : ",options(4)
+    WRITE(*,*) "Read type           : ",options(0)
+    WRITE(*,*) "Reference           : ",options(3)
+    WRITE(*,*) "SCF Convergence     : ",options(8)
+    WRITE(*,*) "Units               : ",options(11)
+    WRITE(*,*) "==========================================="
+  END SUBROUTINE print_options
+!---------------------------------------------------------------------
 
 END PROGRAM parser
