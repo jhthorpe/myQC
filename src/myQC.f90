@@ -26,7 +26,7 @@ PROGRAM myQC
 
 !~~~~~
 ! Parse input
-  CALL EXECUTE_COMMAND_LINE('parse')
+  CALL EXECUTE_COMMAND_LINE('parse2')
   INQUIRE(file='error', EXIST=ex)
   IF (ex) THEN
     WRITE(*,*) "Error from parse, exiting"
