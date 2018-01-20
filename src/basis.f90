@@ -22,8 +22,7 @@ MODULE basis
 !---------------------------------------------------------------------
   SUBROUTINE buildBasis(bkey,atoms,bas,basinfo,set,setinfo,verb,maxN,maxL)
 
-    ! Basis is a 3D array, 1st index is each atom, 2nd index is each orbital section, 3rd index are the individual values within the section in a linear array. They must be iterated through differently for each basis set 
-
+    ! The author does not believe the line directly below this one...
     ! Basis is now ordered by [atom, setnum, {alpha, #orbs, w0,w1,w2,...}]
 
     ! Values
@@ -81,6 +80,7 @@ MODULE basis
     !Open basis file
     OPEN (unit=2,file="mybasis",status="old",access="sequential")
     OPEN (unit=3,file='basinfo',status='replace',access='sequential')
+ 
     OPEN (unit=4,file='setinfo',status='replace',access='sequential')
     
     !tracking variables

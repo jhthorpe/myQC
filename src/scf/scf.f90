@@ -189,6 +189,9 @@ PROGRAM scf
     WRITE(*,*) "============================================================"
     WRITE(*,*)
 
+    !write to molden file
+    CALL makeMOLDEN(atoms,xyz,Eig,[0.0D0],0,nnuc,norb)
+
     DEALLOCATE(Cui)
     DEALLOCATE(Suv)
     DEALLOCATE(Fuv)
@@ -357,6 +360,9 @@ PROGRAM scf
       WRITE(*,998) i+1, EigB(i)
     END DO
     WRITE(*,*) "============================================================"
+
+    !write to molden file
+    CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb)
 
     !free the memory we are done with
     DEALLOCATE(FuvA)
@@ -1223,5 +1229,133 @@ PROGRAM scf
 
   END SUBROUTINE getSpinCont
 
+!---------------------------------------------------------------------
+!		Make MOLDEN input file	
+!---------------------------------------------------------------------
+  SUBROUTINE makeMOLDEN(atoms,xyz,EigA,EigB,ref,nnuc,norb)
+    USE basis
+    IMPLICIT NONE
+
+    !Values
+    !atoms	: 1D int, list of atoms in calculation
+    !xyz	: 2D dp, list of nuclei positions
+    !EigA,B	: 1D dp, list of MO eigenvalues	
+    !ref	: int, reference 0-RHF,1-UHF,2-ROHF
+    !nnuc	: int, number of atoms
+    !norb	: int, number of orbitals
+
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: EigA,EigB
+    INTEGER, DIMENSION(0:), INTENT(IN) :: atoms
+    INTEGER, INTENT(IN) :: ref,nnuc,norb
+
+    !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: bas,set,val
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: basinfo,setinfo,dummy
+    CHARACTER(LEN=2), DIMENSION(1:10) :: A
+    CHARACTER(LEN=8), DIMENSION(0:0) :: B
+    CHARACTER(LEN=1),DIMENSION(0:5) :: C 
+    CHARACTER(LEN=8) :: line
+    CHARACTER(LEN=2) :: Aname
+    INTEGER :: i,j,k,maxN,maxL,bkey,sec,orb,nset
+    INTEGER :: func,coef,pri,ang,ori,nelcA,nelcB
+
+999 FORMAT(A2,4x,I3,4x,I3,4x,F15.8,4x,F15.8,4x,F15.8)
+
+    A = ['H ','He','Li','Be','B ','C ','N ','O ','F ','Ne']
+    B = ['STO-3G']
+    C = ['s','p','d','f','g','h']
+    bkey = options(2)
+    OPEN(unit=1,file='envdat',status='old',access='sequential')
+    READ(1,*)
+    READ(1,*) nelcA,nelcB
+    CLOSE(unit=1)
+
+    OPEN(unit=12,file='MOLDEN',status='replace',access='sequential')
+    OPEN(unit=13,file='mybasis',status='old',access='sequential')
+
+    !write geometry
+    WRITE(12,*) "[Molden Format]"
+    WRITE(12,*) "[ATOMS] AU"
+    DO i=1,nnuc
+      WRITE(12,999) A(atoms(i-1)), i, atoms(i-1), xyz(i-1,0:2) 
+    END DO
+
+    !write AO 
+    WRITE(12,*) '[Molden Format]'
+    WRITE(12,*) "[GTO]"
+
+    DO i=0,nnuc-1
+      WRITE(12,*) i+1,0
+      !get information
+      DO WHILE (line .NE. B(bkey))
+        READ(13,*) line 
+      END DO
+      Aname = A(atoms(i))
+      DO WHILE(line .NE. Aname)
+        READ(13,*) line
+      END DO
+
+      READ(13,*) sec,orb,nset
+      WRITE(*,*) "sec, orb, nset", sec, orb, nset
+      DO j=0,sec-1
+        READ(13,*) func, coef, pri, ang, ori
+        WRITE(*,*) func, coef, pri, ang, ori
+        ALLOCATE(val(0:coef-1))
+        WRITE(12,*) C(ang),func, "1.00"
+        DO k=0,func-1 
+          ! do stuff 
+          READ(13,*) val
+          WRITE(12,*) val(1:coef-1), val(0)
+        END DO
+        DEALLOCATE(val)
+      END DO
+      WRITE(12,*) 
+      REWIND(13)
+      READ(13,*) line
+    END DO
+    WRITE(12,*)
+    CLOSE(unit=13) 
+
+
+    !write MO
+998 FORMAT(1x,A4,1x,F15.8)
+    WRITE(12,*) "[MO]"
+
+    !write for alpha (guarenteed)
+    DO i=0,norb-1
+      WRITE(12,*) " Sym= E"
+      WRITE(12,998) "Ene=",EigA(i)
+      WRITE(12,*) " Spin= Alpha"
+      IF (i .LE. nelcA) THEN
+        WRITE(12,*) " Occup= 1.0"
+      ELSE
+        WRITE(12,*) " Occup= 0.0" 
+      END IF
+      DO j=0,norb-1
+        WRITE(12,*) j+1, EigA(j)
+      END DO
+    END DO
+
+    !write for beta (if needed)
+    IF (ref .EQ. 1) THEN
+      DO i=0,norb-1
+        WRITE(12,*) " Sym= E"
+        WRITE(12,998) "Ene=",EigB(i)
+        WRITE(12,*) " Spin= Beta"
+        IF (i .LE. nelcB) THEN
+          WRITE(12,*) " Occup= 1.0"
+        ELSE
+          WRITE(12,*) " Occup= 0.0" 
+        END IF
+        DO j=0,norb-1
+          WRITE(12,*) j+1,EigB(j)
+        END DO
+      END DO
+    END IF
+    CLOSE(unit=12,status='keep')
+
+  END SUBROUTINE makeMOLDEN
 !---------------------------------------------------------------------
 END PROGRAM scf
