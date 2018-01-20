@@ -19,14 +19,14 @@ PROGRAM myQC
   LOGICAL :: ex
 
   CALL CPU_TIME(timeS)
-  WRITE(*,*) "Starting myQC"  
+  WRITE(*,*) "                 Starting myQC"  
   ex = .FALSE.
 
 999 FORMAT(1x,A15,2x,F8.4)
 
 !~~~~~
 ! Parse input
-  CALL EXECUTE_COMMAND_LINE('parse2')
+  CALL EXECUTE_COMMAND_LINE('parse')
   INQUIRE(file='error', EXIST=ex)
   IF (ex) THEN
     WRITE(*,*) "Error from parse, exiting"

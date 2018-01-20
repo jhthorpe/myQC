@@ -44,7 +44,6 @@ PROGRAM int1e
 
 ! input managment 
   CALL CPU_TIME(timeS)
-  WRITE(*,*)
   WRITE(*,*) "int1e called"
   CALL getenv(nnuc,nelcA,nelcB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
