@@ -1319,36 +1319,37 @@ PROGRAM scf
 
     !write MO
 998 FORMAT(1x,A4,1x,F15.8)
+997 FORMAT(1x,I4,4x,F15.10)
     WRITE(12,*) "[MO]"
 
     !write for alpha (guarenteed)
     DO i=0,norb-1
-      WRITE(12,*) " Sym= A"
+      WRITE(12,*) "Sym= A"
       WRITE(12,998) "Ene=",EigA(i)
       WRITE(12,*) " Spin= Alpha"
       IF (i .LE. nelcA) THEN
-        WRITE(12,*) " Occup= 1.0"
+        WRITE(12,*) "Occup= 1.0"
       ELSE
-        WRITE(12,*) " Occup= 0.0" 
+        WRITE(12,*) "Occup= 0.0" 
       END IF
       DO j=0,norb-1
-        WRITE(12,*) j+1, CuiA(i,j)
+        WRITE(12,997) j+1, CuiA(j,i)
       END DO
     END DO
 
     !write for beta (if needed)
     IF (ref .EQ. 1) THEN
       DO i=0,norb-1
-        WRITE(12,*) " Sym= A"
+        WRITE(12,*) "Sym= A"
         WRITE(12,998) "Ene=",EigB(i)
         WRITE(12,*) " Spin= Beta"
         IF (i .LE. nelcB) THEN
-          WRITE(12,*) " Occup= 1.0"
+          WRITE(12,*) "Occup= 1.0"
         ELSE
-          WRITE(12,*) " Occup= 0.0" 
+          WRITE(12,*) "Occup= 0.0" 
         END IF
         DO j=0,norb-1
-          WRITE(12,*) j+1,CuiB(i,j)
+          WRITE(12,997) j+1,CuiB(j,i)
         END DO
       END DO
     END IF
