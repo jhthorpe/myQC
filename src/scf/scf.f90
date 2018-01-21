@@ -1327,7 +1327,7 @@ PROGRAM scf
       WRITE(12,*) "Sym= A"
       WRITE(12,998) "Ene=",EigA(i)
       WRITE(12,*) " Spin= Alpha"
-      IF (i .LE. nelcA) THEN
+      IF (i .LT. nelcA) THEN
         WRITE(12,*) "Occup= 1.0"
       ELSE
         WRITE(12,*) "Occup= 0.0" 
@@ -1343,7 +1343,7 @@ PROGRAM scf
         WRITE(12,*) "Sym= A"
         WRITE(12,998) "Ene=",EigB(i)
         WRITE(12,*) " Spin= Beta"
-        IF (i .LE. nelcB) THEN
+        IF (i .LT. nelcB) THEN
           WRITE(12,*) "Occup= 1.0"
         ELSE
           WRITE(12,*) "Occup= 0.0" 
