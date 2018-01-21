@@ -190,7 +190,7 @@ PROGRAM scf
     WRITE(*,*)
 
     !write to molden file
-    CALL makeMOLDEN(atoms,xyz,Eig,[0.0D0],0,nnuc,norb)
+    CALL makeMOLDEN(atoms,xyz,Eig,[0.0D0],0,nnuc,norb,Cui,Cui)
 
     DEALLOCATE(Cui)
     DEALLOCATE(Suv)
@@ -362,7 +362,7 @@ PROGRAM scf
     WRITE(*,*) "============================================================"
 
     !write to molden file
-    CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb)
+    CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb,CuiA,CuiB)
 
     !free the memory we are done with
     DEALLOCATE(FuvA)
@@ -1232,7 +1232,7 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !		Make MOLDEN input file	
 !---------------------------------------------------------------------
-  SUBROUTINE makeMOLDEN(atoms,xyz,EigA,EigB,ref,nnuc,norb)
+  SUBROUTINE makeMOLDEN(atoms,xyz,EigA,EigB,ref,nnuc,norb,CuiA,CuiB)
     USE basis
     IMPLICIT NONE
 
@@ -1245,7 +1245,7 @@ PROGRAM scf
     !norb	: int, number of orbitals
 
     !Inout
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz,CuiA,CuiB
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: EigA,EigB
     INTEGER, DIMENSION(0:), INTENT(IN) :: atoms
     INTEGER, INTENT(IN) :: ref,nnuc,norb
@@ -1298,10 +1298,8 @@ PROGRAM scf
       END DO
 
       READ(13,*) sec,orb,nset
-      WRITE(*,*) "sec, orb, nset", sec, orb, nset
       DO j=0,sec-1
         READ(13,*) func, coef, pri, ang, ori
-        WRITE(*,*) func, coef, pri, ang, ori
         ALLOCATE(val(0:coef-1))
         WRITE(12,*) C(ang),func, "1.00"
         DO k=0,func-1 
@@ -1325,7 +1323,7 @@ PROGRAM scf
 
     !write for alpha (guarenteed)
     DO i=0,norb-1
-      WRITE(12,*) " Sym= E"
+      WRITE(12,*) " Sym= A"
       WRITE(12,998) "Ene=",EigA(i)
       WRITE(12,*) " Spin= Alpha"
       IF (i .LE. nelcA) THEN
@@ -1334,14 +1332,14 @@ PROGRAM scf
         WRITE(12,*) " Occup= 0.0" 
       END IF
       DO j=0,norb-1
-        WRITE(12,*) j+1, EigA(j)
+        WRITE(12,*) j+1, CuiA(i,j)
       END DO
     END DO
 
     !write for beta (if needed)
     IF (ref .EQ. 1) THEN
       DO i=0,norb-1
-        WRITE(12,*) " Sym= E"
+        WRITE(12,*) " Sym= A"
         WRITE(12,998) "Ene=",EigB(i)
         WRITE(12,*) " Spin= Beta"
         IF (i .LE. nelcB) THEN
@@ -1350,7 +1348,7 @@ PROGRAM scf
           WRITE(12,*) " Occup= 0.0" 
         END IF
         DO j=0,norb-1
-          WRITE(12,*) j+1,EigB(j)
+          WRITE(12,*) j+1,CuiB(i,j)
         END DO
       END DO
     END IF
