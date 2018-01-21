@@ -2,7 +2,7 @@
 My crummy implementation of Hartree Fock
 
 ====  RUNNING  ===
-1) compile program with 'makeAll.sh' in src. This MUST be done once, and with the correct linker to BLAS and LAPACK libraries.
+1) Compile program with 'make all' in src. If you don't want to use gfortran, then you must edit each subdirectory's Makefile (sorry). The scf subdirectory MUST be linked to your blas/lapack libraries!
 2) Add bin to your path.
 3) Copy 'mybasis' and 'Ftab' (temporary fix) from bin into current directory.
 4) In same directory, create or copy 'input'.
