@@ -163,7 +163,7 @@ PROGRAM scf
 
     ! RHF iterations
     WRITE(*,*) "RHF calculation..."
-    WRITE(*,*) "Interation   Total Energy (hartrees)   Ediff"
+    WRITE(*,*) "Iteration   Total Energy (hartrees)   Ediff"
     WRITE(*,*) "============================================================"
     DO WHILE (.NOT. conv)
       CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
@@ -321,7 +321,7 @@ PROGRAM scf
 
     ! UHF iterations
     WRITE(*,*) "UHF calculation..."
-    WRITE(*,*) "Interation   Total Energy (hartrees)   Ediff"
+    WRITE(*,*) "Iteration   Total Energy (hartrees)   Ediff"
     WRITE(*,*) "============================================================"
     DO WHILE (.NOT. conv)
       CALL UHFiter(Suv,Huv,GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db,EigA,EigB,&
