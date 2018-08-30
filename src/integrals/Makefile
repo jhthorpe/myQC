@@ -1,6 +1,8 @@
 bindir:=../../bin
 FC=gfortran
-FFLAGS= -O2 -fcheck=bounds
+FFLAGS= -O3 -fcheck=bounds
+#FC= ifort
+#FFLAGS= -O3
 
 all:
 	$(FC) -o $(bindir)/int1e int1e.f90 ../env.f90 ../basis.f90 auxilary.f90 $(FFLAGS); \

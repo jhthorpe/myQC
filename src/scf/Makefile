@@ -1,6 +1,8 @@
 bindir:= ../../bin
 FC=gfortran
-FFLAGS= -O2 -fcheck=bounds
+FFLAGS= -O3 -fcheck=bounds
+#FC=ifort
+#FFLAGS= -O3 -g
 LINAL= -L/Users/jamesthorpe/LAPACK/lapack-3.7.0 -llapack -lblas
 
 all:

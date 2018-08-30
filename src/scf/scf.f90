@@ -168,7 +168,7 @@ PROGRAM scf
     DO WHILE (.NOT. conv)
       CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
       iter = iter + 1
-      IF (iter .GE. 300) THEN
+      IF (iter .GE. 500) THEN
         WRITE(*,*) "SCF failed to converge."
         EXIT
       END IF

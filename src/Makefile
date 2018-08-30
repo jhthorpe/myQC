@@ -1,6 +1,10 @@
 #fortran compiler and flags, change as needed for each subdirectory (sorry)
 FC=gfortran
-FFLAGS=-O2 -fcheck=bounds
+FFLAGS=-O3 -fcheck=bounds
+#FC=ifort
+#FFLAGS=-O3
+
+export $(FC) $(FFLAGS)
 
 bindir:= ../bin
 
