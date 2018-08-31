@@ -86,12 +86,13 @@ PROGRAM scf
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Eig
     REAL(KIND=8), DIMENSION(1:3) :: Etrk
     INTEGER, DIMENSION(0:1) :: line
-    REAL(KIND=8) :: timeS, timeF, Enr
+    REAL(KIND=8) :: timeS,timeF,Enr,mdiff
     INTEGER :: LWORK,i
     INTEGER :: iter,stat1,stat2,stat3,stat4,stat5,stat6,stat7,norb
     LOGICAL :: conv,ex,flag 
 
 999 FORMAT(1x,A30,F8.5)
+996 FORMAT(1x,A30,F8.5,F8.5)
 997 FORMAT(1x,A16,F8.5)
 
     CALL CPU_TIME(timeS)
@@ -163,30 +164,30 @@ PROGRAM scf
 
     ! RHF iterations
     WRITE(*,*) "RHF calculation..."
-    WRITE(*,*) "Iteration   Total Energy (hartrees)   Ediff"
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "Iteration   Total Energy (hartrees)   Ediff               Ddiff"
+    WRITE(*,*) "========================================================================="
     DO WHILE (.NOT. conv)
-      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+      CALL RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,mdiff,options)
       iter = iter + 1
       IF (iter .GE. 500) THEN
         WRITE(*,*) "SCF failed to converge."
         EXIT
       END IF
     END DO
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "========================================================================="
 
 998 FORMAT(15x,I3,4x,F20.15)
     !Write output
     WRITE(*,*) "Orbital eigenvalues (a.u.)"
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,998) 1, Eig(0)
     DO i=1,norb-1
       IF (Eig(i) .GT. 0.0D0 .AND. Eig(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "------------------------------------------------------------"
+        WRITE(*,*) "---------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, Eig(i)
     END DO
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,*)
 
     !write to molden file
@@ -199,6 +200,7 @@ PROGRAM scf
     DEALLOCATE(Guv)
     DEALLOCATE(Da)
     DEALLOCATE(Eig)
+    CALL EXECUTE_COMMAND_LINE('rm Dold')
 
     fmem = fmem + (6*norb*norb*8/1.0D6 + norb*8.0/1.0D6)
     CALL nmem(fmem)
@@ -237,7 +239,7 @@ PROGRAM scf
     REAL(KIND=8), DIMENSION(1:3) :: Etrk
     INTEGER, DIMENSION(0:13) :: stat
     INTEGER, DIMENSION(0:1) :: line
-    REAL(KIND=8) :: timeS, timeF, Enr
+    REAL(KIND=8) :: timeS,timeF,Enr,mdiff
     INTEGER :: LWORK,i
     INTEGER :: iter,norb
     LOGICAL :: conv,ex,flag 
@@ -321,11 +323,11 @@ PROGRAM scf
 
     ! UHF iterations
     WRITE(*,*) "UHF calculation..."
-    WRITE(*,*) "Iteration   Total Energy (hartrees)   Ediff"
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "Iteration   Total Energy (hartrees)   Ediff               Ddiff"
+    WRITE(*,*) "========================================================================="
     DO WHILE (.NOT. conv)
       CALL UHFiter(Suv,Huv,GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db,EigA,EigB,&
-      Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+      Enr,Etrk,norb,conv,fmem,iter,LWORK,mdiff,options)
       iter = iter + 1
       IF (iter .GE. 300) THEN
         WRITE(*,*) "SCF failed to converge."
@@ -337,29 +339,29 @@ PROGRAM scf
 
     !Write orbitals
 998 FORMAT(15x,I3,4x,F20.15)
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,*) "Orbital eigenvalues of Alpha (a.u.)"
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,998) 1, EigA(0)
     DO i=1,norb-1
       IF (EigA(i) .GT. 0.0D0 .AND. EigA(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "------------------------------------------------------------"
+        WRITE(*,*) "---------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, EigA(i)
     END DO
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,*)
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,*) "Orbital eigenvalues of Beta (a.u.)"
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
     WRITE(*,998) 1, EigB(0)
     DO i=1,norb-1
       IF (EigB(i) .GT. 0.0D0 .AND. EigB(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "------------------------------------------------------------"
+        WRITE(*,*) "---------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, EigB(i)
     END DO
-    WRITE(*,*) "============================================================"
+    WRITE(*,*) "==============================================================="
 
     !write to molden file
     CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb,CuiA,CuiB)
@@ -704,7 +706,7 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !			RHF iteration	
 !---------------------------------------------------------------------
-  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+  SUBROUTINE RHFiter(Suv,Huv,Guv,Fuv,Cui,Da,Eig,Enr,Etrk,norb,conv,fmem,iter,LWORK,mdiff,options)
     IMPLICIT NONE
     
     !Values
@@ -724,13 +726,14 @@ PROGRAM scf
     !iter	: int, iteration number
     !Eelc	: dp, electronic energy
     !LWORK	: int, length of work array
+    !mdiff	: real8, max diff of density matrix
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Guv,Fuv,Cui,Da
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Suv,Huv
     REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Eig,Etrk
     INTEGER, DIMENSION(0:), INTENT(IN) :: options
-    REAL(KIND=8), INTENT(INOUT) :: fmem
+    REAL(KIND=8), INTENT(INOUT) :: fmem,mdiff
     REAL(KIND=8), INTENT(IN) :: Enr
     INTEGER, INTENT(INOUT) :: LWORK
     LOGICAL, INTENT(INOUT) :: conv 
@@ -748,7 +751,6 @@ PROGRAM scf
     OPEN(unit=8,file='Da',access='sequential',status='old',form='unformatted')
     READ(8) Da(:,:) 
     CLOSE(unit=8)
-
 
     !get Guv matrix
     OPEN(unit=11,file='Guv',access='sequential',status='old',form='unformatted')
@@ -768,10 +770,11 @@ PROGRAM scf
     Eelc = 0.5D0*Eelc
  
 999 FORMAT(4x,I3,4x,F20.15,8x,ES15.8)
+996 FORMAT(4x,I3,4x,F20.15,8x,ES15.8,4x,ES15.8)
 
     !write output
-    !WORK NOTe - need better output
-    WRITE(*,999) iter+1, Eelc+Enr, Eelc+Enr-Etrk(2)
+    !WORK NOTE - need better output
+    WRITE(*,996) iter+1, Eelc+Enr, Eelc+Enr-Etrk(2), mdiff
 
     !Get our coefficients and eigenvalues
 
@@ -856,7 +859,10 @@ PROGRAM scf
     CLOSE(unit=7,status='keep')
     Cui(:,:) = A(:,:)
 
-    !write new dens and Guv
+    !write new dens, write old dens, and Guv
+    OPEN(unit=9,file='Dold',status='replace',form='unformatted')
+    WRITE(9) Da(:,:)
+    CLOSE(unit=9)
     CALL EXECUTE_COMMAND_LINE('dens')
     CALL EXECUTE_COMMAND_LINE('RHFI2G')
  
@@ -874,7 +880,7 @@ PROGRAM scf
     Etrk(2) = Eelc + Enr
 
     IF (iter .GT. 0) THEN
-      CALL checkConv(Etrk,options,conv)
+      CALL checkConv(norb,Etrk,options,conv,mdiff)
     END IF
 
     IF (conv) THEN
@@ -890,7 +896,7 @@ PROGRAM scf
 !			UHF iteration	
 !---------------------------------------------------------------------
   SUBROUTINE UHFiter(Suv,Huv,GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db,EigA,EigB,&
-  Enr,Etrk,norb,conv,fmem,iter,LWORK,options)
+  Enr,Etrk,norb,conv,fmem,iter,LWORK,mdiff,options)
     IMPLICIT NONE
     
     !Values
@@ -910,6 +916,7 @@ PROGRAM scf
     !iter	: int, iteration number
     !Eelc	: dp, electronic energy
     !LWORK	: int, length of work array
+    !mdiff	: real8, max diff of density matrix
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: GuvA,GuvB,FuvA,FuvB,CuiA,CuiB,Da,Db
@@ -925,7 +932,7 @@ PROGRAM scf
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: A,B
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: WORK
-    REAL(KIND=8) :: Eelc,temp
+    REAL(KIND=8) :: Eelc,temp,mdiff
     INTEGER :: INFO,stat1,stat2,stat3
     INTEGER :: i,j,u,v
     LOGICAL :: ex
@@ -957,9 +964,10 @@ PROGRAM scf
     Eelc = 0.5D0*Eelc
  
 999 FORMAT(4x,I3,4x,F20.15,8x,ES15.8)
+996 FORMAT(4x,I3,4x,F20.15,8x,ES15.8,4x,ES15.8)
 
     !write energy output
-    WRITE(*,999) iter+1, Eelc+Enr, Eelc+Enr-Etrk(2)
+    WRITE(*,996) iter+1, Eelc+Enr, Eelc+Enr-Etrk(2), mdiff
 
     !Get our new coefficients and eigenvalues
 
@@ -1064,7 +1072,11 @@ PROGRAM scf
     WRITE(7,*) CuiB(:,:)
     CLOSE(unit=7,status='keep')
 
-    !write new dens and Guv
+    !write new dens, old dens, and Guv
+    OPEN(unit=9,file='Dold',status='replace',access='sequential',form='unformatted')
+    WRITE(9) Da(:,:)
+    WRITE(9) Db(:,:)
+    CLOSE(unit=9)
     CALL EXECUTE_COMMAND_LINE('dens')
     CALL EXECUTE_COMMAND_LINE('UHFI2G')
  
@@ -1081,7 +1093,7 @@ PROGRAM scf
     Etrk(2) = Eelc + Enr
 
     IF (iter .GT. 0) THEN
-      CALL checkConv(Etrk,options,conv)
+      CALL checkConv(norb,Etrk,options,conv,mdiff)
     END IF
 
     IF (conv) THEN
@@ -1131,30 +1143,101 @@ PROGRAM scf
 !---------------------------------------------------------------------
 !		Check for convergence	
 !---------------------------------------------------------------------
-  SUBROUTINE checkConv(Etrk,options,conv)
+  SUBROUTINE checkConv(norb,Etrk,options,conv,mdiff)
     IMPLICIT NONE
 
     !Value
     !Etrk	: 1D dp, list of 3 last energies
     !options	: 1D int, options array
     !conv	: bool, converged or not
+    !Dnew	: 2D real8, new density matrix 
+    !Dold	: 2D real8, old density matrix
+    !norb	: int, number of orbitals
+    !mdiff	: real8, max diff of density matrix
 
     !Inout
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: Etrk
     INTEGER, DIMENSION(0:), INTENT(IN) :: options
     LOGICAL, INTENT(INOUT) :: conv
+    INTEGER, INTENT(IN) :: norb
 
     !Internal
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Dold,Dnew 
     REAL(KIND=8), DIMENSION(0:11) :: lim
-    INTEGER :: i 
+    REAL(KIND=8) :: mdiff
+    INTEGER :: stat1,stat2
+    INTEGER :: i,j
+    LOGICAL :: flag
+
+    flag = .TRUE.
+    conv = .FALSE.
 
     !These go to 11
     i = options(8)
     lim = [1.0D0,1.0D-1,1.0D-2,1.0D-3,1.0D-4,1.0D-5,1.0D-6,1.0D-7,1.0D-8,1.0D-9,1.0D-10,1.0D-11]
 
+    !check energy convergence
     IF (Etrk(1)-Etrk(2) .LT. lim(i) .AND. Etrk(2) .LE. Etrk(1)) THEN
-      conv = .TRUE.
+      flag = .FALSE.
     END IF 
+
+    !check density convergence
+    IF (options(3) .EQ. 0) THEN
+      ALLOCATE(Dold(0:norb-1,0:norb-1),STAT=stat1)
+      ALLOCATE(Dnew(0:norb-1,0:norb-1),STAT=stat2)
+      IF (stat1 + stat2 .NE. 0) THEN
+        WRITE(*,*) "scf:checkConv could not allocate Dold or Dnew"
+        STOP
+      END IF 
+    ELSE
+      ALLOCATE(Dold(0:norb-1,0:2*norb-1),STAT=stat1)
+      ALLOCATE(Dnew(0:norb-1,0:2*norb-1),STAT=stat2)
+      IF (stat1 + stat2 .NE. 0) THEN
+        WRITE(*,*) "scf:checkConv could not allocate Dold or Dnew"
+        STOP
+      END IF 
+    END IF
+
+    OPEN(unit=9,file='Dold',status='old',access='sequential',form='unformatted')
+    READ(9) Dold(:,:)
+    CLOSE(unit=9)
+    OPEN(unit=9,file='Da',status='old',access='sequential',form='unformatted')
+    READ(9) Dnew(:,:)
+    CLOSE(unit=9)
+
+    !the old fashioned way
+    mdiff = 0.0D0
+
+    !rhf
+    IF (options(3) .EQ. 0) THEN
+      DO i=0,norb-1
+        DO j=0,norb-1
+          IF (ABS(Dold(i,j)-Dnew(i,j)) .GT. mdiff) THEN
+            mdiff = ABS(Dold(i,j)-Dnew(i,j))
+          END IF
+        END DO
+      END DO      
+
+    !uhf - currently broken
+    ELSE
+      DO i=0,2*norb-1
+        DO j=0,norb-1
+          IF (ABS(Dold(i,j)-Dnew(i,j)) .GT. mdiff) THEN
+            mdiff = ABS(Dold(i,j)-Dnew(i,j))
+          END IF
+        END DO
+      END DO      
+    END IF
+
+    !check for convergence
+    IF (mdiff .LT. lim(options(8))) THEN
+      conv = .TRUE.
+    ELSE
+      conv = .FALSE.
+    END IF
+
+    DEALLOCATE(Dold)
+    DEALLOCATE(Dnew)
 
   END SUBROUTINE
 
