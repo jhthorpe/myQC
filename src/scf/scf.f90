@@ -179,15 +179,15 @@ PROGRAM scf
 998 FORMAT(15x,I3,4x,F20.15)
     !Write output
     WRITE(*,*) "Orbital eigenvalues (a.u.)"
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
     WRITE(*,998) 1, Eig(0)
     DO i=1,norb-1
       IF (Eig(i) .GT. 0.0D0 .AND. Eig(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "---------------------------------------------------------------"
+        WRITE(*,*) "-------------------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, Eig(i)
     END DO
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "=========================================================================="
     WRITE(*,*)
 
     !write to molden file
@@ -339,29 +339,29 @@ PROGRAM scf
 
     !Write orbitals
 998 FORMAT(15x,I3,4x,F20.15)
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
     WRITE(*,*) "Orbital eigenvalues of Alpha (a.u.)"
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
     WRITE(*,998) 1, EigA(0)
     DO i=1,norb-1
       IF (EigA(i) .GT. 0.0D0 .AND. EigA(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "---------------------------------------------------------------"
+        WRITE(*,*) "-------------------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, EigA(i)
     END DO
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
     WRITE(*,*)
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
     WRITE(*,*) "Orbital eigenvalues of Beta (a.u.)"
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
     WRITE(*,998) 1, EigB(0)
     DO i=1,norb-1
       IF (EigB(i) .GT. 0.0D0 .AND. EigB(i-1) .LT. 0.0D0) THEN
-        WRITE(*,*) "---------------------------------------------------------------"
+        WRITE(*,*) "-------------------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, EigB(i)
     END DO
-    WRITE(*,*) "==============================================================="
+    WRITE(*,*) "========================================================================="
 
     !write to molden file
     CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb,CuiA,CuiB)
@@ -1150,8 +1150,8 @@ PROGRAM scf
     !Etrk	: 1D dp, list of 3 last energies
     !options	: 1D int, options array
     !conv	: bool, converged or not
-    !Dnew	: 2D real8, new density matrix 
-    !Dold	: 2D real8, old density matrix
+    !Dna,Dnb	: 2D real8, new density matrix (spin,col,row) 
+    !Doa,Dob	: 2D real8, old density matrix
     !norb	: int, number of orbitals
     !mdiff	: real8, max diff of density matrix
 
@@ -1162,11 +1162,11 @@ PROGRAM scf
     INTEGER, INTENT(IN) :: norb
 
     !Internal
-    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Dold,Dnew 
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Dna,Dnb,Doa,Dob
     REAL(KIND=8), DIMENSION(0:11) :: lim
     REAL(KIND=8) :: mdiff
     INTEGER :: stat1,stat2
-    INTEGER :: i,j
+    INTEGER :: i,j,k
     LOGICAL :: flag
 
     flag = .TRUE.
@@ -1181,29 +1181,36 @@ PROGRAM scf
       flag = .FALSE.
     END IF 
 
-    !check density convergence
+    OPEN(unit=9,file='Dold',status='old',access='sequential',form='unformatted')
+    OPEN(unit=10,file='Da',status='old',access='sequential',form='unformatted')
+    !get rhf density 
     IF (options(3) .EQ. 0) THEN
-      ALLOCATE(Dold(0:norb-1,0:norb-1),STAT=stat1)
-      ALLOCATE(Dnew(0:norb-1,0:norb-1),STAT=stat2)
+      ALLOCATE(Doa(0:norb-1,0:norb-1),STAT=stat1)
+      ALLOCATE(Dna(0:norb-1,0:norb-1),STAT=stat2)
       IF (stat1 + stat2 .NE. 0) THEN
         WRITE(*,*) "scf:checkConv could not allocate Dold or Dnew"
         STOP
       END IF 
+      READ(9) Doa(:,:)
+      READ(10) Dna(:,:)
+    !get uhf density
     ELSE
-      ALLOCATE(Dold(0:norb-1,0:2*norb-1),STAT=stat1)
-      ALLOCATE(Dnew(0:norb-1,0:2*norb-1),STAT=stat2)
+      ALLOCATE(Doa(0:norb-1,0:norb-1),STAT=stat1)
+      ALLOCATE(Dob(0:norb-1,0:norb-1),STAT=stat1)
+      ALLOCATE(Dna(0:norb-1,0:norb-1),STAT=stat2)
+      ALLOCATE(Dnb(0:norb-1,0:norb-1),STAT=stat2)
       IF (stat1 + stat2 .NE. 0) THEN
         WRITE(*,*) "scf:checkConv could not allocate Dold or Dnew"
         STOP
       END IF 
+      READ(9) Doa(:,:)
+      READ(9) Dob(:,:)
+      READ(10) Dna(:,:)
+      READ(10) Dnb(:,:)
     END IF
 
-    OPEN(unit=9,file='Dold',status='old',access='sequential',form='unformatted')
-    READ(9) Dold(:,:)
     CLOSE(unit=9)
-    OPEN(unit=9,file='Da',status='old',access='sequential',form='unformatted')
-    READ(9) Dnew(:,:)
-    CLOSE(unit=9)
+    CLOSE(unit=10)
 
     !the old fashioned way
     mdiff = 0.0D0
@@ -1212,18 +1219,21 @@ PROGRAM scf
     IF (options(3) .EQ. 0) THEN
       DO i=0,norb-1
         DO j=0,norb-1
-          IF (ABS(Dold(i,j)-Dnew(i,j)) .GT. mdiff) THEN
-            mdiff = ABS(Dold(i,j)-Dnew(i,j))
+          IF (ABS(Doa(i,j)-Dna(i,j)) .GT. mdiff) THEN
+            mdiff = ABS(Doa(i,j)-Dna(i,j))
           END IF
         END DO
       END DO      
 
     !uhf - currently broken
     ELSE
-      DO i=0,2*norb-1
+      DO i=0,norb-1
         DO j=0,norb-1
-          IF (ABS(Dold(i,j)-Dnew(i,j)) .GT. mdiff) THEN
-            mdiff = ABS(Dold(i,j)-Dnew(i,j))
+          IF (ABS(Doa(i,j)-Dna(i,j)) .GT. mdiff) THEN
+            mdiff = ABS(Doa(i,j)-Dna(i,j))
+          END IF
+          IF (ABS(Dob(i,j)-Dnb(i,j)) .GT. mdiff) THEN
+            mdiff = ABS(Dob(i,j)-Dnb(i,j))
           END IF
         END DO
       END DO      
@@ -1236,8 +1246,12 @@ PROGRAM scf
       conv = .FALSE.
     END IF
 
-    DEALLOCATE(Dold)
-    DEALLOCATE(Dnew)
+    DEALLOCATE(Doa)
+    DEALLOCATE(Dna)
+    IF (ALLOCATED(Dob)) THEN
+      DEALLOCATE(Dob)
+      DEALLOCATE(Dnb)
+    END IF 
 
   END SUBROUTINE
 
