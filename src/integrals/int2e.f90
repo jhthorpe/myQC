@@ -83,6 +83,10 @@ PROGRAM int2e
     ! fmem	: dp, free memory left in MB
     ! nnuc	: int, number of nuclii
     ! norb	: int, number of orbitals in molecule
+    ! npri	: int, number of primatives in molecule
+    ! noint	: int, number of orbital integrals to be evaluated 
+    ! npint	: int, number of primative integrals to be evaulated
+    ! npri	: int, number of primatives in molecule
     ! bas	: 1D dp, basis for each atom: atom : orbital : [d,a]
     ! basinfo	: 1D int, array of basis information
     ! set	: 1D dp, array of exponential coefficients
@@ -117,7 +121,7 @@ PROGRAM int2e
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
     REAL(KIND=8) :: aa,bb,cc,dd,p,q,nn,mm
     INTEGER :: nset,setl,OpS,stat1,stat2,setK,kmaxAB,kmaxCD 
-    INTEGER :: orba,orbb,orbc,orbd,norb
+    INTEGER :: orba,orbb,orbc,orbd,norb,npri,noint,npint
     INTEGER :: a,b,c,d,g,h,i,j,k,s,t,u,v
 
     CALL CPU_TIME(timeS)
@@ -132,6 +136,15 @@ PROGRAM int2e
     OpS = basinfo(0)
     norb = basinfo(1)
     setK = Ops**2*(2*maxL*(2*maxL+1)/2)**3
+
+    !get number of orbitals and primatives that need to be evaluated
+    DO i=0,norb-1
+      npri = npri + basinfo(1+i*5+4)
+    END DO
+    npint = ((npri+1)*npri)**2/8+((npri+1)*npri)/4
+    noint = ((norb+1)*norb)**2/8+((norb+1)*norb)/4
+    WRITE(*,*) "Total primative integrals :", npri**4
+    WRITE(*,*) "Total to be evaluated :", npint
 
     ALLOCATE(Ck(0:setK))
     ALLOCATE(Ckp(0:setK))
