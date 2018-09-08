@@ -1,7 +1,0 @@
-H2
-H
-H 1 R
-
-R = 1.0
-
-*CFOUR(CALC=SCF,BASIS=STO-3G)
