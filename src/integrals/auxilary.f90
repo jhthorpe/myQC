@@ -582,7 +582,9 @@ MODULE aux
       END IF
 
       !go through orbitals of set b
+!      DO j=i, setb(0)-1
       DO j=0, setb(0)-1
+!here
         orbb = setb(3+j)
 
         ori = basinfo(1+5*orbb+3)
