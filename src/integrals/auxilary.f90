@@ -82,14 +82,16 @@ MODULE aux
 !---------------------------------------------------------------------
 !	Control scheme for Boys integrals
 !---------------------------------------------------------------------
-  SUBROUTINE Boys(Fj,Q,T)
+  SUBROUTINE Boys(Fj,Q,T,Ft)
     IMPLICIT NONE
     ! Values
     ! Fj	: 1d dp, table for results of integrals
     ! Q		: int, max j value of Boys integral
     ! T		: dp, T value of Boys integral
+    ! Ft	: 2d dp, Ftable
 
     ! Inout
+    REAL(KIND=8), DIMENSION(0:120,0:22), INTENT(IN) :: Ft
     REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Fj
     REAL(KIND=8), INTENT(IN) :: T
     INTEGER, INTENT(IN) :: Q
@@ -108,7 +110,7 @@ MODULE aux
     ! Case 1
     ! if 0 < T < 12 and 0 <= j <= J, use 7 term Taylor expansion
     IF (T .GE. 0 .AND. T .LT. 12) THEN
-      CALL Boys1(Fj,Q,T)
+      CALL Boys1(Fj,Q,T,Ft)
     ! for 12 < T < 2*J+36, use  
     ELSE IF (T .GE. 12 .AND. T .LT. 2*Q+36) THEN
       CALL Boys2(Fj,Q,T)
@@ -125,31 +127,31 @@ MODULE aux
 !---------------------------------------------------------------------
 !	Case 1 of Boys, uses downwards recursion scheme
 !---------------------------------------------------------------------
-  SUBROUTINE Boys1(Fj,Q,T)
+  SUBROUTINE Boys1(Fj,Q,T,Ft)
     IMPLICIT NONE
     !Values
     ! Ftab	: 2d dp, table of FJ+k(T*) values, precalculated in Mathmatica, stored T,J
 
     ! inout
+    REAL(KIND=8), DIMENSION(0:120,0:22), INTENT(IN) :: Ft
     REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: Fj
     REAL(KIND=8), INTENT(IN) :: T
     INTEGER, INTENT(IN) :: Q
 
     ! internal
-    REAL(KIND=8), DIMENSION(0:120,0:22) :: Ftab
     INTEGER :: j,k,Tk
 
     !read in Ftab
-    OPEN(unit=1,file='Ftab',status='old',access='sequential',form='unformatted')
-    READ(1) Ftab
-    CLOSE(unit=1)
+!    OPEN(unit=1,file='Ftab',status='old',access='sequential',form='unformatted')
+!    READ(1) Ftab
+!    CLOSE(unit=1)
 
     Fj = (/ (0.0D0, j=0,SIZE(Fj)-1) /)
 
     ! Get FJ
     Tk = NINT(T*10)
     DO k=0,6
-      Fj(Q) = Fj(Q) + Ftab(Tk,Q+k)*(Tk/10.0D0 - T)**k/factR8(k) 
+      Fj(Q) = Fj(Q) + Ft(Tk,Q+k)*(Tk/10.0D0 - T)**k/factR8(k) 
     END DO
 
     ! Downwards Recursion
@@ -236,7 +238,7 @@ MODULE aux
 
     val = 0.0D0
 
-    CALL Boys(Fj,N+L+M,T)
+    !CALL Boys(Fj,N+L+M,T,Ft)
 
     DO i=0,FLOOR(N/2.0D0)
       DO j=0,FLOOR(L/2.0D0)
@@ -582,10 +584,10 @@ MODULE aux
       END IF
 
       !go through orbitals of set b
-!      DO j=i, setb(0)-1
       DO j=0, setb(0)-1
-!here
         orbb = setb(3+j)
+!        IF (orbb.LT.orba) CYCLE
+!here
 
         ori = basinfo(1+5*orbb+3)
         !S-TYPE

@@ -101,6 +101,7 @@ PROGRAM int2e
     ! kmax	: int, max k value that is nonzero
     ! Dk,Dkp	: 1D dp, array of nonzero coefficients for sets AB and CD
     ! Ok,Okp	: 1D int, array of orbitals of sets AB, CD, stored {left, right}
+    ! Ft        : 2D real8, F table for Boys function
  
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: xyz
@@ -114,9 +115,10 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: XX,coefAB,coefCD
     REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: II
     REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: Dk, Dkp
+    REAL(KIND=8), DIMENSION(0:120,0:22) :: Ft
+    INTEGER, DIMENSION(:), ALLOCATABLE :: Ck,Ckp,Ok,Okp
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, QC, QD, CD
     REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ
-    INTEGER, DIMENSION(:), ALLOCATABLE :: Ck,Ckp,Ok,Okp
     INTEGER, DIMENSION(0:2) :: la,lb,lc,ld,na,nb,nc,nd
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
     REAL(KIND=8) :: aa,bb,cc,dd,p,q,nn,mm
@@ -152,6 +154,11 @@ PROGRAM int2e
     ALLOCATE(Dkp(0:setK))
     ALLOCATE(Ok(0:2*setK+1))
     ALLOCATE(Okp(0:2*setK+1))
+
+    !read in Boys table  
+    OPEN(unit=1,file='Ftab',status='old',access='sequential',form='unformatted')
+    READ(1) Ft
+    CLOSE(unit=1)
 
     !Iuv will be my intermediate file for the integrals
     OPEN(unit=42,file='XX',status='replace',access='sequential',form='unformatted') 
@@ -230,7 +237,7 @@ PROGRAM int2e
 
 !here
           DO d=0,nset-1
-!          DO d=0,nset-1
+!          DO d=c,nset-1
             dd = set(d)                          !alpha d
             t = setinfo(1+d*setl+3)
             ld(0:2) = [setinfo(1+d*setl+2),setinfo(1+d*setl+2),setinfo(1+d*setl+2)]
@@ -259,7 +266,7 @@ PROGRAM int2e
             END DO
    
 !            CALL clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Okp)
-            CALL clmnew(XX,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Ok,Okp,norb)
+            CALL clmnew(XX,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Ok,Okp,norb,Ft)
 
              DEALLOCATE(coefCD)
 
@@ -344,7 +351,7 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 !		Generates intermediate II for electron repulsion	
 !---------------------------------------------------------------------
-  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Okp)
+  SUBROUTINE clmII(II,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Okp,Ft)
              
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -363,6 +370,7 @@ PROGRAM int2e
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(INOUT) :: II
+    REAL(KIND=8), DIMENSION(0:120,0:22), INTENT(IN) :: Ft
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ,Dk,Dkp
     INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,Okp 
     INTEGER, DIMENSION(0:), INTENT(IN) :: la,lb,lc,ld
@@ -392,7 +400,7 @@ PROGRAM int2e
 
     !get Boys Table
     Fj(:) = (/ (0.0D0, i=0, Nmax+Lmax+Mmax) /) 
-    CALL Boys(Fj,Nmax+Lmax+Mmax,TT)
+    CALL Boys(Fj,Nmax+Lmax+Mmax,TT,Ft)
 
     !setup recursive table
     DO N=-2,Nmax
@@ -605,7 +613,7 @@ PROGRAM int2e
 !---------------------------------------------------------------------
 !		Generates XX 
 !---------------------------------------------------------------------
-  SUBROUTINE clmnew(XX,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Ok,Okp,norb)
+  SUBROUTINE clmnew(XX,p,q,la,lb,lc,ld,PQ,Dk,Dkp,Ck,Ckp,kmaxAB,kmaxCD,Ok,Okp,norb,Ft)
              
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
@@ -621,9 +629,11 @@ PROGRAM int2e
     ! Nmax	: int, n + nbar + n' + n'bar
     ! foo	: int, dummy
     ! g,h	: int, orbs of XX(i,j,g,h)
+    ! Ft	: 2d real8, Ftable 
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:), INTENT(INOUT) :: XX
+    REAL(KIND=8), DIMENSION(0:120,0:22), INTENT(IN) :: Ft
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PQ,Dk,Dkp
     INTEGER, DIMENSION(0:), INTENT(IN) :: Ck,Ckp,Ok,Okp 
     INTEGER, DIMENSION(0:), INTENT(IN) :: la,lb,lc,ld
@@ -653,7 +663,7 @@ PROGRAM int2e
 
     !get Boys Table
     Fj(:) = (/ (0.0D0, i=0, Nmax+Lmax+Mmax) /) 
-    CALL Boys(Fj,Nmax+Lmax+Mmax,TT)
+    CALL Boys(Fj,Nmax+Lmax+Mmax,TT,Ft)
 
     !setup recursive table
     DO N=-2,Nmax

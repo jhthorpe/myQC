@@ -153,6 +153,7 @@ PROGRAM int1e
     ! Dk	: 1D dp, tracks nonzero EIJ*N*L*M
     ! Ck	: 1D int, nonzero combinations of Nk,Lk,Mk
     ! Ok	: 1D int, lists orbitals of Dk,Ck
+    ! Ft	: 2d real8, boys table
 
     !Inout
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: S,F 
@@ -166,8 +167,9 @@ PROGRAM int1e
     !Internal
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:) :: coef
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Dk
-    REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
     INTEGER, DIMENSION(:), ALLOCATABLE :: Ck,Ok
+    REAL(KIND=8), DIMENSION(0:120,0:22) :: Ft
+    REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
     INTEGER, DIMENSION(0:2) :: la,lb,amax,bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     REAL(KIND=8) :: timeS, timeF
@@ -194,6 +196,10 @@ PROGRAM int1e
     ALLOCATE(Dk(0:kmax)) 
     ALLOCATE(Ck(0:kmax))
     ALLOCATE(Ok(0:2*kmax+1))
+
+    OPEN(unit=1,file='Ftab',status='old',access='sequential',form='unformatted')
+    READ(1) Ft
+    CLOSE(unit=1)
 
     ! left set
     DO a=0,nset-1
@@ -248,7 +254,7 @@ PROGRAM int1e
         CALL kinetic(F,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,coef,&
         setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ)
 
-        CALL coulomb(F,u,v,p,la,lb,PP,atoms,Dk,Ck,Ok,kmax)
+        CALL coulomb(F,u,v,p,la,lb,PP,atoms,Dk,Ck,Ok,kmax,Ft)
 
         DEALLOCATE(coef)
 
@@ -469,7 +475,7 @@ PROGRAM int1e
 !---------------------------------------------------------------------
 !	Calculate the coulomb potential of a gaussian of two orbitals
 !---------------------------------------------------------------------
-  SUBROUTINE coulomb(F,u,v,ap,lmaxA,lmaxB,PP,atoms,Dk,Ck,Ok,kmax)
+  SUBROUTINE coulomb(F,u,v,ap,lmaxA,lmaxB,PP,atoms,Dk,Ck,Ok,kmax,Ft)
     IMPLICIT NONE
     ! Values
     ! F		: 2D dp, Fock matrix 
@@ -492,6 +498,7 @@ PROGRAM int1e
     ! inout
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
     REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: F
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: Ft
     REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: PP,Dk
     INTEGER, DIMENSION(0:), INTENT(IN) :: atoms,lmaxA,lmaxB,Ck,Ok
     REAL(KIND=8), INTENT(IN) :: ap
@@ -537,7 +544,7 @@ PROGRAM int1e
       DO i=0,Nmax+Lmax+Mmax               ! get Boys table
         Fj(i) = 0.0D0 
       END DO
-      CALL Boys(Fj,Nmax+Lmax+Mmax,TT)
+      CALL Boys(Fj,Nmax+Lmax+Mmax,TT,Ft)
 
        DO i=-2,Nmax
          DO j=-2,Lmax
