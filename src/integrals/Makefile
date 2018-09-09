@@ -1,6 +1,7 @@
 bindir:=../../bin
 FC=gfortran
-FFLAGS= -O3 -fcheck=bounds
+#FFLAGS= -O3 -fcheck=bounds
+FFLAGS= -O3 
 #FC= ifort
 #FFLAGS= -O3
 
