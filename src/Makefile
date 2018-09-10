@@ -10,7 +10,7 @@ bindir:= ../bin
 
 progdirs:= parser integrals I2G dens scf clean
 
-.PHONY: all prog
+.PHONY: all prog clean
 
 all: prog
 	$(FC) -o $(bindir)/myQC $(FFLAGS) myQC.f90 
@@ -24,3 +24,15 @@ prog:
 		    fi; \
 		  fi; \
 	done;
+
+clean:
+	rm ../bin/parse
+	rm ../bin/int1e
+	rm ../bin/int2e
+	rm ../bin/RHFI2G
+	rm ../bin/UHFI2G
+	rm ../bin/dens
+	rm ../bin/clean
+	rm ../bin/scf
+	rm ../bin/myQC
+
