@@ -387,13 +387,17 @@ PROGRAM parser
       xyz(i,0) = (xyz(i,0) - COM(0))
       xyz(i,1) = (xyz(i,1) - COM(1)) 
       xyz(i,2) = (xyz(i,2) - COM(2)) 
-      WRITE(1,*) atoms(i), xyz(i,:)
     END DO
 
     !adjust for input units
     IF (options(11) .EQ. 0) THEN
       xyz(:,:) = xyz(:,:)*A2B
     END IF
+
+    !write to nucpos file
+    DO i=0,nnuc-1
+      WRITE(1,*) atoms(i), xyz(i,:)
+    END DO
 
     !write radii file
 !    DO i=0,nnuc-1 
