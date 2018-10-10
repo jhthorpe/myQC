@@ -5,7 +5,7 @@ export LINAL =
 export MKL = /apps/compilers/intel/2018/1.163/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64_lin
 export bindir = /home/james.thorpe/bin/myQC/bin
 
-progdirs:= myQC parser clean integrals I2G dens scf 
+progdirs:= myQC parser clean integrals I2G dens scf ao2mo 
 
 .PHONY: all prog clean
 

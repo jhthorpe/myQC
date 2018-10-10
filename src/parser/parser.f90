@@ -153,10 +153,11 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=10),INTENT(IN) :: chr
     ! WORK NOTE : ugly - impliment dictionary?
-    getcalc = 1
     IF (chr .EQ. 'SCF' .OR. chr .EQ. 'HF') THEN
-      getcalc = 2
+      getcalc = 0
       WRITE(*,*) "Method : SCF"
+    ELSE IF (chr .EQ. 'MP2') THEN
+      getcalc = 1
     ELSE
       WRITE(*,*) "Sorry, that method has not been implimented. Exiting..."
       STOP 'bad method'
