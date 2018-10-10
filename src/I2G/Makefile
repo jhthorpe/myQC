@@ -1,10 +1,16 @@
 bindir:= ../../bin
-#FC=gfortran
-#FFLAGS=-O3 -fcheck=bounds
-FC=ifort
-FFLAGS=-O3
+envdir = ../myQC
+envprog = ../myQC/env.o
+objects = RHFI2G.o UHFI2G.o
 
-all:
-	$(FC) -o $(bindir)/RHFI2G RHFI2G.f90 ../env.f90 $(FFLAGS); \
-	$(FC) -o $(bindir)/UHFI2G UHFI2G.f90 ../env.f90 $(FFLAGS)
+all: $(objects)
+	cp RHFI2G.o $(bindir)/RHFI2G
+	cp UHFI2G.o $(bindir)/UHFI2G
+
+RHFI2G.o : RHFI2G.f90
+	$(FC) $(FFLAGS) -o RHFI2G.o RHFI2G.f90 $(envprog) -I$(envdir) 
+UHFI2G.o : UHFI2G.f90
+	$(FC) $(FFLAGS) -o UHFI2G.o UHFI2G.f90 $(envprog) -I$(envdir) 
 	
+clean:
+	rm -f *.o *.mod

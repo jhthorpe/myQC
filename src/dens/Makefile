@@ -1,8 +1,14 @@
+objects = dens.o
 bindir:=../../bin
-#FC=gfortran
-#FFLAGS= -O3 -fcheck=bounds
-FC=ifort
-FFLAGS= -O3
+envdir = ../myQC
+envprog = ../myQC/env.o ../myQC/basis.o
 
-all:
-	$(FC) -o $(bindir)/dens dens.f90 ../env.f90 $(FFLAGS)
+
+all: $(objects)
+	cp dens.o $(bindir)/dens
+
+dens.o : dens.f90
+	$(FC) $(FFLAGS) -o dens.o dens.f90 $(envprog) -I$(envdir)
+
+clean:
+	rm -f *.o *.mod

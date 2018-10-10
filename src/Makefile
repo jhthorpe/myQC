@@ -1,11 +1,11 @@
 #fortran compiler and flags, change as needed for each subdirectory (sorry)
 export FC = ifort
-export FFLAGS = -O3 -CB
+export FFLAGS = -O3
 export LINAL =
 export MKL = /apps/compilers/intel/2018/1.163/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64_lin
 export bindir = /home/james.thorpe/bin/myQC/bin
 
-progdirs:= myQC parser clean integrals # I2G dens scf 
+progdirs:= myQC parser clean integrals I2G dens scf 
 
 .PHONY: all prog clean
 

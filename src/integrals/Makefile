@@ -10,11 +10,11 @@ all: $(objects)
 	cp int2e.o $(bindir)/int2e
 	
 auxilary.o : auxilary.f90
-	$(FC) $(FFLAGS) -c auxilary.f90 
+	$(FC) $(FFLAGS) -recursive -c auxilary.f90 
 int1e.o : auxilary.o int1e.f90 
-	$(FC) $(FFLAGS) -o int1e.o int1e.f90 auxilary.o $(envprog) -I$(envdir)
+	$(FC) $(FFLAGS) -recursive -o int1e.o int1e.f90 auxilary.o $(envprog) -I$(envdir)
 int2e.o : auxilary.o int2e.f90 
-	$(FC) $(FFLAGS) -o int2e.o int2e.f90 auxilary.o $(envprog) -I$(envdir)
+	$(FC) $(FFLAGS) -recursive -o int2e.o int2e.f90 auxilary.o $(envprog) -I$(envdir)
 
 clean:
-	rm -r *.o *.mod
+	rm -f *.o *.mod
