@@ -1,18 +1,20 @@
-bindir:=../../bin
-<<<<<<< HEAD
-#FC=gfortran
-#FFLAGS= -O3 -g -fcheck=bounds
-#FFLAGS= -O3 -frecursive
-FC= ifort
-FFLAGS= -O3
-=======
-FC=gfortran
-#FFLAGS= -O3 -fcheck=bounds
-FFLAGS= -O3 
-#FC= ifort
-#FFLAGS= -O3
->>>>>>> 8f61b4ba6bd480cce98b3ea34a5dffda6731a153
+objects = auxilary.o int1e.o int2e.o 
+envdir = ../myQC
+envprog = ../myQC/env.o ../myQC/basis.o
+bindir = ../../bin
 
-all:
-	$(FC) -o $(bindir)/int1e int1e.f90 ../env.f90 ../basis.f90 auxilary.f90 $(FFLAGS); \
-	$(FC) -o $(bindir)/int2e int2e.f90 ../env.f90 ../basis.f90 auxilary.f90 $(FFLAGS)
+.PHONY: all
+
+all: $(objects)
+	cp int1e.o $(bindir)/int1e
+	cp int2e.o $(bindir)/int2e
+	
+auxilary.o : auxilary.f90
+	$(FC) $(FFLAGS) -c auxilary.f90 
+int1e.o : auxilary.o int1e.f90 
+	$(FC) $(FFLAGS) -o int1e.o int1e.f90 auxilary.o $(envprog) -I$(envdir)
+int2e.o : auxilary.o int2e.f90 
+	$(FC) $(FFLAGS) -o int2e.o int2e.f90 auxilary.o $(envprog) -I$(envdir)
+
+clean:
+	rm -r *.o *.mod

@@ -14,7 +14,8 @@
 PROGRAM int1e
   USE env
   USE basis
-  USE aux
+  USE auxilary
+
   IMPLICIT NONE
 
   ! Values

@@ -2,7 +2,7 @@ bindir:= ../../bin
 #FC=gfortran
 #FFLAGS= -O3 -fcheck=bounds
 FC=ifort
-FFLAGS= -O3 -g
+FFLAGS= -O3
 #LINAL= -L/Users/jamesthorpe/LAPACK/lapack-3.7.0 -llapack -lblas
 MKL=/apps/compilers/intel/2018/1.163/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64_lin
 

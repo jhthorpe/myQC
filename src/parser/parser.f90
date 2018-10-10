@@ -7,7 +7,6 @@
 !///////////////////////////////////////////////////////////////////
 
 PROGRAM parser
-  USE env
 
   IMPLICIT NONE
 
@@ -62,7 +61,7 @@ PROGRAM parser
   CALL getfline(flag,fline) 
   IF (flag) STOP "parser encountered an error"
 
-  OPEN (unit=1,file="input",status="old",access="sequential")
+  OPEN (unit=1,file="ZMAT",status="old",access="sequential")
   
   !WORK NOTE : hardcoded, needs fixing
   READ(1,*) str       !read what type of molecule we have
@@ -506,9 +505,9 @@ PROGRAM parser
     INTEGER :: io
     LOGICAL :: ex
     flag = .FALSE. 
-    INQUIRE(file='input',EXIST=ex)
+    INQUIRE(file='ZMAT',EXIST=ex)
     IF (.NOT. ex) THEN
-      WRITE(*,*) "You need to create the input file : 'input'"
+      WRITE(*,*) "You need to create the input file : 'ZMAT'"
       CALL EXECUTE_COMMAND_LINE('touch error')
       flag = .TRUE. 
       fline = -1
@@ -516,7 +515,7 @@ PROGRAM parser
     END IF
     fline = 0
     io = 0
-    OPEN(unit=1,file='input',status='old',access='sequential')
+    OPEN(unit=1,file='ZMAT',status='old',access='sequential')
     DO WHILE (io .EQ. 0)
       READ(1,*,iostat=io)
       IF (io .EQ. 0) fline = fline + 1
@@ -550,7 +549,7 @@ PROGRAM parser
     DO WHILE (flag) 
       i = i + 1
       IF (i .GT. fline) THEN
-        WRITE(*,*) "You need to put 'END' marker in input"
+        WRITE(*,*) "You need to put 'END' marker in ZMAT"
         CALL EXECUTE_COMMAND_LINE('touch error')
         RETURN 
       END IF

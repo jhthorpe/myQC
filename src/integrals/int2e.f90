@@ -14,7 +14,7 @@
 PROGRAM int2e
   USE env
   USE basis
-  USE aux
+  USE auxilary
 
   IMPLICIT NONE
 
@@ -120,10 +120,11 @@ PROGRAM int2e
     REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, QC, QD, CD
     REAL(KIND=8), DIMENSION(0:2) :: PP,QQ,PQ
     INTEGER, DIMENSION(0:2) :: la,lb,lc,ld,na,nb,nc,nd
+    INTEGER(KIND=8) :: npri, noint, npint
     REAL(KIND=8) :: timeS,timeF,temp,EIJ,EGH
     REAL(KIND=8) :: aa,bb,cc,dd,p,q,nn,mm
     INTEGER :: nset,setl,OpS,stat1,stat2,setK,kmaxAB,kmaxCD 
-    INTEGER :: orba,orbb,orbc,orbd,norb,npri,noint,npint,dummy
+    INTEGER :: orba,orbb,orbc,orbd,norb,dummy
     INTEGER :: a,b,c,d,g,h,i,j,k,s,t,u,v
 
     CALL CPU_TIME(timeS)
@@ -138,6 +139,7 @@ PROGRAM int2e
     OpS = basinfo(0)
     norb = basinfo(1)
     setK = Ops**2*(2*maxL*(2*maxL+1)/2)**3
+    npri = 0
 
     !get number of orbitals and primatives that need to be evaluated
     DO i=0,norb-1
@@ -147,6 +149,7 @@ PROGRAM int2e
     noint = ((norb+1)*norb)**2/8+((norb+1)*norb)/4
     WRITE(*,*) "Total primative integrals :", npri**4
     WRITE(*,*) "Total to be evaluated :", npint
+    WRITE(*,*) "testing: norb, npri", norb, npri
 
     ALLOCATE(Ck(0:setK))
     ALLOCATE(Ckp(0:setK))

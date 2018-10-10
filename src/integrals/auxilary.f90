@@ -8,7 +8,7 @@
 !//             
 !///////////////////////////////////////////////////////////////////
 
-MODULE aux
+MODULE auxilary
   IMPLICIT NONE
  
   CONTAINS
@@ -659,4 +659,4 @@ MODULE aux
   END FUNCTION gtoD
 !---------------------------------------------------------------------
 
-END MODULE aux
+END MODULE auxilary
