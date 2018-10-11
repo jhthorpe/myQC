@@ -7,15 +7,15 @@
 !///////////////////////////////////////////////////////////////////
 
 PROGRAM myQC
-!  USE parser  !input parser
-
+  USE env
   IMPLICIT NONE
 
   ! timeS	: real dp, starting CPU time for program 
   ! timeF	: real dp, ending CPU time for program 
   
- 
+  INTEGER,DIMENSION(:),ALLOCATABLE :: options
   REAL(KIND=8) :: timeS, timeF
+  INTEGER :: nopt
   LOGICAL :: ex
 
   CALL CPU_TIME(timeS)
@@ -32,6 +32,14 @@ PROGRAM myQC
     WRITE(*,*) "Error from parse, exiting"
     STOP "Error from parse"
   END IF
+
+  OPEN(unit=100,file='envdat',status='old',access='sequential')
+  READ(100,*) nopt
+  READ(100,*) nopt,nopt
+  READ(100,*) nopt
+  ALLOCATE(options(0:nopt-1))
+  READ(100,*) options
+  CLOSE(unit=100)
 
 !~~~~~~
 ! 1 electron integrals
@@ -58,6 +66,26 @@ PROGRAM myQC
     WRITE(*,*) "Error from scf, exiting"
     STOP "Error from scf"
   END IF
+
+!~~~~
+IF (options(1) .GT. 0) THEN
+  CALL EXECUTE_COMMAND_LINE('ao2mo')
+  INQUIRE (file='error',EXIST=ex)
+  IF (ex) THEN
+    WRITE(*,*) "Error from ao2mo, exiting"
+    STOP "Error from ao2mo"
+  END IF
+END IF
+
+!~~~
+IF (options(3) .EQ. 1) THEN
+  CALL EXECUTE_COMMAND_LINE('mp2')
+  INQUIRE (file='error',EXIST=ex)
+  IF (ex) THEN
+    WRITE(*,*) "Error from mp2, exiting"
+    STOP "Error from mp2"
+  END IF
+END IF
 
 !~~~
 ! Output

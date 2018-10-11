@@ -21,7 +21,7 @@ PROGRAM parser
 
   !options currently:
   ! 0) geometry type    : 0- internal, 1- cartesian 
-  ! 1) calculation type : 0 - SCF 
+  ! 1) calculation type : 0 - SCF, 1 - MP2 
   ! 2) basis set        : 0 - STO-3G
   ! 3) referecnce       : 0 - RHF, 1 - UHF, 2 - ROHF
   ! 4) parallel alg     : 0 - None, 1 - OMP, 2 - MPI
