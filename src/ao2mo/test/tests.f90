@@ -78,6 +78,35 @@ program tests
     WRITE(*,*) B(i,:)
   END DO
 
+!------
+!symmetric matrix stuff
+  A(0,:) = [1,2,0]
+  A(1,:) = [0,0,3]
+  A(2,:) = [0,0,1]
+!  A(1,:) = [2,0,3]
+!  A(2,:) = [0,3,1]
+
+  WRITE(*,*) 
+  WRITE(*,*) "testing sym mat vec"
+  WRITE(*,*) "A is"
+  DO i=0,2
+    WRITE(*,*) A(i,:)
+  END DO  
+
+  WRITE(*,*) 
+  WRITE(*,*) "v is..."
+  DO i=0,2
+    WRITE(*,*) v(i)
+  END DO
+
+  CALL DSYMV('U',N,ALPHA,A,LDA,v,INCX,BETA,Y,INCY)
+
+  WRITE(*,*) 
+  WRITE(*,*) "Y is..."
+  WRITE(*,*) Y
+
+  
+
   
 
 end program tests

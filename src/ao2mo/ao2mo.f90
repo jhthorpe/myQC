@@ -28,7 +28,7 @@ PROGRAM ao2mo
   REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xyz
   INTEGER, ALLOCATABLE, DIMENSION(:) :: atoms, options
   INTEGER, DIMENSION(0:1) :: line
-  INTEGER, DIMENSION(0) :: mem_lvl
+  INTEGER, DIMENSION(0:0) :: mem_lvl
   REAL(KIND=8) :: fmem, timeS, timeF
   INTEGER :: nnuc,noccA,noccB,nvrtA,nvrtB,ntot,dummy
   LOGICAL :: flag
@@ -57,7 +57,13 @@ PROGRAM ao2mo
 
   IF (options(1) .EQ. 1) THEN
     IF (options(3) .EQ. 0) THEN
-!      CALL uvld_ijab_AAAA(noccA,options)
+      IF (mem_lvl(0) .EQ. 3) THEN
+        CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
+      ELSE
+        WRITE(*,*) "Sorry, that memory case not coded yet"
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        STOP "Bad mem case in ao2mo"
+      END IF
     ELSE
       WRITE(*,*) "Sorry, that spin case for MP2 has not been coded"      
       CALL EXECUTE_COMMAND_LINE('touch error')
@@ -100,27 +106,34 @@ PROGRAM ao2mo
     REAL(KIND=8), INTENT(IN) :: fmem
     INTEGER, INTENT(IN) :: noccA,noccB,nvrtA,nvrtB,ntot
 
-    REAL(KIND=8) :: hmem, lmem
+    REAL(KIND=8) :: hmem,mmem,lmem
 
     WRITE(*,*) "--------------------------------------------------------------"
     WRITE(*,*) "Starting memory analysis"
     WRITE(*,*) "Your free memory (MB)               :", fmem 
-    
 
     !MP2 analysis
     IF (options(1) .EQ. 1) THEN
       !RHF
       IF (options(3) .EQ. 0) THEN
         lmem = (3*ntot**2+nvrtA*ntot+nvrtA*nvrtA)*8/1.D6
-        hmem = (2*ntot**2+nvrtA*ntot+nvrtA*nvrtA+(noccA-1)*ntot**2)*8/1.D6
-        WRITE(*,*) "<ij|ab> miminum memory (MB)         :", lmem 
-        WRITE(*,*) "<ij|ab> high memory (MB)            :", hmem 
+        mmem = (2*ntot**2+nvrtA*ntot+nvrtA*nvrtA+(noccA-1)*ntot**2)*8/1.D6
+        hmem = mmem + (ntot**4)*8/1.D6 
+        WRITE(*,*) "<ij|ab> minimum memory (MB)         :", lmem 
+        WRITE(*,*) "<ij|ab> medium memory (MB)          :", mmem
+        WRITE(*,*) "<ij|ab> maximum memory (MB)         :", hmem 
         IF (hmem .LT. fmem-1) THEN
+          WRITE(*,*) "K matrix                            : held in memory"
           WRITE(*,*) "L matrix                            : held in memory"
           mem_lvl(0) = 3
+        ELSE IF (mmem .LT. fmem-1) THEN
+          WRITE(*,*) "K matrix                            : R/W to disk"
+          WRITE(*,*) "L matrix                            : held in memory"
+          mem_lvl(0) = 2
         ELSE
+          WRITE(*,*) "K matrix                            : R/W to disk"
           WRITE(*,*) "L matrix                            : R/W to disk"
-          mem_lvl(1) = 1
+          mem_lvl(0) = 1
         END IF
       !UHF
       ELSE
@@ -157,14 +170,24 @@ PROGRAM ao2mo
   ! ntot        :       int, number of total orbitals
   ! options     :       1D int, options array
   ! line        :       1D int, dummy readline
+  ! Km          :       4D real8, K matrix of (l,d,u,v). ntot x ntot x ntot x ntot
+  ! Lm          :       3D real8, L matrix of (d,v,l). ntot x ntot x ntot
+  ! Cm          :       2D real8, C matrix of coefficients ntot x ntot
+  ! Mm          :       2D real8, M matrix of ij(v,d). ntot x ntot
+  ! Nm          :       2D real8, N matrix of ij(a,d). nvrt x ntot
+  ! Om          :       2D real8, M matrix of ij(a,b). nvrt x nvrt
 
-  SUBROUTINE uvld_ijab_AAAA_high(noccA,nvrtA,ntot)
+  SUBROUTINE uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
     IMPLICIT NONE
 
     !Inout
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options
     INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
     
     !Internal
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:) :: Km
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:) :: Lm
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: Cm,Mm,Nm,Om
     INTEGER :: u,v,l,d,i,j,a,b
 
     WRITE(*,*) 
@@ -173,7 +196,114 @@ PROGRAM ao2mo
     WRITE(*,*) 
     WRITE(*,*) "Spin Case <AA|AA>" 
 
+    !Sort the 2e- integrals into Ild,u,v order
+    CALL build_K(ntot,3)
+    ALLOCATE(Km(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Lm(0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Mm(0:ntot-1,0:ntot-1))
+
+    OPEN(unit=100,file='K_h',status='old',access='sequential',form='unformatted')
+    READ(100) Km(:,:,:,:)
+    CLOSE(unit=100)
+
+    DO i=0,ntot-2
+      DO d=0,ntot-1
+        DO l=0,ntot-1
+          !construct L(d,:,l) 
+        END DO !lambda loop
+      END DO !delta loop
+      DO j=i+1,ntot-1
+        DO d=0,ntot-1
+          !construct M(v,d)
+        END DO !delta loop
+      DO a=noccA+1,ntot-2
+        !construct N(a,d)
+        DO b=a+1,ntot-1
+          !construct O(a,b) 
+        END DO !b loop
+      END DO !a loop
+      END DO !j loop
+    END DO !i loop
+
+    DEALLOCATE(Km)
+    DEALLOCATE(Lm)
+    DEALLOCATE(Mm)
+
   END SUBROUTINE uvld_ijab_AAAA_high
 
+!---------------------------------------------------------------------
+!       build_K
+!               James H. Thorpe
+!               Oct 11, 2018
+!       - read in (uv|ld) ao integrals and sort into K matrices
+!       - NOTE : this algorithm is based on my crappy 4 index storage
+!       - it WILL need to be fixed when I fix that
+!---------------------------------------------------------------------
+  ! Variables
+  ! ntot        :       int, number of orbitals
+  ! mem_lvl     :       int, memory level
+  ! K_h         :       2d real8, K matrix storage in high memory case
+
+  SUBROUTINE build_K(ntot,mem_lvl)
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: ntot, mem_lvl
+  
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: XX, K_h
+    INTEGER :: ios1,ios2
+    INTEGER :: Ild,l,d
+
+    ALLOCATE(XX(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1),STAT=ios1)
+    IF (ios1 .NE. 0) THEN
+      WRITE(*,*) "ao2mo:build_K failed to allocate memory"
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      STOP "memory problem in ao2mo:build_K"
+    END IF
+
+    OPEN(unit=100,file='XX',status='old',access='sequential',form='unformatted')
+    READ(100) XX(:,:,:,:)
+    CLOSE(unit=100)
+
+    IF (mem_lvl .EQ. 3) THEN
+      !high memory case
+      ALLOCATE(K_h(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1),STAT=ios2)
+      IF (ios2 .NE. 0) THEN
+        WRITE(*,*) "ao2mo:build_K failed to allocate memory"
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        STOP "memory problem in ao2mo:build_K"
+      END IF
+
+      DO l=0,ntot-1
+        DO d=l,ntot-1 !using symmetry
+          K_h(l,d,:,:) = XX(:,:,l,d)
+        END DO
+      END DO  
+
+      OPEN(unit=101,file='K_h',status='replace',access='sequential',form='unformatted')
+      WRITE(101) K_h(:,:,:,:)
+      CLOSE(unit=101,status='keep')
+
+    ELSE
+      !low/medium memory case
+      IF (ios2 .NE. 0) THEN
+        WRITE(*,*) "ao2mo:build_K failed to allocate memory"
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        STOP "memory problem in ao2mo:build_K"
+      END IF
+
+      OPEN(unit=101,file='K_l',status='replace',access='sequential',form='unformatted')
+      DO l=0,ntot-1
+        DO d=0,ntot-1 !not using symmetry, we don't care about disk space
+          WRITE(101) XX(:,:,l,d) 
+        END DO 
+      END DO
+      CLOSE(unit=101,status='keep')
+    END IF
+   
+    DEALLOCATE(XX)
+    IF (ALLOCATED(K_h)) DEALLOCATE(K_h)
+
+  END SUBROUTINE build_K
+!---------------------------------------------------------------------
 END PROGRAM ao2mo
 
