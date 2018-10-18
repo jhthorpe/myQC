@@ -12,10 +12,15 @@ all: $(objects)
 	cp scf.o $(bindir)/scf
 
 scf.o : scf.f90
+#hipergator
+#	$(FC) $(FFLAGS) $(LINAL) -o scf.o scf.f90 $(envprog) -I$(envdir) \
+#	-L$(MKL) \
+#	-Wl,-R$(MKL) -lmkl_lapack95_lp64 \
+#	-lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lm
+
+#local
 	$(FC) $(FFLAGS) $(LINAL) -o scf.o scf.f90 $(envprog) -I$(envdir) \
-	-L$(MKL) \
-	-Wl,-R$(MKL) -lmkl_lapack95_lp64 \
-	-lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lm
+	$(LINAL)
 
 clean:
 	rm -f *.o *.mod
