@@ -236,7 +236,8 @@ PROGRAM ao2mo
     OPEN(unit=102,file='ijab',status='replace',access='sequential',form='unformatted')
     OPEN(unit=103,file='ijba',status='replace',access='sequential',form='unformatted')
 
-    DO i=0,noccA-2
+!    DO i=0,noccA-2
+    DO i=0,noccA-1
       DO d=0,ntot-1
         DO l=0,ntot-1
           !construct L(d,:,l) 
@@ -264,7 +265,8 @@ PROGRAM ao2mo
 
         END DO !lambda loop
       END DO !delta loop
-      DO j=i+1,noccA-1
+!      DO j=i+1,noccA-1
+      DO j=0,noccA-1
         DO d=0,ntot-1
           !construct M(v,d)
           f1 = Lm(d,:,:)
@@ -286,21 +288,20 @@ PROGRAM ao2mo
             WRITE(*,*) Mm(:,:)
           END IF
         END DO !delta loop
-      DO a=noccA+1,ntot-2
+
         !construct N(a,d)
         f1 = Mm(:,:) 
         f4 = Cm(0:ntot-1,noccA+1:ntot-1)
         !check that this behaves properly
         CALL DGEMM('T','N',nvrtA,ntot,ntot,1.0D0,f4,ntot,f1,ntot,0.0D0,Nm,nvrtA)
-        DO b=a+1,ntot-1
-          !construct O(a,b) 
-          f5 = Nm
-          f4 = Cm(0:ntot-1,noccA+1:ntot-1)
-          CALL DGEMM('N','N',nvrtA,nvrtA,ntot,1.0D0,f5,nvrtA,f4,ntot,0.0,Om,nvrtA)
-          !Write integrals to disk
-          CALL write_Oij(Om,nvrtA)
-        END DO !b loop
-      END DO !a loop
+
+        !construct O(a,b) 
+        f5 = Nm
+        f4 = Cm(0:ntot-1,noccA+1:ntot-1)
+        CALL DGEMM('N','N',nvrtA,nvrtA,ntot,1.0D0,f5,nvrtA,f4,ntot,0.0,Om,nvrtA)
+
+        !Write integrals to disk
+        CALL write_Oij(Om,nvrtA)
       END DO !j loop
     END DO !i loop
 
@@ -420,8 +421,10 @@ PROGRAM ao2mo
     WRITE(*,*) "Oij is:"
     WRITE(*,*) Oij
 
-    DO a=0,n-2 
-      DO b=a+1,n-1 
+!    DO a=0,n-2 
+!      DO b=a+1,n-1 
+    DO a=0,n-1
+      DO b=0,n-1 
         WRITE(102) Oij(a,b) 
         WRITE(103) Oij(b,a)
       END DO
