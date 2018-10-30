@@ -192,6 +192,11 @@ PROGRAM scf
 
     !write to molden file
     CALL makeMOLDEN(atoms,xyz,Eig,[0.0D0],0,nnuc,norb,Cui,Cui)
+    
+    !write to eigenvalues file
+    OPEN(unit=105,file='eig',status='replace',access='sequential')
+    WRITE(105,*) Eig
+    CLOSE(unit=105,status='keep')
 
     DEALLOCATE(Cui)
     DEALLOCATE(Suv)
@@ -365,6 +370,12 @@ PROGRAM scf
 
     !write to molden file
     CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb,CuiA,CuiB)
+
+    !write to eigenvalues file
+    OPEN(unit=105,file='eig',status='replace',access='sequential')
+    WRITE(105,*) EigA
+    WRITE(105,*) EigB
+    CLOSE(unit=105,status='keep')
 
     !free the memory we are done with
     DEALLOCATE(FuvA)

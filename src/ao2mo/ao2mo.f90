@@ -36,7 +36,7 @@ PROGRAM ao2mo
   CALL CPU_TIME(timeS)
   WRITE(*,*) 
   WRITE(*,*) "ao2mo called"
-    WRITE(*,*)
+  WRITE(*,*)
   WRITE(*,*) "Starting AO to MO integral transform"
 
   !Read enviromental data
@@ -52,7 +52,6 @@ PROGRAM ao2mo
   CLOSE(unit=1)
   nvrtA = ntot - noccA
   nvrtB = ntot - noccB
-  
   CALL mem_analysis(mem_lvl,noccA,noccB,nvrtA,nvrtB,ntot,fmem,options)  
 
   IF (options(1) .EQ. 1) THEN
@@ -236,8 +235,8 @@ PROGRAM ao2mo
     OPEN(unit=102,file='ijab',status='replace',access='sequential',form='unformatted')
     OPEN(unit=103,file='ijba',status='replace',access='sequential',form='unformatted')
 
-!    DO i=0,noccA-2
-    DO i=0,noccA-1
+    DO i=0,noccA-2
+!    DO i=0,noccA-1
       DO d=0,ntot-1
         DO l=0,ntot-1
           !construct L(d,:,l) 
@@ -265,8 +264,8 @@ PROGRAM ao2mo
 
         END DO !lambda loop
       END DO !delta loop
-!      DO j=i+1,noccA-1
-      DO j=0,noccA-1
+      DO j=i+1,noccA-1
+!      DO j=0,noccA-1
         DO d=0,ntot-1
           !construct M(v,d)
           f1 = Lm(d,:,:)
@@ -416,15 +415,15 @@ PROGRAM ao2mo
     !internal
     INTEGER :: a,b
 
-    WRITE(*,*)
-    WRITE(*,*) 
-    WRITE(*,*) "Oij is:"
-    WRITE(*,*) Oij
+!    WRITE(*,*)
+!    WRITE(*,*) 
+!    WRITE(*,*) "Oij is:"
+!    WRITE(*,*) Oij
 
-!    DO a=0,n-2 
-!      DO b=a+1,n-1 
-    DO a=0,n-1
-      DO b=0,n-1 
+    DO a=0,n-2 
+      DO b=a+1,n-1 
+!    DO a=0,n-1
+!      DO b=0,n-1 
         WRITE(102) Oij(a,b) 
         WRITE(103) Oij(b,a)
       END DO

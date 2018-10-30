@@ -7,11 +7,11 @@
 
 #local
 export FC = gfortran
-export FFLAGS = -O3
+export FFLAGS = -O3 -fcheck=bounds
 export LINAL = -L/Users/jamesthorpe/LAPACK/lapack-3.7.0 -llapack -lblas
 export bindir = /Users/jamesthorpe/local-hbar/myQC/myQC/bin
 
-progdirs:= myQC parser clean integrals I2G dens scf ao2mo 
+progdirs:= myQC parser clean integrals I2G dens scf ao2mo mp2 
 
 .PHONY: all prog clean
 
