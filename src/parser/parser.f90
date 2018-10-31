@@ -32,12 +32,13 @@ PROGRAM parser
   ! 9) charge		: int
   !10) multiplicity	: int
   !11) units		: 0-angstrom,1-bohr
+  !12) ao2mo alg        : 0-fast,1-slow
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:11) :: options 
+  INTEGER(KIND=8),DIMENSION(0:12) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
@@ -52,7 +53,7 @@ PROGRAM parser
   i = 0
 
   !defaults
-  options = [0,0,0,0,0,1,1000,1,7,0,1,0]
+  options = [0,0,0,0,0,1,1000,1,7,0,1,0,0]
 
   WRITE(*,*) ""
   WRITE(*,*) "Input parameters"
@@ -337,6 +338,20 @@ PROGRAM parser
       WRITE(*,*) "Units : Angstrom"
     END IF
   END FUNCTION getunits
+!---------------------------------------------------------------------
+!			Get ao2mo algorithm	
+!---------------------------------------------------------------------
+  INTEGER FUNCTION getao2mo(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20),INTENT(IN) :: chr
+    IF (chr .EQ. '1') THEN
+      WRITE(*,*) "ao2mo alg : 1 (slow)"
+      getao2mo = 1
+    ELSE
+      WRITE(*,*) "ao2mo alg : 0 (fast)"
+      getao2mo=0
+    END IF
+  END FUNCTION getao2mo
 !---------------------------------------------------------------------
 !		Build the molecule (nucpos and envdat files)	
 !---------------------------------------------------------------------
@@ -625,6 +640,8 @@ PROGRAM parser
         options(8) = getSCF_Conv(line(1))
       ELSE IF (line(0) == 'UNITS=') THEN
         options(11) = getunits(line(1))
+      ELSE IF (line(0) == 'ao2mo=') THEN
+        options(12) = getao2mo(line(1))
       ELSE
         WRITE(*,*) "parser could not understand options line ", i
       END IF
@@ -651,6 +668,7 @@ PROGRAM parser
     WRITE(*,*) "Reference           : ",options(3)
     WRITE(*,*) "SCF Convergence     : ",options(8)
     WRITE(*,*) "Units               : ",options(11)
+    WRITE(*,*) "ao2mo               : ",options(12)
     WRITE(*,*) "==========================================="
   END SUBROUTINE print_options
 !---------------------------------------------------------------------

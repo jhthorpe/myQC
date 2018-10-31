@@ -1,15 +1,15 @@
 #hipergator
-#export FC = ifort
-#export FFLAGS = -O3
-#export LINAL =
-#export MKL = /apps/compilers/intel/2018/1.163/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64_lin
-#export bindir = /home/james.thorpe/bin/myQC/bin
+export FC = ifort
+export FFLAGS = -O3
+export LINAL =
+export MKL = /apps/compilers/intel/2018/1.163/compilers_and_libraries_2018.1.163/linux/mkl/lib/intel64_lin
+export bindir = /home/james.thorpe/bin/myQC/bin
 
 #local
-export FC = gfortran
-export FFLAGS = -O3 -fcheck=bounds
-export LINAL = -L/Users/jamesthorpe/LAPACK/lapack-3.7.0 -llapack -lblas
-export bindir = /Users/jamesthorpe/local-hbar/myQC/myQC/bin
+#export FC = gfortran
+#export FFLAGS = -O3 -fcheck=bounds
+#export LINAL = -L/Users/jamesthorpe/LAPACK/lapack-3.7.0 -llapack -lblas
+#export bindir = /Users/jamesthorpe/local-hbar/myQC/myQC/bin
 
 progdirs:= myQC parser clean integrals I2G dens scf ao2mo mp2 
 

@@ -43,6 +43,7 @@ PROGRAM ao2mo
   CALL getenv(nnuc,noccA,noccB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
+  WRITE(*,*) "Options(12) is..." ,options(12)
 
   !Determine memory needs
   !get orbital data
@@ -57,12 +58,16 @@ PROGRAM ao2mo
   IF (options(1) .EQ. 1) THEN
     IF (options(3) .EQ. 0) THEN
       IF (mem_lvl(0) .EQ. 3) THEN
-        CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
+        IF (options(12) .EQ. 0) THEN
+          CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
+        ELSE IF (options(12) .EQ. 1) THEN
+          CALL slow_ao2mo_RHF(noccA,nvrtA,ntot)
+        END IF
       ELSE
         WRITE(*,*) "Sorry, that memory case not coded yet"
         CALL EXECUTE_COMMAND_LINE('touch error')
         STOP "Bad mem case in ao2mo"
-      END IF
+    END IF
     ELSE
       WRITE(*,*) "Sorry, that spin case for MP2 has not been coded"      
       CALL EXECUTE_COMMAND_LINE('touch error')
@@ -226,6 +231,7 @@ PROGRAM ao2mo
     OPEN(unit=101,file='Cui',status='old',access='sequential')
     READ(101,*) Cm(:,:)
     CLOSE(unit=101)
+    !Cm = TRANSPOSE(Cm)
 
     WRITE(*,*) "TESTING TESTING"
     WRITE(*,*) "noccA", noccA
@@ -235,8 +241,8 @@ PROGRAM ao2mo
     OPEN(unit=102,file='ijab',status='replace',access='sequential',form='unformatted')
     OPEN(unit=103,file='ijba',status='replace',access='sequential',form='unformatted')
 
-    DO i=0,noccA-2
-!    DO i=0,noccA-1
+!    DO i=0,noccA-2
+    DO i=0,noccA-1
       DO d=0,ntot-1
         DO l=0,ntot-1
           !construct L(d,:,l) 
@@ -264,8 +270,8 @@ PROGRAM ao2mo
 
         END DO !lambda loop
       END DO !delta loop
-      DO j=i+1,noccA-1
-!      DO j=0,noccA-1
+!      DO j=i+1,noccA-1
+      DO j=0,noccA-1
         DO d=0,ntot-1
           !construct M(v,d)
           f1 = Lm(d,:,:)
@@ -366,7 +372,9 @@ PROGRAM ao2mo
 
       DO l=0,ntot-1
         DO d=l,ntot-1 !using symmetry
-          K_h(l,d,:,:) = XX(:,:,l,d)
+        !DO d=0,ntot-1
+          K_h(l,d,:,:) = XX(:,:,l,d)  !why did I do this?
+          !K_h(:,:,l,d) = XX(:,:,l,d)  !why did I do this?
         END DO
       END DO  
 
@@ -420,10 +428,10 @@ PROGRAM ao2mo
 !    WRITE(*,*) "Oij is:"
 !    WRITE(*,*) Oij
 
-    DO a=0,n-2 
-      DO b=a+1,n-1 
-!    DO a=0,n-1
-!      DO b=0,n-1 
+!    DO a=0,n-2 
+!      DO b=a+1,n-1 
+    DO a=0,n-1
+     DO b=0,n-1 
         WRITE(102) Oij(a,b) 
         WRITE(103) Oij(b,a)
       END DO
@@ -431,6 +439,92 @@ PROGRAM ao2mo
 
   END SUBROUTINE write_Oij
 !---------------------------------------------------------------------
+!       slow_ao2mo
+!               James H. Thorpe
+!               Oct 31, 2018
+!       -does the very slow, O(N^8) ao -> mo transform
+!       -useful for checking code
+!---------------------------------------------------------------------
+  SUBROUTINE slow_ao2mo_RHF(noccA,nvrtA,ntot)
+    ! ij        :       int, occupied indicies
+    ! ab        :       int, virtual indicies
+    ! uvld      :       int, ao indicies
+    ! Km        :       4D real8, matrix of (uv|ld) ao integrals
+    ! Cm        :       2D real8, matrix of Cui's from SCF
 
+    !Inout
+    INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
+
+    !Internal
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Cm
+    REAL(KIND=8) :: sum1
+    INTEGER :: u,v,l,d,p,q,r,s
+  
+    ALLOCATE(Km(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Cm(0:ntot-1,0:ntot-1))
+    CALL build_K(ntot,3) 
+    Km = 0
+    Cm = 0
+
+    !get K matrix
+    OPEN(unit=100,file='XX',status='old',access='sequential',form='unformatted')
+    READ(100) Km(:,:,:,:)
+    CLOSE(unit=100)
+
+    !hardcoding
+!    Km(0,0,0,0) = 0.774605960366
+!    Km(1,0,0,0) = 0.309308868052
+!    Km(0,1,0,0) = 0.309308868052
+!    Km(0,0,1,0) = 0.309308868052
+!    Km(0,0,0,1) = 0.309308868052
+!    Km(1,0,1,0) = 0.157865686635
+!    Km(0,1,1,0) = 0.157865686635
+!    Km(1,0,0,1) = 0.157865686635
+!    Km(0,1,0,1) = 0.157865686635
+!    Km(1,1,0,0) = 0.478041306648
+!    Km(0,0,1,1) = 0.478041306648
+!    Km(1,1,1,0) = 0.309308868052
+!    Km(1,1,0,1) = 0.309308868052
+!    Km(1,0,1,1) = 0.309308868052
+!    Km(0,1,1,1) = 0.309308868052
+!    Km(1,1,1,1) = 0.774605960366
+
+    !get coef matrix
+    OPEN(unit=101,file='Cui',status='old',access='sequential')
+    READ(101,*) Cm(:,:)
+    CLOSE(unit=101)
+
+    OPEN(unit=106,file="moints",status="replace")
+    !MO index
+    DO p=0,ntot-1
+      DO q=0,ntot-1
+        DO r=0,ntot-1
+          DO s=0,ntot-1
+            sum1 = 0.0D0
+            !AO index
+            DO u=0,ntot-1
+              DO v=0,ntot-1      
+                DO l=0,ntot-1
+                  DO d=0,ntot-1
+                    sum1 = sum1 +(Km(u,l,v,d) &
+                           *Cm(u,p)*Cm(v,q)*Cm(l,r)*Cm(d,s))
+                  END DO
+                END DO !l loop
+              END DO !v loop
+            END DO !u loop
+
+            WRITE(106,*) sum1 
+
+          END DO !b loop
+        END DO ! a loop
+      END DO ! j loop
+    END DO !i loop
+    CLOSE(unit=106,status="keep")
+    
+    DEALLOCATE(Km)
+
+  END SUBROUTINE slow_ao2mo_RHF
+!---------------------------------------------------------------------
 END PROGRAM ao2mo
 

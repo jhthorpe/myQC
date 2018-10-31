@@ -76,9 +76,8 @@ IF (options(1) .GT. 0) THEN
     STOP "Error from ao2mo"
   END IF
 END IF
-
 !~~~
-IF (options(3) .EQ. 1) THEN
+IF (options(1) .EQ. 1) THEN
   CALL EXECUTE_COMMAND_LINE('mp2')
   INQUIRE (file='error',EXIST=ex)
   IF (ex) THEN
