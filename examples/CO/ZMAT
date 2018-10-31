@@ -9,3 +9,4 @@ CHARGE= 0
 MULTI= 1
 REF= RHF
 MEMORY= 1000
+ao2mo= 1

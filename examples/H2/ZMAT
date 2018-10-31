@@ -11,3 +11,4 @@ REF= RHF
 MEMORY= 1000
 VERB= 1
 SCF_Conv= 11
+ao2mo= 1

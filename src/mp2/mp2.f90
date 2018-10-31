@@ -204,19 +204,33 @@ PROGRAM mp2
     READ(104,*) eig(:)
     CLOSE(unit=104)
 
-    sum1 = 0.0D0
-
+    !AA part
+    sum1=0.0D0
     DO i=0,nocc-1
-      DO j=0,nocc-1
+      DO j=i+1,nocc-1
         DO a=nocc,ntot-1
-          DO b=nocc,ntot-1
-            sum1 = sum1 + pqrs(i,j,a,b)*(2*pqrs(i,j,a,b)-pqrs(i,j,b,a))/(eig(i)+eig(j)-eig(a)-eig(b))
+          DO b=a+1,ntot-1
+            sum1 = sum1 + (pqrs(i,j,a,b)-pqrs(i,j,b,a))**2.0D0/(eig(i)+eig(j)-eig(a)-eig(b))
           END DO
         END DO
       END DO
     END DO
+    WRITE(*,*) "E(AA) = ", sum1+0.00
 
-    WRITE(*,*) "MP2 energy : ",sum1
+    !AB part
+    sum2=0.0D0
+    DO i=0,nocc-1
+      DO j=0,nocc-1
+        DO a=nocc,ntot-1
+          DO b=nocc,ntot-1
+            sum2 = sum2 + pqrs(i,j,a,b)**2.0D0/(eig(i)+eig(j)-eig(a)-eig(b)) 
+          END DO
+        END DO
+      END DO
+    END DO
+    WRITE(*,*) "E(AB) = ", sum2+0.00
+
+    WRITE(*,*) "E(MBPT2) = ", 2*sum1+sum2
 
     DEALLOCATE(pqrs)
     DEALLOCATE(eig)
