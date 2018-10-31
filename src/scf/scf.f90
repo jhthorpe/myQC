@@ -182,7 +182,7 @@ PROGRAM scf
     WRITE(*,*) "========================================================================="
     WRITE(*,998) 1, Eig(0)
     DO i=1,norb-1
-      IF (Eig(i) .GT. 0.0D0 .AND. Eig(i-1) .LT. 0.0D0) THEN
+      IF (i .EQ. nelc/2) THEN
         WRITE(*,*) "-------------------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, Eig(i)
@@ -192,6 +192,11 @@ PROGRAM scf
 
     !write to molden file
     CALL makeMOLDEN(atoms,xyz,Eig,[0.0D0],0,nnuc,norb,Cui,Cui)
+    
+    !write to eigenvalues file
+    OPEN(unit=105,file='eig',status='replace',access='sequential')
+    WRITE(105,*) Eig
+    CLOSE(unit=105,status='keep')
 
     DEALLOCATE(Cui)
     DEALLOCATE(Suv)
@@ -344,7 +349,7 @@ PROGRAM scf
     WRITE(*,*) "========================================================================="
     WRITE(*,998) 1, EigA(0)
     DO i=1,norb-1
-      IF (EigA(i) .GT. 0.0D0 .AND. EigA(i-1) .LT. 0.0D0) THEN
+      IF (i .EQ. nelcA) THEN
         WRITE(*,*) "-------------------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, EigA(i)
@@ -356,7 +361,7 @@ PROGRAM scf
     WRITE(*,*) "========================================================================="
     WRITE(*,998) 1, EigB(0)
     DO i=1,norb-1
-      IF (EigB(i) .GT. 0.0D0 .AND. EigB(i-1) .LT. 0.0D0) THEN
+      IF (i .EQ. nelcB) THEN
         WRITE(*,*) "-------------------------------------------------------------------------"
       END IF 
       WRITE(*,998) i+1, EigB(i)
@@ -365,6 +370,12 @@ PROGRAM scf
 
     !write to molden file
     CALL makeMOLDEN(atoms,xyz,EigA,EigB,1,nnuc,norb,CuiA,CuiB)
+
+    !write to eigenvalues file
+    OPEN(unit=105,file='eig',status='replace',access='sequential')
+    WRITE(105,*) EigA
+    WRITE(105,*) EigB
+    CLOSE(unit=105,status='keep')
 
     !free the memory we are done with
     DEALLOCATE(FuvA)

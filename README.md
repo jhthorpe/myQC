@@ -1,5 +1,5 @@
 # myQC
-My crummy implementation of Hartree Fock
+My crummy implementation of Quantum Chemical Techniques
 
 ====  RUNNING  ===
 1) Compile program with 'make all' in src. If you don't want to use gfortran, then you must edit each subdirectory's Makefile (sorry). The scf subdirectory's Makefile MUST be linked to your blas/lapack libraries!

@@ -1,0 +1,402 @@
+ @GETMEM-I,  Allocated     762 MB of main memory.
+  Partial RHF integral transformation
+  @GTNRB2-I, There are  1 irreducible representations.
+  SCF eigenvalues (a.u.):
+[  1]   -20.493619[  2]   -11.115108[  3]    -1.575523[  4]    -0.721132
+[  5]    -0.642411[  6]    -0.642411[  7]    -0.455420[  8]     0.374477
+[  9]     0.374477[ 10]     1.291374[
+  Transformation of IIII integrals :
+  1 pass through the AO integral file was required.
+         512 AO integrals were read.
+        1263 MO integrals were written to HF2.
+  Summary of active molecular orbitals: 
+------------------------------------------------------------------------
+ 
+  Index      Eigenvalue    Symmetry    Index      Eigenvalue    Symmetry
+------------------------------------------------------------------------
+     1       -20.4936188        1         6        -0.6424112        1
+     2       -11.1151084        1         7        -0.4554201        1
+     3        -1.5755233        1         8         0.3744769        1
+     4        -0.7211325        1         9         0.3744769        1
+     5        -0.6424112        1        10         1.2913739        1
+------------------------------------------------------------------------
+ @CHECKOUT-I, Total execution time (CPU/WALL):        0.01/       0.02 seconds.
+ @GETMEM-I,  Allocated     762 MB of main memory.
+  Processing integrals for MBPT(2) calculation.
+  Initial AA sort requires    58291 words of core.
+  @GMOIAA-I, Processing MO integrals for spin case AA.
+  @GMOIAA-I, Generation of integral list completed.
+                      TYPE                NUMBER
+                      ----               --------
+                      PPPP                     0
+                      PPPH                     0
+                      PPHH                   183
+                      PHPH                     0
+                      PHHH                     0
+                      HHHH                     0
+
+                     TOTAL                   183
+                     0
+  creating list in intprc                    48  with                      1
+                     3
+                     0
+  creating list in intprc                    50  with                     13
+                    14
+                     0
+  creating list in intprc                    64  with                      1
+                     3
+                     0
+  creating list in intprc                    66  with                     13
+                    14
+                     0
+  creating list in intprc                    14  with                      1
+                     3
+                     0
+  creating list in intprc                    16  with                     13
+                    14
+                     0
+  creating list in intprc                    18  with                      9
+                    10
+                     0
+  creating list in intprc                    19  with                      9
+                     9
+                     0
+  creating list in intprc                     5  with                      9
+                     9
+                     0
+  creating list in intprc                    21  with                     11
+                    12
+                     0
+  creating list in intprc                    46  with                     13
+                    14
+                     0
+  creating list in intprc                    44  with                      1
+                     3
+                     0
+  creating list in intprc                    53  with                     14
+                    14
+                     0
+  creating list in intprc                   153  with                     14
+                    14
+                     0
+  creating list in intprc                   146  with                     13
+                    14
+                     2
+                     0
+  creating list in intprc                    63  with                     13
+                    14
+                     0
+  creating list in intprc                    61  with                      1
+                     3
+                     0
+  creating list in intprc                   116  with                     13
+                    14
+                     0
+  creating list in intprc                   134  with                      9
+                     9
+                     0
+  creating list in intprc                   137  with                      9
+                    10
+                     0
+  creating list in intprc                   139  with                     11
+                    12
+                     0
+  creating list in intprc                    34  with                      9
+                     9
+                     0
+  creating list in intprc                    37  with                      9
+                    10
+                     0
+  creating list in intprc                    39  with                     11
+                    12
+                     0
+  creating list in intprc                    41  with                     10
+                    10
+                     0
+  creating list in intprc                    42  with                      9
+                    10
+                     0
+  creating list in intprc                    43  with                     11
+                    12
+                     0
+  creating list in intprc                    54  with                      9
+                     9
+                     0
+  creating list in intprc                    57  with                     10
+                     9
+                     0
+  creating list in intprc                    59  with                     12
+                    12
+                     0
+  creating list in intprc                    56  with                      9
+                    10
+                     0
+  creating list in intprc                    58  with                     11
+                    11
+                     0
+  creating list in intprc                   144  with                      1
+                     3
+                     0
+  creating list in intprc                   165  with                     14
+                    18
+                     0
+  creating list in intprc                   169  with                     13
+                    11
+                     0
+  creating list in intprc                   118  with                      9
+                    10
+                     0
+  creating list in intprc                     3  with                     13
+                    14
+  @FILSUM-I, MOINTS file directory follows 
+  MOINTS physical record size is      4096 words.
+ ------------------------------------------------------------
+  List Subclass Distribution  Number of    Begins on  Begins at
+                   Size      Distributions  Record      Word
+                 (Words)
+ ------------------------------------------------------------
+     3      1            9           49            4        430
+     5      1           21           21            1       2395
+    14      1            3           21            1       1009
+    16      1            9           49            1       1072
+    18      1           21           21            1       1513
+    19      1           21           21            1       1954
+    21      1           21           21            1       2836
+    34      1           21           21            2       3771
+    37      1           21           21            3        116
+    39      1           21           21            3        557
+    41      1           21           21            3        998
+    42      1           21           21            3       1439
+    43      1           21           21            3       1880
+    44      1            3           21            2        442
+    46      1            9           49            2          1
+    48      1            3           21            1          1
+    50      1            9           49            1         64
+    53      1           49           49            2        866
+    54      1           21           21            3       2321
+    56      1           21           21            3       3644
+    57      1           21           21            3       2762
+    58      1           21           21            3       4085
+    59      1           21           21            3       3203
+    61      1            3           21            2       3708
+    63      1            9           49            2       3267
+    64      1            3           21            1        505
+    66      1            9           49            1        568
+    90      1           21            1            2        505
+    91      1           49            1            2        652
+    93      1           21            1            2        547
+    90      3           21            1            2        526
+    91      3           49            1            2        701
+    92      3            9            1            2        848
+    93      3           21            1            2        568
+    91      5           49            1            2        750
+    92      5            9            1            2        857
+    93      5           21            1            2        589
+    64      9           21            1            2        631
+    91      9           49            1            2        799
+    93      9           21            1            2        610
+ ------------------------------------------------------------
+  @FILSUM-I, GAMLAM file directory follows 
+  GAMLAM physical record size is      4096 words.
+ ------------------------------------------------------------
+  List Subclass Distribution  Number of    Begins on  Begins at
+                   Size      Distributions  Record      Word
+                 (Words)
+ ------------------------------------------------------------
+   116      1            9           49            1       3022
+   118      1           21           21            2       1971
+   134      1           21           21            1       3463
+   137      1           21           21            1       3904
+   139      1           21           21            2        249
+   144      1            3           21            2        690
+   146      1            9           49            1       2581
+   153      1           49           49            1        180
+   160      1           49            1            1         43
+   165      1           49           21            2        753
+   169      1            9           21            2       1782
+   190      1           21            1            1          1
+   191      1           49            1            1        122
+   160      3            9            1            1         92
+   190      3           21            1            1         22
+   192      3            9            1            1        171
+   160      5           21            1            1        101
+ ------------------------------------------------------------
+  @DS3AA-I, PPHHAA integrals will be sorted in core.
+     Words required:     6346  Words available: 99959020
+  @STT3AA-I, Processing integral type PPHH spin case AAAA.
+  ALPHA EIGENVALUES 
+ -20.49362 -11.11511  -1.57552  -0.72113  -0.64241  -0.64241  -0.45542
+   0.37448   0.37448   1.29137
+  BETA EIGENVALUES 
+ -20.49362 -11.11511  -1.57552  -0.72113  -0.64241  -0.64241  -0.45542
+   0.37448   0.37448   1.29137
+
+  @FORMT2-I, Second-order MP correlation energies:
+            ------------------------------------------------
+            E(SCF)                  =   -111.143611953700 a.u.
+            E2(AA)                  =     -0.012515791724 a.u.
+            E2(AB)                  =     -0.076554029471 a.u.
+            E2(TOT)                 =     -0.101585612919 a.u.
+            Total MP2 energy        =   -111.245197566620 a.u.
+            ------------------------------------------------
+   Largest T2 amplitudes for spin case AB:
+       _       _                 _       _                 _       _
+   i   j   a   b             i   j   a   b             i   j   a   b
+-----------------------------------------------------------------------------
+[  6   6   8   8]-0.04806 [  5   5   9   9]-0.04806 [  7   7   8   8]-0.04115
+[  7   7   9   9]-0.04115 [  5   5   8   8]-0.03883 [  6   6   9   9]-0.03883
+[  6   5   8   8] 0.03502 [  5   6   8   8] 0.03502 [  6   6   9   8] 0.03502
+[  6   6   8   9] 0.03502 [  5   5   9   8]-0.03502 [  5   5   8   9]-0.03502
+[  6   5   9   9]-0.03502 [  5   6   9   9]-0.03502 [  6   5   8   9] 0.03181
+-----------------------------------------------------------------------------
+   Norm of T2AB vector (      441 symmetry allowed elements):  0.1811035606.
+-----------------------------------------------------------------------------
+  @FILSUM-I, MOINTS file directory follows 
+  MOINTS physical record size is      4096 words.
+ ------------------------------------------------------------
+  List Subclass Distribution  Number of    Begins on  Begins at
+                   Size      Distributions  Record      Word
+                 (Words)
+ ------------------------------------------------------------
+     3      1            9           49            4        430
+     5      1           21           21            1       2395
+    14      1            3           21            1       1009
+    16      1            9           49            1       1072
+    18      1           21           21            1       1513
+    19      1           21           21            1       1954
+    21      1           21           21            1       2836
+    34      1           21           21            2       3771
+    37      1           21           21            3        116
+    39      1           21           21            3        557
+    41      1           21           21            3        998
+    42      1           21           21            3       1439
+    43      1           21           21            3       1880
+    44      1            3           21            2        442
+    46      1            9           49            2          1
+    48      1            3           21            1          1
+    50      1            9           49            1         64
+    53      1           49           49            2        866
+    54      1           21           21            3       2321
+    56      1           21           21            3       3644
+    57      1           21           21            3       2762
+    58      1           21           21            3       4085
+    59      1           21           21            3       3203
+    61      1            3           21            2       3708
+    63      1            9           49            2       3267
+    64      1            3           21            1        505
+    66      1            9           49            1        568
+    90      1           21            1            2        505
+    91      1           49            1            2        652
+    93      1           21            1            2        547
+    90      3           21            1            2        526
+    91      3           49            1            2        701
+    92      3            9            1            2        848
+    93      3           21            1            2        568
+    91      5           49            1            2        750
+    92      5            9            1            2        857
+    93      5           21            1            2        589
+    48      9           21            1            4        871
+    64      9           21            1            2        631
+    91      9           49            1            2        799
+    93      9           21            1            2        610
+ ------------------------------------------------------------
+  @FILSUM-I, GAMLAM file directory follows 
+  GAMLAM physical record size is      4096 words.
+ ------------------------------------------------------------
+  List Subclass Distribution  Number of    Begins on  Begins at
+                   Size      Distributions  Record      Word
+                 (Words)
+ ------------------------------------------------------------
+   116      1            9           49            1       3022
+   118      1           21           21            2       1971
+   134      1           21           21            1       3463
+   137      1           21           21            1       3904
+   139      1           21           21            2        249
+   144      1            3           21            2        690
+   146      1            9           49            1       2581
+   153      1           49           49            1        180
+   160      1           49            1            1         43
+   165      1           49           21            2        753
+   169      1            9           21            2       1782
+   190      1           21            1            1          1
+   191      1           49            1            1        122
+   160      3            9            1            1         92
+   190      3           21            1            1         22
+   192      3            9            1            1        171
+   160      5           21            1            1        101
+ ------------------------------------------------------------
+------------------------------------------------------------------------
+          Core memory requirement for full matrix algorithms
+
+    Contraction or quantity             Memory needed (words)
+                                      C1                     C1 
+------------------------------------------------------------------------
+  Particle-particle ladder (AB)         963                     963
+  Hole-hole ladder (AB)                3283                    3283
+  Fourth-order singles (AB)               0                       0
+  Rings (AB)                           1323                    1323
+  T2 vector (AB)                        441                     441
+  T2 vector (AA)                         63                      63
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+     Floating point operations required for full  matrix algorithms
+
+  Term            spins   method                    FLOP
+                                           C1                 C1 
+------------------------------------------------------------------------
+ a) contributions to the intermediates :
+ 
+ T2 --> W(MNIJ)  (ABAB)   2 - 7            21609             21609
+ 
+ T1 --> W(MNIJ)  (ABAB)     7               7203              7203
+ 
+ T2 --> W(MBEJ)  (AAAA)   3 - 7            18522             18522
+ T2 --> W(MBEJ)  (ABAB)   3 - 7            18522             18522
+ T2 --> W(MBEJ)  (BAAB)   3 - 7             9261              9261
+ 
+ T1 --> W(MBEJ)  (AAAA)     7               4410              4410
+ T1 --> W(MBEJ)  (ABAB)     7               4410              4410
+ T1 --> W(MBEJ)  (BAAB)     7               4410              4410
+ 
+ T1 --> W(ABEF)  (ABAB)     7              12348             12348
+ 
+ T2 --> F(MI)    (AA)     3 - 7             3087              3087
+ 
+ T2 --> F(AE)    (AA)     3 - 7             1323              1323
+ 
+b) contractions
+------------------------------------------------------------------------
+ 
+ W(ABEF) --> T2 (ABAB)    1 - 7             3969              3969
+ 
+ W(MNIJ) --> T2 (ABAB)    1 - 7            21609             21609
+ 
+ W(MBEJ) --> T2 (ABAB)    1 - 7            18522             18522
+ W(MBEJ) --> T2 (BAAB)    1 - 7             9261              9261
+ 
+ F(MI) --> T2   (ABAB)    2 - 7             3087              3087
+ 
+ F(AE) --> T2   (ABAB)    2 - 7             1323              1323
+ 
+c) direct contributions
+------------------------------------------------------------------------
+ 
+ T2 --> T1       (AA)     3,4,6,7           6174              6174
+ 
+ T1 --> T2      (ABAB)     6,7              4410              4410
+ 
+ T1**2 --> T2   (ABAB)      7               6174              6174
+ T1**2 --> T2   (BAAB)      7               6174              6174
+ 
+d) total number of operations for various methods
+------------------------------------------------------------------------
+ 
+ MBPT(3)                        (1)        53361             53361
+ DQ-MBPT(4)                     (2)       179487            179487
+ SDQ-MBPT(4)                    (3)       185661            185661
+ CCD          per iteration     (5)       130095            130095
+ QCISD        per iteration     (6)       140679            140679
+ CCSD         per iteration     (7)       181398            181398
+ 
+------------------------------------------------------------------------
+ @CHECKOUT-I, Total execution time (CPU/WALL):        0.01/       0.01 seconds.

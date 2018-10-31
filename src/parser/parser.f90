@@ -21,7 +21,7 @@ PROGRAM parser
 
   !options currently:
   ! 0) geometry type    : 0- internal, 1- cartesian 
-  ! 1) calculation type : 0 - SCF 
+  ! 1) calculation type : 0 - SCF, 1 - MP2 
   ! 2) basis set        : 0 - STO-3G
   ! 3) referecnce       : 0 - RHF, 1 - UHF, 2 - ROHF
   ! 4) parallel alg     : 0 - None, 1 - OMP, 2 - MPI
@@ -32,12 +32,13 @@ PROGRAM parser
   ! 9) charge		: int
   !10) multiplicity	: int
   !11) units		: 0-angstrom,1-bohr
+  !12) ao2mo alg        : 0-fast,1-slow
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:11) :: options 
+  INTEGER(KIND=8),DIMENSION(0:12) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
@@ -52,7 +53,7 @@ PROGRAM parser
   i = 0
 
   !defaults
-  options = [0,0,0,0,0,1,1000,1,7,0,1,0]
+  options = [0,0,0,0,0,1,1000,1,7,0,1,0,0]
 
   WRITE(*,*) ""
   WRITE(*,*) "Input parameters"
@@ -153,10 +154,11 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=10),INTENT(IN) :: chr
     ! WORK NOTE : ugly - impliment dictionary?
-    getcalc = 1
     IF (chr .EQ. 'SCF' .OR. chr .EQ. 'HF') THEN
-      getcalc = 2
+      getcalc = 0
       WRITE(*,*) "Method : SCF"
+    ELSE IF (chr .EQ. 'MP2') THEN
+      getcalc = 1
     ELSE
       WRITE(*,*) "Sorry, that method has not been implimented. Exiting..."
       STOP 'bad method'
@@ -336,6 +338,20 @@ PROGRAM parser
       WRITE(*,*) "Units : Angstrom"
     END IF
   END FUNCTION getunits
+!---------------------------------------------------------------------
+!			Get ao2mo algorithm	
+!---------------------------------------------------------------------
+  INTEGER FUNCTION getao2mo(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20),INTENT(IN) :: chr
+    IF (chr .EQ. '1') THEN
+      WRITE(*,*) "ao2mo alg : 1 (slow)"
+      getao2mo = 1
+    ELSE
+      WRITE(*,*) "ao2mo alg : 0 (fast)"
+      getao2mo=0
+    END IF
+  END FUNCTION getao2mo
 !---------------------------------------------------------------------
 !		Build the molecule (nucpos and envdat files)	
 !---------------------------------------------------------------------
@@ -624,6 +640,8 @@ PROGRAM parser
         options(8) = getSCF_Conv(line(1))
       ELSE IF (line(0) == 'UNITS=') THEN
         options(11) = getunits(line(1))
+      ELSE IF (line(0) == 'ao2mo=') THEN
+        options(12) = getao2mo(line(1))
       ELSE
         WRITE(*,*) "parser could not understand options line ", i
       END IF
@@ -650,6 +668,7 @@ PROGRAM parser
     WRITE(*,*) "Reference           : ",options(3)
     WRITE(*,*) "SCF Convergence     : ",options(8)
     WRITE(*,*) "Units               : ",options(11)
+    WRITE(*,*) "ao2mo               : ",options(12)
     WRITE(*,*) "==========================================="
   END SUBROUTINE print_options
 !---------------------------------------------------------------------
