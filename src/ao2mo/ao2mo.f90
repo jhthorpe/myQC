@@ -35,6 +35,8 @@ PROGRAM ao2mo
 
   CALL CPU_TIME(timeS)
   WRITE(*,*) 
+  WRITE(*,*)"                STARTING AO TRANSFORM"
+  WRITE(*,*)"------------------------------------------------------------"
   WRITE(*,*) "ao2mo called"
   WRITE(*,*)
   WRITE(*,*) "Starting AO to MO integral transform"
@@ -43,7 +45,6 @@ PROGRAM ao2mo
   CALL getenv(nnuc,noccA,noccB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
-  WRITE(*,*) "Options(12) is..." ,options(12)
 
   !Determine memory needs
   !get orbital data
@@ -53,23 +54,27 @@ PROGRAM ao2mo
   CLOSE(unit=1)
   nvrtA = ntot - noccA
   nvrtB = ntot - noccB
-  CALL mem_analysis(mem_lvl,noccA,noccB,nvrtA,nvrtB,ntot,fmem,options)  
 
-  IF (options(1) .EQ. 1) THEN
-    IF (options(3) .EQ. 0) THEN
-      IF (mem_lvl(0) .EQ. 3) THEN
-        IF (options(12) .EQ. 0) THEN
-          CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
-        ELSE IF (options(12) .EQ. 1) THEN
-          CALL slow_ao2mo_RHF(noccA,nvrtA,ntot)
-        END IF
-      ELSE
-        WRITE(*,*) "Sorry, that memory case not coded yet"
-        CALL EXECUTE_COMMAND_LINE('touch error')
-        STOP "Bad mem case in ao2mo"
-    END IF
-    ELSE
-      WRITE(*,*) "Sorry, that spin case for MP2 has not been coded"      
+!  CALL mem_analysis(mem_lvl,noccA,noccB,nvrtA,nvrtB,ntot,fmem,options)  
+
+  IF (options(1) .EQ. 1) THEN !MP2
+    IF (options(3) .EQ. 0) THEN !RHF
+      CALL slow_ao2mo_RHF(noccA,nvrtA,ntot)
+      !IF (mem_lvl(0) .EQ. 3) THEN !memory
+      !  IF (options(12) .EQ. 0) THEN !fast
+      !    !CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
+      !  ELSE IF (options(12) .EQ. 1) THEN !slow
+      !    CALL slow_ao2mo_RHF(noccA,nvrtA,ntot)
+      !  END IF
+      !ELSE
+      !  WRITE(*,*) "Sorry, that memory case not coded yet"
+      !  CALL EXECUTE_COMMAND_LINE('touch error')
+      !  STOP "Bad mem case in ao2mo"
+      !END IF
+    ELSE IF (options(3) .EQ. 1) THEN !UHF
+      CALL slow_ao2mo_UHF(noccA,noccB,nvrtA,nvrtB,ntot)
+    ELSE !not RHF or UHF
+      WRITE(*,*) "Sorry, that reference not coded yet"
       CALL EXECUTE_COMMAND_LINE('touch error')
       STOP "Bad ref in ao2mo"
     END IF
@@ -113,7 +118,7 @@ PROGRAM ao2mo
     REAL(KIND=8) :: hmem,mmem,lmem
 
     WRITE(*,*) "--------------------------------------------------------------"
-    WRITE(*,*) "Starting memory analysis"
+    WRITE(*,*) "Starting memory analysis - currently unused and incorrect"
     WRITE(*,*) "Your free memory (MB)               :", fmem 
 
     !MP2 analysis
@@ -398,6 +403,8 @@ PROGRAM ao2mo
       END DO
       CLOSE(unit=101,status='keep')
     END IF
+
+    CALL print_moints(noccA,noccB,nvrtA,nvrtB,ntot,options)
    
     DEALLOCATE(XX)
     IF (ALLOCATED(K_h)) DEALLOCATE(K_h)
@@ -442,7 +449,7 @@ PROGRAM ao2mo
 !       slow_ao2mo
 !               James H. Thorpe
 !               Oct 31, 2018
-!       -does the very slow, O(N^8) ao -> mo transform
+!       -slow version, explicit do loops, O(N^5) ao -> mo transform
 !       -useful for checking code
 !---------------------------------------------------------------------
   SUBROUTINE slow_ao2mo_RHF(noccA,nvrtA,ntot)
@@ -456,14 +463,17 @@ PROGRAM ao2mo
     INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
 
     !Internal
-    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km,Lm,Mm,Nm,Om
     REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Cm
     REAL(KIND=8) :: sum1
-    INTEGER :: u,v,l,d,p,q,r,s
+    INTEGER :: u,v,l,d,p,q,r,s,i,j,a,b
+
+    !spin case AB, the only one we need now
+    WRITE(*,*)
+    WRITE(*,*) "Spin Case AB"
   
     ALLOCATE(Km(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     ALLOCATE(Cm(0:ntot-1,0:ntot-1))
-    CALL build_K(ntot,3) 
     Km = 0
     Cm = 0
 
@@ -472,59 +482,462 @@ PROGRAM ao2mo
     READ(100) Km(:,:,:,:)
     CLOSE(unit=100)
 
-    !hardcoding
-!    Km(0,0,0,0) = 0.774605960366
-!    Km(1,0,0,0) = 0.309308868052
-!    Km(0,1,0,0) = 0.309308868052
-!    Km(0,0,1,0) = 0.309308868052
-!    Km(0,0,0,1) = 0.309308868052
-!    Km(1,0,1,0) = 0.157865686635
-!    Km(0,1,1,0) = 0.157865686635
-!    Km(1,0,0,1) = 0.157865686635
-!    Km(0,1,0,1) = 0.157865686635
-!    Km(1,1,0,0) = 0.478041306648
-!    Km(0,0,1,1) = 0.478041306648
-!    Km(1,1,1,0) = 0.309308868052
-!    Km(1,1,0,1) = 0.309308868052
-!    Km(1,0,1,1) = 0.309308868052
-!    Km(0,1,1,1) = 0.309308868052
-!    Km(1,1,1,1) = 0.774605960366
-
     !get coef matrix
     OPEN(unit=101,file='Cui',status='old',access='sequential')
     READ(101,*) Cm(:,:)
     CLOSE(unit=101)
-
-    OPEN(unit=106,file="moints",status="replace")
-    !MO index
-    DO p=0,ntot-1
-      DO q=0,ntot-1
-        DO r=0,ntot-1
-          DO s=0,ntot-1
+     
+    !first index (uv|ld) -> (iv|ld)
+    WRITE(*,*) "Transforming (uv|ld) -> (iv|ld)"
+    ALLOCATE(Lm(0:noccA-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    Lm = 0.0D0
+    DO i=0,noccA-1
+      DO v=0,ntot-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
             sum1 = 0.0D0
-            !AO index
             DO u=0,ntot-1
-              DO v=0,ntot-1      
-                DO l=0,ntot-1
-                  DO d=0,ntot-1
-                    sum1 = sum1 +(Km(u,l,v,d) &
-                           *Cm(u,p)*Cm(v,q)*Cm(l,r)*Cm(d,s))
-                  END DO
-                END DO !l loop
-              END DO !v loop
-            END DO !u loop
-
-            WRITE(106,*) sum1 
-
-          END DO !b loop
-        END DO ! a loop
-      END DO ! j loop
-    END DO !i loop
-    CLOSE(unit=106,status="keep")
-    
+              sum1 = sum1 + (Km(u,v,l,d) & 
+                            *Cm(u,i))
+            END DO
+            Lm(i,v,l,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
     DEALLOCATE(Km)
 
+    !second index (iv|ld) -> (ia|ld) 
+    WRITE(*,*) "Transforming (iv|ld) -> (ia|ld)"
+    ALLOCATE(Mm(0:noccA-1,0:nvrtA-1,0:ntot-1,0:ntot-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO v=0,ntot-1
+              sum1 = sum1 + (Lm(i,v,l,d) &
+                     *Cm(v,a+noccA))
+            END DO
+            Mm(i,a,l,d) = sum1
+          END DO
+        END DO
+      END DO 
+    END DO
+    DEALLOCATE(Lm)
+
+    !third index (ia|ld) -> (ia|jd) 
+    WRITE(*,*) "Transforming (ia|ld) -> (ia|jd)"
+    ALLOCATE(Nm(0:noccA-1,0:nvrtA-1,0:noccA-1,0:ntot-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO j=0,noccA-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO l=0,ntot-1
+              sum1 = sum1 + (Mm(i,a,l,d) &
+                     *Cm(l,j))
+            END DO
+            Nm(i,a,j,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Mm)
+
+    !fourth index (ia|jd) -> (ia|jb) 
+    WRITE(*,*) "Transforming (ia|jd) -> (ia|jb)"
+    ALLOCATE(Om(0:noccA-1,0:nvrtA-1,0:noccA-1,0:nvrtA-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO j=0,noccA-1
+          DO b=0,nvrtA-1
+            sum1 = 0.0D0
+            DO d=0,ntot-1
+              sum1 = sum1 + (Nm(i,a,j,d) &
+                     *Cm(d,b+noccA))
+            END DO
+            Om(i,a,j,b) = sum1 
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Nm)
+   
+    !for now only
+    WRITE(*,*) "Transforming (ia|jdb) -> <ij|ab>"
+    WRITE(*,*) "Writing to ijab_AA" 
+    OPEN(unit=106,file="ijab_AA",status="replace",form="unformatted")
+    DO i=0,noccA-2
+      DO j=i+1,noccA-1
+        WRITE(106) Om(i,:,j,:)
+      END DO
+    END DO
+    CLOSE(unit=106)
+
+    WRITE(*,*) "Writing to ijab_AB" 
+    OPEN(unit=107,file="ijab_AB",status="replace",form="unformatted")
+    DO i=0,noccA-1
+      DO j=0,noccA-1
+        WRITE(107) Om(i,:,j,:)
+      END DO
+    END DO
+    CLOSE(unit=107)
+
+    WRITE(*,*)
+    DEALLOCATE(Om)
+
+    
+
   END SUBROUTINE slow_ao2mo_RHF
+!---------------------------------------------------------------------
+!       slow_ao2mo_uhf
+!               James H. Thorpe
+!               Nov. 1, 2018
+!       -uses do loops to create ijab_AA, ijab_BB, and ijab_AB
+!---------------------------------------------------------------------
+  !Variables
+  ! noccA,B     :       int, number of occupied A,B orbitals
+  ! nvrtA,B     :       int, number of virtual A,B orbitals
+  ! ntot        :       int, total number of orbitals
+  
+  SUBROUTINE slow_ao2mo_UHF(noccA,noccB,nvrtA,nvrtB,ntot)
+    IMPLICIT NONE
+    !Inout
+    INTEGER, INTENT(IN) :: noccA,noccB,nvrtA,nvrtB,ntot
+    !Internal
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km,Lm,Mm,Nm,Om
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: CmA,CmB
+    REAL(KIND=8) :: sum1
+    INTEGER :: i,j,a,b,u,v,l,d
+
+    ALLOCATE(CmA(0:ntot-1,0:ntot-1))
+    ALLOCATE(CmB(0:ntot-1,0:ntot-1))
+    ALLOCATE(Km(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    Km = 0
+    CmA = 0
+    CmB = 0
+
+    !get K matrix
+    OPEN(unit=100,file='XX',status='old',access='sequential',form='unformatted')
+    READ(100) Km(:,:,:,:)
+    CLOSE(unit=100)
+
+    !get coef matrix
+    OPEN(unit=101,file='Cui',status='old',access='sequential')
+    READ(101,*) CmA(:,:)
+    READ(101,*) CmB(:,:)
+    CLOSE(unit=101)
+
+    !Spin Case AA
+    WRITE(*,*) "Spin Case AA"
+    !first index (uv|ld) -> (iv|ld)
+    WRITE(*,*) "Transforming (uv|ld) -> (iv|ld)"
+    ALLOCATE(Lm(0:noccA-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    Lm = 0.0D0
+    DO i=0,noccA-1
+      DO v=0,ntot-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO u=0,ntot-1
+              sum1 = sum1 + (Km(u,v,l,d) & 
+                            *CmA(u,i))
+            END DO
+            Lm(i,v,l,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    !second index (iv|ld) -> (ia|ld) 
+    WRITE(*,*) "Transforming (iv|ld) -> (ia|ld)"
+    ALLOCATE(Mm(0:noccA-1,0:nvrtA-1,0:ntot-1,0:ntot-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO v=0,ntot-1
+              sum1 = sum1 + (Lm(i,v,l,d) &
+                     *CmA(v,a+noccA))
+            END DO
+            Mm(i,a,l,d) = sum1
+          END DO
+        END DO
+      END DO 
+    END DO
+    DEALLOCATE(Lm)
+    !third index (ia|ld) -> (ia|jd) 
+    WRITE(*,*) "Transforming (ia|ld) -> (ia|jd)"
+    ALLOCATE(Nm(0:noccA-1,0:nvrtA-1,0:noccA-1,0:ntot-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO j=0,noccA-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO l=0,ntot-1
+              sum1 = sum1 + (Mm(i,a,l,d) &
+                     *CmA(l,j))
+            END DO
+            Nm(i,a,j,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Mm)
+    !fourth index (ia|jd) -> (ia|jb) 
+    WRITE(*,*) "Transforming (ia|jd) -> (ia|jb)"
+    ALLOCATE(Om(0:noccA-1,0:nvrtA-1,0:noccA-1,0:nvrtA-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO j=0,noccA-1
+          DO b=0,nvrtA-1
+            sum1 = 0.0D0
+            DO d=0,ntot-1
+              sum1 = sum1 + (Nm(i,a,j,d) &
+                     *CmA(d,b+noccA))
+            END DO
+            Om(i,a,j,b) = sum1 
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Nm)
+    WRITE(*,*) "Transforming (ia|jdb) -> <ij|ab>"
+    WRITE(*,*) "Writing to ijab_AA" 
+    OPEN(unit=106,file="ijab_AA",status="replace",form="unformatted")
+    DO i=0,noccA-2
+      DO j=i+1,noccA-1
+        WRITE(106) Om(i,:,j,:)
+      END DO
+    END DO
+    CLOSE(unit=106)
+    DEALLOCATE(Om)
+
+    !Spin Case BB
+    WRITE(*,*) 
+    WRITE(*,*) "Spin Case BB"
+    !first index (uv|ld) -> (iv|ld)
+    WRITE(*,*) "Transforming (uv|ld) -> (iv|ld)"
+    ALLOCATE(Lm(0:noccB-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    Lm = 0.0D0
+    DO i=0,noccB-1
+      DO v=0,ntot-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO u=0,ntot-1
+              sum1 = sum1 + (Km(u,v,l,d) & 
+                            *CmB(u,i))
+            END DO
+            Lm(i,v,l,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    !second index (iv|ld) -> (ia|ld) 
+    WRITE(*,*) "Transforming (iv|ld) -> (ia|ld)"
+    ALLOCATE(Mm(0:noccB-1,0:nvrtB-1,0:ntot-1,0:ntot-1))
+    DO i=0,noccB-1
+      DO a=0,nvrtB-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO v=0,ntot-1
+              sum1 = sum1 + (Lm(i,v,l,d) &
+                     *CmB(v,a+noccB))
+            END DO
+            Mm(i,a,l,d) = sum1
+          END DO
+        END DO
+      END DO 
+    END DO
+    DEALLOCATE(Lm)
+    !third index (ia|ld) -> (ia|jd) 
+    WRITE(*,*) "Transforming (ia|ld) -> (ia|jd)"
+    ALLOCATE(Nm(0:noccB-1,0:nvrtB-1,0:noccB-1,0:ntot-1))
+    DO i=0,noccB-1
+      DO a=0,nvrtB-1
+        DO j=0,noccB-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO l=0,ntot-1
+              sum1 = sum1 + (Mm(i,a,l,d) &
+                     *CmB(l,j))
+            END DO
+            Nm(i,a,j,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Mm)
+    !fourth index (ia|jd) -> (ia|jb) 
+    WRITE(*,*) "Transforming (ia|jd) -> (ia|jb)"
+    ALLOCATE(Om(0:noccB-1,0:nvrtB-1,0:noccB-1,0:nvrtB-1))
+    DO i=0,noccB-1
+      DO a=0,nvrtB-1
+        DO j=0,noccB-1
+          DO b=0,nvrtB-1
+            sum1 = 0.0D0
+            DO d=0,ntot-1
+              sum1 = sum1 + (Nm(i,a,j,d) &
+                     *CmB(d,b+noccB))
+            END DO
+            Om(i,a,j,b) = sum1 
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Nm)
+    WRITE(*,*) "Transforming (ia|jdb) -> <ij|ab>"
+    WRITE(*,*) "Writing to ijab_BB" 
+    OPEN(unit=106,file="ijab_BB",status="replace",form="unformatted")
+    DO i=0,noccB-2
+      DO j=i+1,noccB-1
+        WRITE(106) Om(i,:,j,:)
+      END DO
+    END DO
+    CLOSE(unit=106)
+    DEALLOCATE(Om)
+
+    !Spin Case AB: i=A,a=A,j=B,b=B
+    WRITE(*,*) 
+    WRITE(*,*) "Spin Case AB"
+    !first index (uv|ld) -> (iv|ld)
+    WRITE(*,*) "Transforming (uv|ld) -> (iv|ld)"
+    ALLOCATE(Lm(0:noccA-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    Lm = 0.0D0
+    DO i=0,noccA-1
+      DO v=0,ntot-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO u=0,ntot-1
+              sum1 = sum1 + (Km(u,v,l,d) & 
+                            *CmA(u,i))
+            END DO
+            Lm(i,v,l,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    !second index (iv|ld) -> (ia|ld) 
+    WRITE(*,*) "Transforming (iv|ld) -> (ia|ld)"
+    ALLOCATE(Mm(0:noccA-1,0:nvrtA-1,0:ntot-1,0:ntot-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO v=0,ntot-1
+              sum1 = sum1 + (Lm(i,v,l,d) &
+                     *CmA(v,a+noccA))
+            END DO
+            Mm(i,a,l,d) = sum1
+          END DO
+        END DO
+      END DO 
+    END DO
+    DEALLOCATE(Lm)
+    !third index (ia|ld) -> (ia|jd) 
+    WRITE(*,*) "Transforming (ia|ld) -> (ia|jd)"
+    ALLOCATE(Nm(0:noccA-1,0:nvrtA-1,0:noccB-1,0:ntot-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO j=0,noccB-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO l=0,ntot-1
+              sum1 = sum1 + (Mm(i,a,l,d) &
+                     *CmB(l,j))
+            END DO
+            Nm(i,a,j,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Mm)
+    !fourth index (ia|jd) -> (ia|jb) 
+    WRITE(*,*) "Transforming (ia|jd) -> (ia|jb)"
+    ALLOCATE(Om(0:noccA-1,0:nvrtA-1,0:noccB-1,0:nvrtB-1))
+    DO i=0,noccA-1
+      DO a=0,nvrtA-1
+        DO j=0,noccB-1
+          DO b=0,nvrtB-1
+            sum1 = 0.0D0
+            DO d=0,ntot-1
+              sum1 = sum1 + (Nm(i,a,j,d) &
+                     *CmB(d,b+noccB))
+            END DO
+            Om(i,a,j,b) = sum1 
+          END DO
+        END DO
+      END DO
+    END DO
+    DEALLOCATE(Nm)
+    WRITE(*,*) "Transforming (ia|jdb) -> <ij|ab>"
+    WRITE(*,*) "Writing to ijab_AB" 
+    OPEN(unit=106,file="ijab_AB",status="replace",form="unformatted")
+    DO i=0,noccA-1
+      DO j=0,noccB-1
+        WRITE(106) Om(i,:,j,:)
+      END DO
+    END DO
+    CLOSE(unit=106)
+    DEALLOCATE(Om)
+
+    DEALLOCATE(Km)
+    DEALLOCATE(CmA)
+    DEALLOCATE(CmB) 
+
+  END SUBROUTINE slow_ao2mo_UHF
+!---------------------------------------------------------------------
+!       print_moints
+!               James H. Thorpe
+!               Nov. 1, 2018
+!       -prints the numbers of MO integrals needed for each spin case
+!---------------------------------------------------------------------
+  ! noccA,noccB         :       int, number of occupied A,B orbitals
+  ! nvrtA,nvrtB         :       int, number of virtual A,B orbitals
+  ! ntot                :       int, total number of orbitals
+  ! options             :       1D int, options array
+
+  SUBROUTINE print_moints(noccA,noccB,nvrtA,nvrtB,ntot,options)
+    IMPLICIT NONE
+    !inout
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options
+    INTEGER, INTENT(IN) :: noccA,noccB,nvrtA,nvrtB,ntot
+    !internal
+    INTEGER :: i,j,k,l,a,b,c,d
+    INTEGER ::no,nv
+
+    WRITE(*,*) "MO Integrals"
+    WRITE(*,*) "-------------------------------"
+    !RHF print
+    IF (options(3) .EQ. 0) THEN
+      !AA
+      WRITE(*,*) "Spin Case AA"
+      !the incredibly lazy way of doing things
+      no = 0
+      nv = 0
+      DO i=0,noccA-2
+        DO j=i+1,noccA-1
+          no = no + 1
+        END DO 
+      END DO
+      DO a=0,nvrtA-2
+        DO b=a+1,nvrtA-1
+          nv = nv + 1
+        END DO 
+      END DO
+      WRITE(*,*) "<ij|ab>         ", no*nv
+      !AB
+      WRITE(*,*) "Spin Case AB"
+      WRITE(*,*) "<ij|ab>         ",noccA*noccA*nvrtA*nvrtA
+      WRITE(*,*)
+    END IF
+
+  END SUBROUTINE
 !---------------------------------------------------------------------
 END PROGRAM ao2mo
 

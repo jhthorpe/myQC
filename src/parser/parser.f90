@@ -53,7 +53,7 @@ PROGRAM parser
   i = 0
 
   !defaults
-  options = [0,0,0,0,0,1,1000,1,7,0,1,0,0]
+  options = [0,0,0,0,0,1,1000,1,7,0,1,0,1]
 
   WRITE(*,*) ""
   WRITE(*,*) "Input parameters"
@@ -346,10 +346,12 @@ PROGRAM parser
     CHARACTER(LEN=20),INTENT(IN) :: chr
     IF (chr .EQ. '1') THEN
       WRITE(*,*) "ao2mo alg : 1 (slow)"
-      getao2mo = 1
+      getao2mo=1
     ELSE
-      WRITE(*,*) "ao2mo alg : 0 (fast)"
-      getao2mo=0
+      WRITE(*,*) "Sorry, only slow ao2mo supported"
+      getao2mo=1
+      !WRITE(*,*) "ao2mo alg : 0 (fast)"
+      !getao2mo=0
     END IF
   END FUNCTION getao2mo
 !---------------------------------------------------------------------
