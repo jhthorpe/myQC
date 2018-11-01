@@ -43,7 +43,6 @@ PROGRAM ao2mo
   CALL getenv(nnuc,noccA,noccB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
   IF (flag) STOP
-  WRITE(*,*) "Options(12) is..." ,options(12)
 
   !Determine memory needs
   !get orbital data
@@ -113,7 +112,7 @@ PROGRAM ao2mo
     REAL(KIND=8) :: hmem,mmem,lmem
 
     WRITE(*,*) "--------------------------------------------------------------"
-    WRITE(*,*) "Starting memory analysis"
+    WRITE(*,*) "Starting memory analysis - currently unused and incorrect"
     WRITE(*,*) "Your free memory (MB)               :", fmem 
 
     !MP2 analysis
@@ -442,7 +441,7 @@ PROGRAM ao2mo
 !       slow_ao2mo
 !               James H. Thorpe
 !               Oct 31, 2018
-!       -does the very slow, O(N^8) ao -> mo transform
+!       -slow version, explicit do loops, O(N^5) ao -> mo transform
 !       -useful for checking code
 !---------------------------------------------------------------------
   SUBROUTINE slow_ao2mo_RHF(noccA,nvrtA,ntot)
@@ -460,12 +459,11 @@ PROGRAM ao2mo
     REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Cm
     REAL(KIND=8) :: sum1
     INTEGER :: u,v,l,d,p,q,r,s
+
+    WRITE(*,*)
+    WRITE(*,*) "Transforming (uv|ld) -> <pq|rs>"
   
     ALLOCATE(Km(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    ALLOCATE(Lm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    ALLOCATE(Mm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    ALLOCATE(Nm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    ALLOCATE(Om(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     ALLOCATE(Cm(0:ntot-1,0:ntot-1))
     CALL build_K(ntot,3) 
     Km = 0
@@ -476,7 +474,7 @@ PROGRAM ao2mo
     READ(100) Km(:,:,:,:)
     CLOSE(unit=100)
 
-    !hardcoding
+    !hardcoding H2 at 1 angstrom
 !    Km(0,0,0,0) = 0.774605960366
 !    Km(1,0,0,0) = 0.309308868052
 !    Km(0,1,0,0) = 0.309308868052
@@ -499,34 +497,9 @@ PROGRAM ao2mo
     READ(101,*) Cm(:,:)
     CLOSE(unit=101)
 
-    OPEN(unit=106,file="moints",status="replace")
-    !MO index
-    !DO p=0,ntot-1
-    !  DO q=0,ntot-1
-    !    DO r=0,ntot-1
-    !      DO s=0,ntot-1
-    !        sum1 = 0.0D0
-    !        !AO index
-    !        DO u=0,ntot-1
-    !          DO v=0,ntot-1      
-    !            DO l=0,ntot-1
-    !              DO d=0,ntot-1
-    !                sum1 = sum1 +(Km(u,l,v,d) &
-    !                       *Cm(u,p)*Cm(v,q)*Cm(l,r)*Cm(d,s))
-    !              END DO
-    !            END DO !l loop
-    !          END DO !v loop
-    !        END DO !u loop
-    !
-    !        WRITE(106,*) sum1 
-    !
-    !      END DO !b loop
-    !    END DO ! a loop
-    !  END DO ! j loop
-    !END DO !i loop
-    !transform i
      
-    !first index
+    !first index (uv|ld) -> (pv|ld)
+    ALLOCATE(Lm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     Lm = 0.0D0
     DO p=0,ntot-1
       DO v=0,ntot-1
@@ -542,8 +515,10 @@ PROGRAM ao2mo
         END DO
       END DO
     END DO
+    DEALLOCATE(Km)
 
-    !second index
+    !second index (pv|ld) -> (pq|ld)
+    ALLOCATE(Mm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     DO p=0,ntot-1
       DO q=0,ntot-1
         DO l=0,ntot-1
@@ -558,8 +533,10 @@ PROGRAM ao2mo
         END DO
       END DO 
     END DO
+    DEALLOCATE(Lm)
 
-    !third index
+    !third index (pq|ld)) -> (pq|rd)
+    ALLOCATE(Nm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     DO p=0,ntot-1
       DO q=0,ntot-1
         DO r=0,ntot-1
@@ -574,8 +551,10 @@ PROGRAM ao2mo
         END DO
       END DO
     END DO
+    DEALLOCATE(Mm)
 
-    !fourth index
+    !fourth index (pq|rd) -> (pq|rs)
+    ALLOCATE(Om(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     DO p=0,ntot-1
       DO q=0,ntot-1
         DO r=0,ntot-1
@@ -584,31 +563,42 @@ PROGRAM ao2mo
             DO d=0,ntot-1
               sum1 = sum1 + (Nm(p,q,r,d) &
                      *Cm(d,s))
+              !sum1 = sum1 + (Nm(p,r,q,d) &
+              !       *Cm(d,s))
             END DO
             Om(p,q,r,s) = sum1 
+            !Om(p,r,q,s) = sum1
           END DO
         END DO
       END DO
     END DO
-
-    !write to moints
+    DEALLOCATE(Nm)
+   
+    !transform to physics notation
+    !<pr|qs> -> <pq|rs>
+    OPEN(unit=105,file="pqrs_AB",status="replace",form="unformatted")
     DO p=0,ntot-1
       DO q=0,ntot-1
-        DO r=0,ntot-1
-          DO s=0,ntot-1
-            WRITE(106,*) Om(p,r,q,s)
-          END DO
-        END DO
+        WRITE(105) Om(p,:,q,:)
       END DO
     END DO 
+    CLOSE(unit=105,status="keep")
 
-    CLOSE(unit=106,status="keep")
-    
-    DEALLOCATE(Km)
-    DEALLOCATE(Lm)
-    DEALLOCATE(Mm)
-    DEALLOCATE(Nm)
+    !write to moints - rework this when convenient
+    !write to pqrs_AA - for now
+    !OPEN(unit=106,file="pqrs_AA",status="replace",form="unformatted")
+    !DO p=0,ntot-1
+    !  DO q=0,ntot-1
+    !    WRITE(106) Om(p,r,:,:)
+    !  END DO
+    !END DO 
+    !CLOSE(unit=106,status="keep")
+
+    !write to ijab_AA
+
     DEALLOCATE(Om)
+
+    
 
   END SUBROUTINE slow_ao2mo_RHF
 !---------------------------------------------------------------------
