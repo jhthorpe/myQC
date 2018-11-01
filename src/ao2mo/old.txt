@@ -1,0 +1,97 @@
+!first index (uv|ld) -> (pv|ld)
+ALLOCATE(Lm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+Lm = 0.0D0
+DO p=0,ntot-1
+  DO v=0,ntot-1
+    DO l=0,ntot-1
+      DO d=0,ntot-1
+        sum1 = 0.0D0
+        DO u=0,ntot-1
+          sum1 = sum1 + (Km(u,v,l,d) &
+                        *Cm(u,p))
+        END DO
+        Lm(p,v,l,d) = sum1
+      END DO
+    END DO
+  END DO
+END DO
+DEALLOCATE(Km)
+!second index (pv|ld) -> (pq|ld)
+ALLOCATE(Mm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+DO p=0,ntot-1
+  DO q=0,ntot-1
+    DO l=0,ntot-1
+      DO d=0,ntot-1
+        sum1 = 0.0D0
+        DO v=0,ntot-1
+          sum1 = sum1 + (Lm(p,v,l,d) &
+                 *Cm(v,q))
+        END DO
+        Mm(p,q,l,d) = sum1
+      END DO
+    END DO
+  END DO
+END DO
+DEALLOCATE(Lm)
+!third index (pq|ld)) -> (pq|rd)
+ALLOCATE(Nm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+DO p=0,ntot-1
+  DO q=0,ntot-1
+    DO r=0,ntot-1
+      DO d=0,ntot-1
+        sum1 = 0.0D0
+        DO l=0,ntot-1
+          sum1 = sum1 + (Mm(p,q,l,d) &
+                 *Cm(l,r))
+        END DO
+        Nm(p,q,r,d) = sum1
+      END DO
+    END DO
+  END DO
+END DO
+DEALLOCATE(Mm)
+!fourth index (pq|rd) -> (pq|rs)
+ALLOCATE(Om(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+DO p=0,ntot-1
+  DO q=0,ntot-1
+    DO r=0,ntot-1
+      DO s=0,ntot-1
+        sum1 = 0.0D0
+        DO d=0,ntot-1
+          sum1 = sum1 + (Nm(p,q,r,d) &
+                 *Cm(d,s))
+          !sum1 = sum1 + (Nm(p,r,q,d) &
+          !       *Cm(d,s))
+        END DO
+        Om(p,q,r,s) = sum1
+        !Om(p,r,q,s) = sum1
+      END DO
+    END DO
+  END DO
+END DO
+DEALLOCATE(Nm)
+!transform to physics notation
+!<pr|qs> -> <pq|rs>
+OPEN(unit=105,file="pqrs_AB",status="replace",form="unformatted")
+DO p=0,ntot-1
+  DO q=0,ntot-1
+    WRITE(105) Om(p,:,q,:)
+  END DO
+END DO
+CLOSE(unit=105,status="keep")
+!for now only
+OPEN(unit=106,file="ijab_AA",status="replace",form="unformatted")
+DO i=0,noccA-2
+  DO j=i+1,noccA-1
+    WRITE(106) Om(i,noccA:ntot-1,j,noccA:ntot-1)
+  END DO
+END DO
+CLOSE(unit=106)
+OPEN(unit=107,file="ijab_AB",status="replace",form="unformatted")
+DO i=0,noccA-1
+  DO j=0,noccA-1
+    WRITE(107) Om(i,noccA:ntot-1,j,noccA:ntot-1)
+  END DO
+END DO
+CLOSE(unit=107)
+
