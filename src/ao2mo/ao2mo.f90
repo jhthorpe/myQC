@@ -456,12 +456,16 @@ PROGRAM ao2mo
     INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
 
     !Internal
-    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km
+    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km,Lm,Mm,Nm,Om
     REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Cm
     REAL(KIND=8) :: sum1
     INTEGER :: u,v,l,d,p,q,r,s
   
     ALLOCATE(Km(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Lm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Mm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Nm(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    ALLOCATE(Om(0:ntot-1,0:ntot-1,0:ntot-1,0:ntot-1))
     ALLOCATE(Cm(0:ntot-1,0:ntot-1))
     CALL build_K(ntot,3) 
     Km = 0
@@ -497,32 +501,114 @@ PROGRAM ao2mo
 
     OPEN(unit=106,file="moints",status="replace")
     !MO index
+    !DO p=0,ntot-1
+    !  DO q=0,ntot-1
+    !    DO r=0,ntot-1
+    !      DO s=0,ntot-1
+    !        sum1 = 0.0D0
+    !        !AO index
+    !        DO u=0,ntot-1
+    !          DO v=0,ntot-1      
+    !            DO l=0,ntot-1
+    !              DO d=0,ntot-1
+    !                sum1 = sum1 +(Km(u,l,v,d) &
+    !                       *Cm(u,p)*Cm(v,q)*Cm(l,r)*Cm(d,s))
+    !              END DO
+    !            END DO !l loop
+    !          END DO !v loop
+    !        END DO !u loop
+    !
+    !        WRITE(106,*) sum1 
+    !
+    !      END DO !b loop
+    !    END DO ! a loop
+    !  END DO ! j loop
+    !END DO !i loop
+    !transform i
+     
+    !first index
+    Lm = 0.0D0
+    DO p=0,ntot-1
+      DO v=0,ntot-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO u=0,ntot-1
+              sum1 = sum1 + (Km(u,v,l,d) & 
+                            *Cm(u,p))
+            END DO
+            Lm(p,v,l,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+
+    !second index
+    DO p=0,ntot-1
+      DO q=0,ntot-1
+        DO l=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO v=0,ntot-1
+              sum1 = sum1 + (Lm(p,v,l,d) &
+                     *Cm(v,q))
+            END DO
+            Mm(p,q,l,d) = sum1
+          END DO
+        END DO
+      END DO 
+    END DO
+
+    !third index
+    DO p=0,ntot-1
+      DO q=0,ntot-1
+        DO r=0,ntot-1
+          DO d=0,ntot-1
+            sum1 = 0.0D0
+            DO l=0,ntot-1
+              sum1 = sum1 + (Mm(p,q,l,d) &
+                     *Cm(l,r))
+            END DO
+            Nm(p,q,r,d) = sum1
+          END DO
+        END DO
+      END DO
+    END DO
+
+    !fourth index
     DO p=0,ntot-1
       DO q=0,ntot-1
         DO r=0,ntot-1
           DO s=0,ntot-1
             sum1 = 0.0D0
-            !AO index
-            DO u=0,ntot-1
-              DO v=0,ntot-1      
-                DO l=0,ntot-1
-                  DO d=0,ntot-1
-                    sum1 = sum1 +(Km(u,l,v,d) &
-                           *Cm(u,p)*Cm(v,q)*Cm(l,r)*Cm(d,s))
-                  END DO
-                END DO !l loop
-              END DO !v loop
-            END DO !u loop
+            DO d=0,ntot-1
+              sum1 = sum1 + (Nm(p,q,r,d) &
+                     *Cm(d,s))
+            END DO
+            Om(p,q,r,s) = sum1 
+          END DO
+        END DO
+      END DO
+    END DO
 
-            WRITE(106,*) sum1 
+    !write to moints
+    DO p=0,ntot-1
+      DO q=0,ntot-1
+        DO r=0,ntot-1
+          DO s=0,ntot-1
+            WRITE(106,*) Om(p,r,q,s)
+          END DO
+        END DO
+      END DO
+    END DO 
 
-          END DO !b loop
-        END DO ! a loop
-      END DO ! j loop
-    END DO !i loop
     CLOSE(unit=106,status="keep")
     
     DEALLOCATE(Km)
+    DEALLOCATE(Lm)
+    DEALLOCATE(Mm)
+    DEALLOCATE(Nm)
+    DEALLOCATE(Om)
 
   END SUBROUTINE slow_ao2mo_RHF
 !---------------------------------------------------------------------
