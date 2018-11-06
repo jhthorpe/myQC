@@ -50,7 +50,8 @@ MODULE linal
     INTEGER(KIND=4), INTENT(IN) :: n,m
     
     REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: evec
-    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: diag,work,iwork
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: diag,work
+    INTEGER(KIND=4), DIMENSION(:), ALLOCATABLE :: iwork
     INTEGER(KIND=4) :: i,j,lwork,liwork,info
     REAL(KIND=8) :: b,c
     CHARACTER(LEN=1) :: fparam
@@ -74,6 +75,10 @@ MODULE linal
     S(0,:) = V
     Td(0) = c
 
+    !change this to while loop
+    !start with given m, and climb by 5 iterations each time
+    !check convergence every 5 iterations
+    !not the best way to do this, but it should work
     DO i=1,m-1
       b = linal_eunorm_1Dreal8(X,n)
       IF (ABS(b - 0.0D0) .GT. tol) THEN
@@ -81,7 +86,6 @@ MODULE linal
       ELSE
         ! add a new vector that is orthonormal to the others
         CALL linal_onvec_2Dreal8(S(0:i-1,:),V,n,i)
-        WRITE(*,*) "new vector: ", V
       END IF
       W = MATMUL(A,V)
       c = SUM(W*V) !this works because we are real valued 
@@ -98,17 +102,26 @@ MODULE linal
     ALLOCATE(evec(0:m-1,0:n-1))
     ALLOCATE(work(0:1))
     ALLOCATE(iwork(0:1))
-    CALL DSTEDC('Y',100,Td,Ts,evec,100,work,-1,iwork,-1,info)
+    work = 0
+    iwork = 0
 
-    lwork = CEILING(MAX(1.0,work(0)))
-    liwork = CEILING(MAX(1.0,iwork(0)))
+    !one at a time?
+    CALL DSTEDC('I',m,Td,Ts,evec,m,work,-1,iwork,2,info)
+    WRITE(*,*) "work is:", work
+    lwork = CEILING(MAX(2.0,work(0)))
+    WRITE(*,*) "lwork is", lwork
     DEALLOCATE(work)
-    DEALLOCATE(iwork)
     ALLOCATE(work(0:lwork-1))
-    ALLOCATE(iwork(0:liwork-1))
 
+    CALL DSTEDC('I',m,Td,Ts,evec,m,work,lwork,iwork,-1,info)
+    WRITE(*,*) "iwork is:", iwork 
+    liwork = MAX(2,iwork(0))
+    WRITE(*,*) "liwork is", liwork
+    DEALLOCATE(iwork)
+    ALLOCATE(iwork(0:liwork-1))
+   
     !get eigenvalues
-    CALL DSTEDC('Y',100,Td,Ts,evec,m,work,lwork,iwork,liwork,info)
+    CALL DSTEDC('I',m,Td,Ts,evec,m,work,lwork,iwork,liwork,info)
 
     !get eigenvectors
     

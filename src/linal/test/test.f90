@@ -22,8 +22,8 @@ PROGRAM test
   !testing lanczos
   CALL random_seed()
 
-  n = 100
-  m = 100
+  n = 5000
+  m = 500
 
   ALLOCATE(A(0:n-1,0:n-1))
   ALLOCATE(S(0:m-1,0:n-1))
@@ -96,7 +96,7 @@ PROGRAM test
   !END DO
 
   call cpu_time(t1)
-  CALL dsyev('N','U',n,A,n,wshit,WORK,LWORK,INFO) 
+  !CALL dsyev('N','U',n,A,n,wshit,WORK,LWORK,INFO) 
   call cpu_time(t2)
   WRITE(*,*) "The actual values are"
   DO i=0,MIN(m-1,9)
