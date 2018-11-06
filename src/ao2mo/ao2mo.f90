@@ -59,7 +59,7 @@ PROGRAM ao2mo
 
   IF (options(1) .EQ. 1) THEN !MP2
     IF (options(3) .EQ. 0) THEN !RHF
-      CALL slow_ao2mo_RHF(noccA,nvrtA,ntot)
+      CALL slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot)
       !IF (mem_lvl(0) .EQ. 3) THEN !memory
       !  IF (options(12) .EQ. 0) THEN !fast
       !    !CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
@@ -72,8 +72,16 @@ PROGRAM ao2mo
       !  STOP "Bad mem case in ao2mo"
       !END IF
     ELSE IF (options(3) .EQ. 1) THEN !UHF
-      CALL slow_ao2mo_UHF(noccA,noccB,nvrtA,nvrtB,ntot)
+      CALL slow_ao2mo_MP2_UHF(noccA,noccB,nvrtA,nvrtB,ntot)
     ELSE !not RHF or UHF
+      WRITE(*,*) "Sorry, that reference not coded yet"
+      CALL EXECUTE_COMMAND_LINE('touch error')
+      STOP "Bad ref in ao2mo"
+    END IF
+  ELSE IF (options(1) .EQ. 2) THEN !CIS
+    IF (options(3) .EQ. 0 ) THEN
+      CALL slow_ao2mo_CIS_RHF(noccA,nvrtA,ntot)
+    ELSE
       WRITE(*,*) "Sorry, that reference not coded yet"
       CALL EXECUTE_COMMAND_LINE('touch error')
       STOP "Bad ref in ao2mo"
@@ -452,7 +460,7 @@ PROGRAM ao2mo
 !       -slow version, explicit do loops, O(N^5) ao -> mo transform
 !       -useful for checking code
 !---------------------------------------------------------------------
-  SUBROUTINE slow_ao2mo_RHF(noccA,nvrtA,ntot)
+  SUBROUTINE slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot)
     ! ij        :       int, occupied indicies
     ! ab        :       int, virtual indicies
     ! uvld      :       int, ao indicies
@@ -589,7 +597,7 @@ PROGRAM ao2mo
 
     
 
-  END SUBROUTINE slow_ao2mo_RHF
+  END SUBROUTINE slow_ao2mo_MP2_RHF
 !---------------------------------------------------------------------
 !       slow_ao2mo_uhf
 !               James H. Thorpe
@@ -601,7 +609,7 @@ PROGRAM ao2mo
   ! nvrtA,B     :       int, number of virtual A,B orbitals
   ! ntot        :       int, total number of orbitals
   
-  SUBROUTINE slow_ao2mo_UHF(noccA,noccB,nvrtA,nvrtB,ntot)
+  SUBROUTINE slow_ao2mo_MP2_UHF(noccA,noccB,nvrtA,nvrtB,ntot)
     IMPLICIT NONE
     !Inout
     INTEGER, INTENT(IN) :: noccA,noccB,nvrtA,nvrtB,ntot
@@ -890,7 +898,23 @@ PROGRAM ao2mo
     DEALLOCATE(CmA)
     DEALLOCATE(CmB) 
 
-  END SUBROUTINE slow_ao2mo_UHF
+  END SUBROUTINE slow_ao2mo_MP2_UHF
+!---------------------------------------------------------------------
+!       slow_ao2mo_CIS_RHF
+!               James H. Thorpe
+!               Nov 3., 2018
+!       -calculates AO -> MO transforms for RHF CIS calculations
+!---------------------------------------------------------------------
+  SUBROUTINE slow_ao2mo_CIS_RHF(noccA,nvrtA,ntot)
+  ! Variables
+  ! noccA       :       int, number of A occupied orbitals
+  ! nvrtA       :       int, number of A virtual orbitals
+  ! ntot        :       int, total nubmer of orbitals
+    IMPLICIT NONE
+    ! Inout
+    INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
+
+  END SUBROUTINE
 !---------------------------------------------------------------------
 !       print_moints
 !               James H. Thorpe

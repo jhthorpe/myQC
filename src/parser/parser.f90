@@ -21,7 +21,7 @@ PROGRAM parser
 
   !options currently:
   ! 0) geometry type    : 0- internal, 1- cartesian 
-  ! 1) calculation type : 0 - SCF, 1 - MP2 
+  ! 1) calculation type : 0-SCF, 1-MP2
   ! 2) basis set        : 0 - STO-3G
   ! 3) referecnce       : 0 - RHF, 1 - UHF, 2 - ROHF
   ! 4) parallel alg     : 0 - None, 1 - OMP, 2 - MPI
@@ -33,12 +33,15 @@ PROGRAM parser
   !10) multiplicity	: int
   !11) units		: 0-angstrom,1-bohr
   !12) ao2mo alg        : 0-fast,1-slow
+  !13) excitation       : 0-none,
+  !14) root algorithm   : 0-lanczos
+  !15) number ex. states: number
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:12) :: options 
+  INTEGER(KIND=8),DIMENSION(0:15) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
@@ -53,7 +56,9 @@ PROGRAM parser
   i = 0
 
   !defaults
-  options = [0,0,0,0,0,1,1000,1,7,0,1,0,1]
+  options = [0,0,0,0,0,1,1000,1,7,0,1,0,1,0,0,0]
+
+  CALL EXECUTE_COMMAND_LINE('cat ZMAT')
 
   WRITE(*,*) ""
   WRITE(*,*) "Input parameters"
@@ -138,10 +143,10 @@ PROGRAM parser
     getsys = 0
     IF (chr .EQ. 'CARTESIAN') THEN
       getsys = 0
-      WRITE(*,*) "System Type : CARTESIAN"
+  !    WRITE(*,*) "System Type : CARTESIAN"
     ELSE IF (chr .EQ. 'INTERNAL') THEN
       getsys = 1
-      WRITE(*,*) "System Type : INTERNAL"
+   !   WRITE(*,*) "System Type : INTERNAL"
     ELSE
       WRITE(*,*) "Bad system type input. Exiting..."
       STOP 'bad system'
@@ -156,9 +161,11 @@ PROGRAM parser
     ! WORK NOTE : ugly - impliment dictionary?
     IF (chr .EQ. 'SCF' .OR. chr .EQ. 'HF') THEN
       getcalc = 0
-      WRITE(*,*) "Method : SCF"
+   !   WRITE(*,*) "Method : SCF"
     ELSE IF (chr .EQ. 'MP2') THEN
       getcalc = 1
+    ELSE IF (chr .EQ. 'CIS') THEN
+      getcalc=2
     ELSE
       WRITE(*,*) "Sorry, that method has not been implimented. Exiting..."
       STOP 'bad method'
@@ -174,16 +181,16 @@ PROGRAM parser
     getbasis = 0
     IF (chr .EQ. 'STO-3G') THEN
       getbasis = 0
-      WRITE(*,*) "Basis : STO-3G"
+  !    WRITE(*,*) "Basis : STO-3G"
     ELSE IF (chr .EQ. 'tester1') THEN
       getbasis = 1
-      WRITE(*,*) "Basis : tester1"
+  !    WRITE(*,*) "Basis : tester1"
     ELSE IF (chr .EQ. 'tester2') THEN
       getbasis = 2
-      WRITE(*,*) "basis : tester2"
+  !    WRITE(*,*) "basis : tester2"
     ELSE IF (chr .EQ. 'tester3') THEN
       getbasis = 3
-      WRITE(*,*) "basis : tester3"
+  !    WRITE(*,*) "basis : tester3"
     ELSE
       WRITE(*,*) "Sorry, that basis has not been implimented. Exiting..."
       STOP 'bad basis'
@@ -199,13 +206,13 @@ PROGRAM parser
     getref = 0
     IF (chr .EQ. 'RHF') THEN
       getref = 0
-      WRITE(*,*) "Ref : RHF"
+  !    WRITE(*,*) "Ref : RHF"
     ELSE IF (chr .EQ. 'UHF') THEN
       getref = 1
-      WRITE(*,*) "Ref : UHF"
+  !    WRITE(*,*) "Ref : UHF"
     ELSE IF (chr .EQ. 'ROHF') THEN
       getref = 2
-      WRITE(*,*) "Ref : ROHF"
+  !    WRITE(*,*) "Ref : ROHF"
       WRITE(*,*) "Sorry, this reference is not implimented yet. Exiting..."
       STOP 'bad ref'
     ELSE
@@ -222,13 +229,13 @@ PROGRAM parser
     getpar=1
     IF (chr .EQ. 'OMP') THEN
       getpar = 2
-      WRITE(*,*) "Parallel : OMP"
+  !    WRITE(*,*) "Parallel : OMP"
     ELSE IF (chr .EQ. 'MPI') THEN
       getpar = 3
-      WRITE(*,*) "Parallel : MPI"
+  !    WRITE(*,*) "Parallel : MPI"
     ELSE
       getpar = 1
-      WRITE(*,*) "Parallel : none"
+  !    WRITE(*,*) "Parallel : none"
     END IF
   END FUNCTION getpar
 
@@ -252,7 +259,7 @@ PROGRAM parser
       WRITE(*,*) "You specificed a memory less than zero."
       getmem = 1000
     ELSE
-      WRITE(*,*) "Memory per CPU (MB) : ", val
+ !     WRITE(*,*) "Memory per CPU (MB) : ", val
       getmem = val
     END IF
   END FUNCTION getmem
@@ -265,11 +272,11 @@ PROGRAM parser
     INTEGER :: val
     READ (chr,'(I8)') val 
     IF (val .GT. 11 .OR. val .LT. 0) THEN
-      WRITE(*,*) "SCF Convergence (default) :", 7
+  !    WRITE(*,*) "SCF Convergence (default) :", 7
     ELSE IF( val .EQ. 11) THEN
-      WRITE(*,*) "SCF Convergence (these go to...) : ", val
+  !    WRITE(*,*) "SCF Convergence (these go to...) : ", val
     ELSE
-      WRITE(*,*) "SCF Convergence : ", val
+  !    WRITE(*,*) "SCF Convergence : ", val
     END IF
     getSCF_CONV = val
   END FUNCTION getSCF_Conv
@@ -281,7 +288,7 @@ PROGRAM parser
     CHARACTER(LEN=20), INTENT(IN) :: chr
     INTEGER :: val
     READ (chr,'(I8)') val 
-    WRITE(*,*) "Charge : ", val
+ !   WRITE(*,*) "Charge : ", val
     getcharge = val
   END FUNCTION getcharge
 
@@ -293,7 +300,7 @@ PROGRAM parser
     INTEGER :: val
     READ (chr,'(I8)') val 
     IF (val .GT. 0) THEN
-      WRITE(*,*) "Multiplicity : ", val
+ !     WRITE(*,*) "Multiplicity : ", val
     ELSE
       WRITE(*,*) "bad value for multiplicity, exiting."
       CALL EXECUTE_COMMAND_LINE('touch error')
@@ -312,30 +319,30 @@ PROGRAM parser
     getverb = 0
     IF (chr .EQ. '1') THEN
       getverb = 1
-      WRITE(*,*) "Verbosity : 1 (some)"
+  !    WRITE(*,*) "Verbosity : 1 (some)"
     ELSE IF (chr .EQ. '2') THEN
       getverb = 2
-      WRITE(*,*) "Verbosity : 2 (detailed)"
+  !    WRITE(*,*) "Verbosity : 2 (detailed)"
     ELSE IF (chr .EQ. '3') THEN
       getverb = 3
-      WRITE(*,*) "Verbosity : 3 (wtf)"
+  !    WRITE(*,*) "Verbosity : 3 (wtf)"
     ELSE
-      WRITE(*,*) "Verbosity : 0 (none)"
+  !    WRITE(*,*) "Verbosity : 0 (none)"
     END IF
     END FUNCTION getverb
 
 !---------------------------------------------------------------------
-!			Get verbosity level	
+!			Get units
 !---------------------------------------------------------------------
   INTEGER FUNCTION getunits(chr)
     IMPLICIT NONE
     CHARACTER(LEN=20),INTENT(IN) :: chr
     IF (chr .EQ. 'Bohr') THEN
       getunits = 1
-      WRITE(*,*) "Units : Bohr"
+  !    WRITE(*,*) "Units : Bohr"
     ELSE
       getunits = 0
-      WRITE(*,*) "Units : Angstrom"
+  !    WRITE(*,*) "Units : Angstrom"
     END IF
   END FUNCTION getunits
 !---------------------------------------------------------------------
@@ -345,7 +352,7 @@ PROGRAM parser
     IMPLICIT NONE
     CHARACTER(LEN=20),INTENT(IN) :: chr
     IF (chr .EQ. '1') THEN
-      WRITE(*,*) "ao2mo alg : 1 (slow)"
+ !     WRITE(*,*) "ao2mo alg : 1 (slow)"
       getao2mo=1
     ELSE
       WRITE(*,*) "Sorry, only slow ao2mo supported"
@@ -354,6 +361,49 @@ PROGRAM parser
       !getao2mo=0
     END IF
   END FUNCTION getao2mo
+!---------------------------------------------------------------------
+!                       Get excite
+!---------------------------------------------------------------------
+  INTEGER FUNCTION getexcite(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20),INTENT(IN) :: chr
+    IF (chr .EQ. 'CIS' .OR. chr .EQ. "1") THEN
+      getexcite=1
+    ELSE IF (chr .EQ. 'NONE' .OR. chr .EQ. "0") THEN
+      getexcite=0
+    ELSE
+      WRITE(*,*) "Sorry, only CIS supported"
+      getexcite=0
+    END IF
+  END FUNCTION getexcite
+!---------------------------------------------------------------------
+!                       Get root_alg
+!---------------------------------------------------------------------
+  INTEGER FUNCTION getroot_alg(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20),INTENT(IN) :: chr
+    IF (chr .EQ. 'lanczos' .OR. chr .EQ. "0") THEN
+      getroot_alg=0
+    ELSE
+      WRITE(*,*) "Sorry, only Lanczos root_alg supported"
+      getroot_alg=0
+    END IF
+  END FUNCTION getroot_alg
+!---------------------------------------------------------------------
+!                       Get E_NUM
+!---------------------------------------------------------------------
+  INTEGER FUNCTION gete_num(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20), INTENT(IN) :: chr
+    INTEGER :: val
+    READ (chr,'(I8)') val
+    IF (val .LT. 0) THEN
+      WRITE(*,*) "You specificed a number of states less than zero."
+      gete_num = 1
+    ELSE
+      gete_num = val
+    END IF
+  END FUNCTION gete_num
 !---------------------------------------------------------------------
 !		Build the molecule (nucpos and envdat files)	
 !---------------------------------------------------------------------
@@ -590,14 +640,14 @@ PROGRAM parser
     !read in the molecule
     DO i=0,nnuc-1
       READ(1,*) id, xyz(i,:)
-      WRITE(*,*) id, xyz(i,:)
+  !    WRITE(*,*) id, xyz(i,:)
       atoms(i) = getelem(id)
       nline = nline + 1
     END DO
  
     !extra lines
     nline = nline + 1
-    WRITE(*,*)
+ !   WRITE(*,*)
     READ(1,*) 
  
   END SUBROUTINE cartesian
@@ -642,8 +692,14 @@ PROGRAM parser
         options(8) = getSCF_Conv(line(1))
       ELSE IF (line(0) == 'UNITS=') THEN
         options(11) = getunits(line(1))
-      ELSE IF (line(0) == 'ao2mo=') THEN
+      ELSE IF (line(0) == 'AO2MO=') THEN
         options(12) = getao2mo(line(1))
+      ELSE IF (line(0) == 'EXCITE=') THEN
+        options(13) = getexcite(line(1))
+      ELSE IF (line(0) == 'ROOT_ALG=') THEN
+        options(14) = getroot_alg(line(1))
+      ELSE IF (line(0) == 'E_NUM=') THEN
+        options(15) = gete_num(line(1))
       ELSE
         WRITE(*,*) "parser could not understand options line ", i
       END IF
@@ -671,6 +727,9 @@ PROGRAM parser
     WRITE(*,*) "SCF Convergence     : ",options(8)
     WRITE(*,*) "Units               : ",options(11)
     WRITE(*,*) "ao2mo               : ",options(12)
+    WRITE(*,*) "excite              : ",options(13)
+    WRITE(*,*) "root algorithm      : ",options(14)
+    WRITE(*,*) "num excite          : ",options(15)
     WRITE(*,*) "==========================================="
   END SUBROUTINE print_options
 !---------------------------------------------------------------------

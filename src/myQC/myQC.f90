@@ -87,6 +87,16 @@ IF (options(1) .EQ. 1) THEN
 END IF
 
 !~~~
+IF (options(1) .EQ. 2) THEN
+  CALL EXECUTE_COMMAND_LINE('CIS')
+  INQUIRE (file='error',EXIST=ex)
+  IF (ex) THEN
+    WRITE(*,*) "Error from CIS, exiting"
+    STOP "Error from CIS"
+  END IF
+END IF
+
+!~~~
 ! Output
   CALL CPU_TIME(timeF)
   WRITE(*,*)
