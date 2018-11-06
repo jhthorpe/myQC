@@ -4,28 +4,30 @@ PROGRAM test
   IMPLICIT NONE
   
   !lanczos
-  REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: A,S
+  REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: A,S,Anew
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: V,W,X,Y,Td,Ts
   INTEGER(KIND=4) :: n,m,i,j
   REAL(KIND=8) :: t1,t2
+  REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: sigma,b
 
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: WORK,wshit
   INTEGER :: LWORK, INFO
 
   !gs
-  REAL(KIND=8), DIMENSION(0:2,0:2) :: B
-  REAL(KIND=8), DIMENSION(0:2) :: u,aba,gaba
+  !REAL(KIND=8), DIMENSION(0:2,0:2) :: B
+  !REAL(KIND=8), DIMENSION(0:2) :: u,aba,gaba
 
   !mkl bullshit
   integer iseed /3/
 
   !testing lanczos
-  CALL random_seed()
+  CALL random_seed(iseed)
 
-  n = 100
-  m = 100
+  n = 3
+  m = 1
 
   ALLOCATE(A(0:n-1,0:n-1))
+  ALLOCATE(Anew(0:n-1,0:n-1))
   ALLOCATE(S(0:m-1,0:n-1))
   ALLOCATE(Td(0:m-1))
   ALLOCATE(Ts(0:m-2))
@@ -55,6 +57,16 @@ PROGRAM test
   OPEN(unit=100,file='mat',status='replace',form='unformatted')
   WRITE(100) A
   CLOSE(unit=100)
+
+  WRITE(*,*) 
+  WRITE(*,*) "A is:"
+  DO i=0,n-1
+    WRITE(*,*) A(:,i) 
+  END DO
+
+  WRITE(*,*) 
+  WRITE(*,*) "-----------------"
+  
 
   !OPEN(unit=100,file='mat',status='old',form='unformatted')
   !READ(100) A
@@ -89,14 +101,9 @@ PROGRAM test
   write(*,*) 
   WRITE(*,*) "my code finished in:", t2-t1 
 
-  !DO i=0,n-1
-  !  DO j=0,i-1
-  !    A(i,j) = 0.0D0
-  !  END DO
-  !END DO
-
   call cpu_time(t1)
-  CALL dsyev('N','U',n,A,n,wshit,WORK,LWORK,INFO) 
+  Anew = A
+  CALL dsyev('N','U',n,Anew,n,wshit,WORK,LWORK,INFO) 
   call cpu_time(t2)
   WRITE(*,*) "The actual values are"
   DO i=0,MIN(m-1,9)
@@ -105,6 +112,31 @@ PROGRAM test
   WRITE(*,*) 
   WRITE(*,*) "lapack finished in", t2-t1
 
+  !//////////////////////////////////////////////////////////////////
+  WRITE(*,*)
+  WRITE(*,*) "Testing Davidson"
+  ALLOCATE(sigma(0:n-1,0))
+  ALLOCATE(b(0:n-1,0))
+  b=0
+  b(0,0) = 1.0D0
+  sigma=0
+
+  DO j=0,n-1
+    sigma(j,0) = A(0,j)*b(j,0)
+  !  write(*,*) A(0,j)*b(j,0)
+  END DO
+
+  !WRITE(*,*) "b is:"
+  !WRITE(*,*) b(:,0)
+
+  !WRITE(*,*) "sigma is:"
+  !WRITE(*,*) sigma(:,0)
+  !WRITE(*,*) sigma
+
+  m = 1
+  CALL linal_davidson_2Dreal8(A(0:n-1,0:n-1),sigma(0:n-1,0:m-1),b(0:n-1,0:m-1),m,n,1,10) 
+
+  !//////////////////////////////////////////////////////////////////
   ! testing GS
   !WRITE(*,*) 
   !WRITE(*,*) "////// TESTING GS //////"
