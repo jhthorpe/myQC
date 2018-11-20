@@ -229,5 +229,191 @@ MODULE linal
   END SUBROUTINE linal_proj_1Dreal8
 
 !---------------------------------------------------------------------
+!       linal_davidson_2Dreal8
+!               James H. Thorpe
+!               Nov 18, 2018
+!       - subroutine that uses davidson's algorithm to iteratively obtain
+!         the k'th eigenvalue from a matrix, A, expanded in subspace of b vectors
+!       - uses BLAS and LAPACK for internal linal
+!       - label in line wth Davidson, JCP, 1975
+!---------------------------------------------------------------------
+  ! Values
+  ! A           : 2D real8, matrix to be partially diagonalized, size [n,n]
+  ! s           : 2D real8, sigma vectors of the expansion A.s, size [n,m]
+  ! b           : 2D real8, b vectors forming the subspace, size[n,m]
+  ! m           : int, size of subspace
+  ! n           : int, size of A matrix
+  ! k           : int, kth eigenvalue is the one we seek 
+  ! texp        : int, exponential of tolerance
+  ! An          : 2D real8, pseudo matrix A^~
+  ! Ap          : 2D real8, copy of An for lapack 
+  ! al          : 1D real8, eigenvector associated with kth eigenvalue
+  ! la          : real8, k'th eigenvalue
+  ! qm          : 1D real8, intermediate vector, size [n]
+  ! qnrm        : real8, eucleian norm of qm
+  ! xi          : 1D real9, intermediate vector, size [n]
+ 
+  SUBROUTINE linal_davidson_2Dreal8(A,s,b,m,n,k,texp)
+    IMPLICIT NONE
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: A,s,b
+    INTEGER(KIND=4), INTENT(INOUT) :: m
+    INTEGER(KIND=4), INTENT(IN) :: k,n,texp
+    !Internal
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: An,Ap,temp1,temp2,one
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: w,work,al,qm,xi,dm,bm
+    REAL(KIND=8) :: la, tol, qnrm
+    INTEGER :: lwork, info
+    INTEGER(KIND=4) :: i,j
+
+    !Initial step
+    ALLOCATE(An(0:m-1,0:m-1)) 
+    ALLOCATE(Ap(0:m-1,0:m-1))
+    ALLOCATE(qm(0:n-1))
+    ALLOCATE(xi(0:n-1))
+    ALLOCATE(dm(0:n-1))
+    ALLOCATE(bm(0:n-1))
+    ALLOCATE(one(0:n-1,0:n-1))
+    ALLOCATE(temp1(0:n-1,0:n-1))
+    ALLOCATE(temp2(0:n-1,0:n-1))
+    An = 0
+    one = 1
+
+    CALL set_tol(texp,tol) 
+
+    WRITE(*,*)
+    WRITE(*,*) "Starting Davidson"
+    WRITE(*,*) "Iteration       eigenvalue      norm" 
+    WRITE(*,*) "sigma vector:"
+    WRITE(*,*) s(:,0)
+    WRITE(*,*) "b vector"
+    WRITE(*,*) b(:,0)
+
+    !form An
+    DO i=0,m-1
+      DO j=0,i
+        An(i,j) = SUM(b(:,j)*s(:,i)) !dot product 
+      END DO
+    END DO
+    Ap = An
+
+    WRITE(*,*) "An is..."
+    WRITE(*,*) An(0:m-1,0:m-1)
+   
+    !diagonalize An, using LAPACK 
+    ALLOCATE(w(0:m-1))
+    ALLOCATE(work(0:1))
+    lwork = -1
+    CALL SSYEV('V','L',m,Ap,m,w,work,lwork,info)
+    lwork = CEILING(MAX(2.0,work(0)))
+    DEALLOCATE(work)
+    ALLOCATE(work(0:lwork-1))
+    CALL SSYEV('V','L',m,Ap,m,w,work,lwork,info)
+
+    !grab kth eigenvalue and eigenvector
+    ALLOCATE(al(0:m-1))
+    al = Ap(0:m-1,k-1)
+    la = w(k-1)
+   
+    !construct qm
+    qm = 0
+    DO i=0,m-1
+      qm = qm + al(i)*(s(0:n-1,i) - la*b(0:n-1,i)) 
+    END DO 
+    qnrm = norm2(qm)
+
+    WRITE(*,*) "qm is:"
+    WRITE(*,*) qm(0:n-1)
+
+    !check convergence (skip on first iteration)
+    WRITE(*,*) " eigenvalue, ||qm||"
+    WRITE(*,*) "1       ",la,"  ",qnrm
+    
+    !form xi
+    xi = 0.0
+    DO i=0,n-1
+      xi(i) = qm(i)/(la - A(i,i))
+    END DO
+
+    WRITE(*,*) "xi is"
+    WRITE(*,*) xi(0:n-1)
+
+    !form dm
+    temp1 = 1.0D0
+    DO i=0,m-1
+      temp2 = 0
+      do j=0,n-1
+        temp2(0:n-1,j) = b(0:n-1,i)*b(j,i) !I am note sure this is right
+      end do
+      temp1 = temp1 * (one - temp2) 
+    END DO
+    dm = temp1*xi
+
+    WRITE(*,*) "dm is:"
+    WRITE(*,*) dm(0:n-1)
+
+    !form bm
+    bm = dm/norm2(dm)
+    WRITE(*,*) "bm is:"
+    WRITE(*,*) bm(0:n-1)
+ 
+    
+    DEALLOCATE(al)
+    DEALLOCATE(w)
+    DEALLOCATE(work)
+    DEALLOCATE(bm)
+    DEALLOCATE(dm)
+    DEALLOCATE(xi)
+    DEALLOCATE(qm)
+    DEALLOCATE(temp1)
+    DEALLOCATE(temp2)
+    DEALLOCATE(An)
+
+  END SUBROUTINE linal_davidson_2Dreal8
+
+!---------------------------------------------------------------------
+!       set_tol
+!               James H. Thorpe
+!               Nov 19, 2018
+!       - sets the tolerance of variable tol
+!---------------------------------------------------------------------
+  SUBROUTINE set_tol(texp,tol)
+    IMPLICIT NONE
+    REAL(KIND=8), INTENT(INOUT) :: tol
+    INTEGER, INTENT(IN) :: texp
+    IF (texp .EQ. 1) THEN
+      tol = 1.0D-1
+    ELSE IF (texp .EQ. 2) THEN
+      tol = 1.0D-2
+    ELSE IF (texp .EQ. 3) THEN
+      tol = 1.0D-3
+    ELSE IF (texp .EQ. 4) THEN
+      tol = 1.0D-4
+    ELSE IF (texp .EQ. 5) THEN
+      tol = 1.0D-5
+    ELSE IF (texp .EQ. 6) THEN
+      tol = 1.0D-6
+    ELSE IF (texp .EQ. 7) THEN
+      tol = 1.0D-7  
+    ELSE IF (texp .EQ. 8) THEN
+      tol = 1.0D-8  
+    ELSE IF (texp .EQ. 9) THEN
+      tol = 1.0D-9
+    ELSE IF (texp .EQ. 10) THEN
+      tol = 1.0D-10
+    ELSE IF (texp .EQ. 11) THEN
+      tol = 1.0D-11
+    ELSE IF (texp .EQ. 12) THEN
+      tol = 1.0D-12
+    ELSE IF (texp .EQ. 13) THEN
+      tol = 1.0D-13
+    ELSE 
+      WRITE(*,*) "Sorry, that convergence is not coded."
+      WRITE(*,*) "Nor should it be, shame on you for thinking that"
+      WRITE(*,*) "I coded this well enough for E-13 convergence"
+    END IF
+  END SUBROUTINE set_tol
+!---------------------------------------------------------------------
+
 
 END MODULE linal
