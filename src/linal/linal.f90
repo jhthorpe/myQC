@@ -234,13 +234,13 @@ MODULE linal
 !               Nov 18, 2018
 !       - subroutine that uses davidson's algorithm to iteratively obtain
 !         the k'th eigenvalue from a matrix, A, expanded in subspace of b vectors
-!       - uses BLAS and LAPACK for internal linal
+!       - uses BLAS and LAPACK for (some) internal linal
 !       - label in line wth Davidson, JCP, 1975
 !---------------------------------------------------------------------
   ! Values
   ! A           : 2D real8, matrix to be partially diagonalized, size [n,n]
-  ! s           : 2D real8, sigma vectors of the expansion A.s, size [n,m]
-  ! b           : 2D real8, b vectors forming the subspace, size[n,m]
+  ! s(_in)      : 2D real8, sigma vectors of the expansion A.s, size [n,m]
+  ! b(_in)      : 2D real8, b vectors forming the subspace, size[n,m]
   ! m           : int, size of subspace
   ! n           : int, size of A matrix
   ! k           : int, kth eigenvalue is the one we seek 
@@ -253,21 +253,23 @@ MODULE linal
   ! qnrm        : real8, eucleian norm of qm
   ! xi          : 1D real9, intermediate vector, size [n]
  
-  SUBROUTINE linal_davidson_2Dreal8(A,s,b,m,n,k,texp)
+  SUBROUTINE linal_davidson_2Dreal8(A,s_in,b_in,m,n,k,texp)
     IMPLICIT NONE
     !Inout
-    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: A,s,b
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: A,s_in,b_in
     INTEGER(KIND=4), INTENT(INOUT) :: m
     INTEGER(KIND=4), INTENT(IN) :: k,n,texp
     !Internal
-    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: An,Ap,temp1,temp2,one
-    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: w,work,al,qm,xi,dm,bm
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: An,Ap,temp1,temp2,temp3,one
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: s,b,stemp,btemp
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: w,work,al,qm,xi,dm,bm,dummy
     REAL(KIND=8) :: la, tol, qnrm
     INTEGER :: lwork, info
     INTEGER(KIND=4) :: i,j
 
     !Initial step
-    ALLOCATE(An(0:m-1,0:m-1)) 
+    ALLOCATE(s(0:n-1,0:m-1))
+    ALLOCATE(b(0:n-1,0:m-1))
     ALLOCATE(Ap(0:m-1,0:m-1))
     ALLOCATE(qm(0:n-1))
     ALLOCATE(xi(0:n-1))
@@ -276,23 +278,34 @@ MODULE linal
     ALLOCATE(one(0:n-1,0:n-1))
     ALLOCATE(temp1(0:n-1,0:n-1))
     ALLOCATE(temp2(0:n-1,0:n-1))
+    ALLOCATE(temp3(0:n-1,0:n-1))
+    ALLOCATE(dummy(0:n-1))
+
+    !FIRST ITERATION STUFF
+    s = s_in
+    b = b_in
     An = 0
-    one = 1
+    one = 1.0D0
+    temp2 = 0.0
+    DO i=0,n-1
+      temp2(i,i) = 1.0D0
+    END DO
 
     CALL set_tol(texp,tol) 
 
-    WRITE(*,*)
-    WRITE(*,*) "Starting Davidson"
-    WRITE(*,*) "Iteration       eigenvalue      norm" 
+    WRITE(*,*) "testing..."
     WRITE(*,*) "sigma vector:"
     WRITE(*,*) s(:,0)
     WRITE(*,*) "b vector"
-    WRITE(*,*) b(:,0)
+    WRITE(*,*) b(0:n-1,0)
+    WRITE(*,*)
+    WRITE(*,*) "Starting Davidson"
+    WRITE(*,*) "Iteration       eigenvalue      norm" 
 
     !form An
     DO i=0,m-1
       DO j=0,i
-        An(i,j) = SUM(b(:,j)*s(:,i)) !dot product 
+        An(i,j) = linal_vTv_1Dreal8(b(0:n-1,j),s(0:n-1,i),n)
       END DO
     END DO
     Ap = An
@@ -314,6 +327,8 @@ MODULE linal
     ALLOCATE(al(0:m-1))
     al = Ap(0:m-1,k-1)
     la = w(k-1)
+
+    !BEGIN ITERATIONS
    
     !construct qm
     qm = 0
@@ -338,17 +353,13 @@ MODULE linal
     WRITE(*,*) "xi is"
     WRITE(*,*) xi(0:n-1)
 
-    !form dm
-    temp1 = 1.0D0
-    DO i=0,m-1
-      temp2 = 0
-      do j=0,n-1
-        temp2(0:n-1,j) = b(0:n-1,i)*b(j,i) !I am note sure this is right
-      end do
-      temp1 = temp1 * (one - temp2) 
-    END DO
-    dm = temp1*xi
-
+    !form dm, this is updated each time
+    temp1 = 0.0D0
+    i = 0
+    CALL linal_vvT_1Dreal8(b(0:n-1,i),b(0:n-1,i),n,temp1)
+    temp2 = MATMUL(one(0:n-1,0:n-1) - temp1(0:n-1,0:n-1),temp2(0:n-1,0:n-1))  
+    CALL linal_smv_2Dreal8(temp2(0:n-1,0:n-1),xi(0:n-1),n)
+    dm(0:n-1) = xi(0:n-1)
     WRITE(*,*) "dm is:"
     WRITE(*,*) dm(0:n-1)
 
@@ -356,8 +367,53 @@ MODULE linal
     bm = dm/norm2(dm)
     WRITE(*,*) "bm is:"
     WRITE(*,*) bm(0:n-1)
- 
+
+    !add new vector to subspace 
+    m = m+1
+    ALLOCATE(btemp(0:n-1,0:m-1))   
+    btemp(0:n-1,0:m-2) = b(0:n-1,0:m-2)
+    btemp(0:n-1,m-1) = bm(0:n-1)
+    DEALLOCATE(b)
+    ALLOCATE(b(0:n-1,0:m-1))
+    b = btemp
+    DEALLOCATE(btemp)
+
+    !generate new sigma vectors
+    ALLOCATE(stemp(0:n-1,0:m-1))
+    stemp(0:n-1,0:m-2) = s(0:n-1,0:m-2)
+    CALL linal_smv_2Dreal8(stemp(0:n-1,0:n-1),bm(0:n-1),n)
+    stemp(0:n-1,m-1) = bm(0:n-1)
+    DEALLOCATE(s)
+    ALLOCATE(s(0:n-1,0:m-1))
+    s(0:n-1,0:m-1) = stemp(0:n-1,0:m-1)
+    DEALLOCATE(stemp)
     
+    !generate new A~ matrix
+    DEALLOCATE(Ap)
+    ALLOCATE(Ap(0:n-1,0:m-1))
+    Ap(0:n-1,0:m-2) = An(0:n-1,0:m-2)
+    DEALLOCATE(An)
+    DO i=0,m-1
+      Ap(i,m-1) = linal_vTv_1Dreal8(b(0:n-1,i),s(0:n-1,m-1),n)
+    END DO
+    ALLOCATE(An(0:n-1,0:m-1))
+    An = Ap
+
+    !diagonalize An, using LAPACK 
+    ALLOCATE(w(0:m-1))
+    ALLOCATE(work(0:1))
+    lwork = -1
+    CALL SSYEV('V','L',m,Ap,m,w,work,lwork,info)
+    lwork = CEILING(MAX(2.0,work(0)))
+    DEALLOCATE(work)
+    ALLOCATE(work(0:lwork-1))
+    CALL SSYEV('V','L',m,Ap,m,w,work,lwork,info)
+
+    !grab kth eigenvalue and eigenvector
+    ALLOCATE(al(0:m-1))
+    al = Ap(0:m-1,k-1)
+    la = w(k-1)
+3
     DEALLOCATE(al)
     DEALLOCATE(w)
     DEALLOCATE(work)
@@ -367,7 +423,12 @@ MODULE linal
     DEALLOCATE(qm)
     DEALLOCATE(temp1)
     DEALLOCATE(temp2)
+    DEALLOCATE(temp3)
+    DEALLOCATE(dummy)
     DEALLOCATE(An)
+    DEALLOCATE(Ap)
+    DEALLOCATE(s)
+    DEALLOCATE(b)
 
   END SUBROUTINE linal_davidson_2Dreal8
 
@@ -413,7 +474,85 @@ MODULE linal
       WRITE(*,*) "I coded this well enough for E-13 convergence"
     END IF
   END SUBROUTINE set_tol
+
 !---------------------------------------------------------------------
+!       linal_vvT_1Dreal8
+!               James H. Thorpe
+!               Nov 23, 2018
+!       -Subroutine that performs v1*v2^T, to form matrix A
+!---------------------------------------------------------------------
+  !values
+  !v1           : 1D real8, vector1 [N]
+  !v2           : 1D real8, vector2 [N]
+  !N            : 1D real8, size of v1,2
+  !A            : 2D real8, array created, [NxN]
+  SUBROUTINE linal_vvT_1Dreal8(v1,v2,N,A)
+    IMPLICIT NONE
+    !Inout
+    REAL(KIND=8),DIMENSION(0:,0:),INTENT(INOUT) :: A
+    REAL(KIND=8),DIMENSION(0:),INTENT(IN) :: v1,v2
+    INTEGER(KIND=4),INTENT(IN) :: N
+    !Internal
+    INTEGER(KIND=4) :: i
+    DO i=0,N-1
+      A(0:N-1,i) = v1(0:N-1)*v2(i)
+    END DO
+  END SUBROUTINE linal_vvT_1Dreal8
 
+!---------------------------------------------------------------------
+!       linal_smv_2Dreal8
+!               James H. Thorpe
+!               Nov 23, 2018
+!       -Subroutine that calculates A*v, where A is an [N,N] matrix,
+!         b [N] vector
+!       -results are stored in the v vector
+!---------------------------------------------------------------------
+  !Values
+  !A            : 2Dreal8, square matrix to multiply, [N,N]
+  !v            : 1Dreal8, vector to multiply [N]
+  !N            : int, size of matrix
+  SUBROUTINE linal_smv_2Dreal8(A,v,N)
+    IMPLICIT NONE
+    !Inout
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: A
+    REAL(KIND=8), DIMENSION(0:), INTENT(INOUT) :: v
+    INTEGER(KIND=4), INTENT(IN) :: N
+    !Internal
+    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: temp
+    INTEGER(KIND=4) :: i
+    ALLOCATE(temp(0:N-1))
+    temp = 0.0D0
+    DO i=0,N-1
+      temp(i) = linal_vTv_1Dreal8(A(i,0:N-1),v(0:N-1),N) 
+    END DO
+    v(0:N-1) = temp(0:N-1)
+    DEALLOCATE(temp)
+  END SUBROUTINE linal_smv_2Dreal8
 
+!---------------------------------------------------------------------
+!       linal_vTv_1Dreal8
+!               James H. Thorpe
+!               Nov 23, 2018
+!       -Function that caluclates v1^T*v2
+!---------------------------------------------------------------------
+  !Values
+  !v1           : 1D real8, vector1 [N]
+  !v2           : 1D real8, vector2 [N]
+  !N            : int, size of v1,2 
+  REAL(KIND=8) FUNCTION linal_vTv_1Dreal8(v1,v2,N)
+    IMPLICIT NONE
+    !Inout
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: v1,v2
+    INTEGER(KIND=4), INTENT(IN) :: N
+    !Internal
+    REAL(KIND=8) :: temp
+    INTEGER(KIND=4) :: i
+    temp = 0.0D0
+    DO i=0,N-1
+      temp = temp + v1(i)*v2(i)
+    END DO
+    linal_vTv_1Dreal8 = temp
+  END FUNCTION linal_vTv_1Dreal8
+
+!---------------------------------------------------------------------
 END MODULE linal
