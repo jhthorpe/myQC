@@ -4,8 +4,8 @@ PROGRAM test
   IMPLICIT NONE
   
   !lanczos
-  REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: A,S,Anew
-  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: V,W,X,Y,Td,Ts
+  REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: A,S,Anew,VL,VR
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: V,W,X,Y,Td,Ts,WR,WI
   INTEGER(KIND=4) :: n,m,i,j
   REAL(KIND=8) :: t1,t2
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: sigma,b
@@ -22,6 +22,31 @@ PROGRAM test
 
   !testing lanczos
   CALL random_seed(iseed)
+ 
+  ALLOCATE(A(0:1,0:1))
+  ALLOCATE(WR(0:1))
+  ALLOCATE(WI(0:1))
+  ALLOCATE(VL(0:1,0:1))
+  ALLOCATE(VR(0:1,0:1))
+  ALLOCATE(WORK(0:10))
+  A(0,0) = 1
+  A(1,0) = 3
+  A(0,1) = 3
+  A(1,1) = 1
+  CALL linal_printmat_2Dreal8(A,2,2)
+  CALL DGEEV('N','V',2,A,2,WR,WI,VL,2,VR,2,WORK,11,i)
+  WRITE(*,*) "Eigenvalues"
+  WRITE(*,*) WR(0)
+  WRITE(*,*) WR(1)
+  WRITE(*,*) "Eigenvectors"
+  !CALL linal_printmat_2Dreal8(VR,2,2)
+  WRITE(*,*) VR
+  WRITE(*,*) "orthonormal..."
+  WRITE(*,*) VR(0,0:1)/SUM(VR(0,0:1)*VR(0,0:1))
+  WRITE(*,*) VR(1,0:1)/SUM(VR(1,0:1)*VR(1,0:1))
+  WRITE(*,*) VR(0:1,0)/SUM(VR(0:1,0)*VR(0:1,0))
+  WRITE(*,*) VR(0:1,1)/SUM(VR(0:1,1)*VR(0:1,1))
+  STOP
 
   n = 3
   m = 1
