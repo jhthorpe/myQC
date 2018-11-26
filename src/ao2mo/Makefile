@@ -9,13 +9,13 @@ all : $(objects)
 
 ao2mo.o : ao2mo.f90
 #hipergator
-	$(FC) $(FFLAGS) $(LINAL) -o ao2mo.o ao2mo.f90 -CB $(envprog) -I$(envdir) \
+#	$(FC) $(FFLAGS) $(LINAL) -o ao2mo.o ao2mo.f90 -CB $(envprog) -I$(envdir) \
 	-L$(MKL) \
 	-Wl,-R$(MKL) -lmkl_lapack95_lp64 \
 	-lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lm
 
 #local
-#	$(FC) $(FFLAGS) -o ao2mo.o ao2mo.f90 $(envprog) -I$(envdir) $(LINAL)
+	$(FC) $(FFLAGS) -o ao2mo.o ao2mo.f90 $(envprog) -I$(envdir) $(LINAL)
 
 clean :
 	rm -f *.o *.mod

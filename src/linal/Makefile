@@ -12,7 +12,7 @@ all: $(objects)
 
 linal.o : linal.f90
 #mkl on hpg
-	$(FC) $(FFLAGS) $(LINAL) -c linal.f90 $(envprog) -I$(envdir) \
+#	$(FC) $(FFLAGS) $(LINAL) -c linal.f90 $(envprog) -I$(envdir) \
 	-L$(MKL) \
 	-Wl,-R$(MKL) -lmkl_lapack95_lp64 \
 	-lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lm
@@ -21,6 +21,10 @@ linal.o : linal.f90
 	-L/home/james.thorpe/bin/lapack-gnu/lapack-release/bin
 #	$(FC) $(FFLAGS) -c linal.f90 /home/james.thorpe/bin/lapack-gnu/lapack-release/bin/*.a \
 	-L/home/james.thorpe/bin/lapack-gnu/lapack-release/bin -llapack -lblas
+#local
+	$(FC) $(FFLAGS) $(LINAL) -c linal.f90 $(envprog) -I$(envdir) \
+	$(LINAL)
+
 
 linal.mod : linal.f90 linal.o
 
