@@ -797,7 +797,7 @@ PROGRAM ao2mo
       END DO
     END DO
     DEALLOCATE(Nm)
-    WRITE(*,*) "Transforming (ia|jdb) -> <ij|ab>"
+    WRITE(*,*) "Transforming (ia|jb) -> <ij|ab>"
     WRITE(*,*) "Writing to ijab_BB" 
     OPEN(unit=106,file="ijab_BB",status="replace",form="unformatted")
     DO i=0,noccB-2

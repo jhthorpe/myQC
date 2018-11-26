@@ -284,8 +284,8 @@ MODULE linal
     ALLOCATE(temp3(0:n-1,0:n-1))
 
     !FIRST ITERATION STUFF
-    s = s_in
-    b = b_in
+    s(0:n-1,0:m-1) = s_in(0:n-1,0:m-1)
+    b(0:n-1,0:m-1) = b_in(0:n-1,0:m-1)
     An = 0
     one = 1.0D0
     temp2 = 0.0
@@ -307,8 +307,8 @@ MODULE linal
     END DO
     Ap = An
 
-    WRITE(*,*) "An is..."
-    CALL linal_printmat_2Dreal8(An(0:m-1,0:m-1),m,m) 
+    !WRITE(*,*) "An is..."
+    !CALL linal_printmat_2Dreal8(An(0:m-1,0:m-1),m,m) 
    
     !diagonalize An, using LAPACK 
     ALLOCATE(w(0:m-1))
@@ -325,10 +325,10 @@ MODULE linal
     al = Ap(0:m-1,k-1)
     la = w(k-1)
 
-    WRITE(*,*) "Eigenvector is..."
-    WRITE(*,*) al(0:m-1)
-    WRITE(*,*) "Eigenvalue is"
-    WRITE(*,*) la
+    !WRITE(*,*) "Eigenvector is..."
+    !WRITE(*,*) al(0:m-1)
+    !WRITE(*,*) "Eigenvalue is"
+    !WRITE(*,*) la
     
     !Initial eigs, force and extra iteration
     eigs(0) = la
@@ -338,7 +338,7 @@ MODULE linal
     DO  WHILE (.NOT. conv) 
 
       !check we aren't over the limit
-      IF (m .GT. n) THEN
+      IF (m .GT. 100) THEN
         WRITE(*,*) "Davidson failed to converge"
         EXIT
       END IF
@@ -350,12 +350,12 @@ MODULE linal
       END DO 
       qnrm = norm2(qm)
 
-      WRITE(*,*) "qm is:"
-      WRITE(*,*) qm(0:n-1)
+      !WRITE(*,*) "qm is:"
+      !WRITE(*,*) qm(0:n-1)
   
       !check convergence
       WRITE(*,*) m,"  ", la,"  ",qnrm
-      IF (ABS(eigs(0) - eigs(1)) .LT. tol) THEN
+      IF (ABS(eigs(0) - eigs(1)) .LT. tol .OR. qnrm .LT. tol) THEN
         WRITE(*,*) "Davidson has converged!"     
         conv = .TRUE.
       END IF
@@ -366,8 +366,8 @@ MODULE linal
         xi(i) = qm(i)/(la - A(i,i))
       END DO
 
-      WRITE(*,*) "xi is"
-      WRITE(*,*) xi(0:n-1)
+      !WRITE(*,*) "xi is"
+      !WRITE(*,*) xi(0:n-1)
 
       !form dm, this is updated each time
       temp1 = 0.0D0
@@ -376,18 +376,18 @@ MODULE linal
       temp2 = MATMUL(one(0:n-1,0:n-1) - temp1(0:n-1,0:n-1),temp2(0:n-1,0:n-1))  
       CALL linal_smv_2Dreal8(temp2(0:n-1,0:n-1),xi(0:n-1),n)
       dm(0:n-1) = xi(0:n-1)
-      WRITE(*,*) "dm is:"
-      WRITE(*,*) dm(0:n-1)
+      !WRITE(*,*) "dm is:"
+      !WRITE(*,*) dm(0:n-1)
 
       !form bm
       bm = dm/norm2(dm)
-      WRITE(*,*) "bm is:"
-      WRITE(*,*) bm(0:n-1)
+      !WRITE(*,*) "bm is:"
+      !WRITE(*,*) bm(0:n-1)
 
       !add new vector to subspace 
       m = m+1
-      WRITE(*,*) "B before is..."
-      CALL linal_printmat_2Dreal8(b(0:n-1,0:m-1),n,m)  
+      !WRITE(*,*) "B before is..."
+      !CALL linal_printmat_2Dreal8(b(0:n-1,0:m-1),n,m)  
       ALLOCATE(btemp(0:n-1,0:m-1))   
       btemp(0:n-1,0:m-2) = b(0:n-1,0:m-2)
       btemp(0:n-1,m-1) = bm(0:n-1)
@@ -395,13 +395,13 @@ MODULE linal
       ALLOCATE(b(0:n-1,0:m-1))
       b = btemp
       DEALLOCATE(btemp)
-      WRITE(*,*) "B after is"
-      CALL linal_printmat_2Dreal8(b(0:n-1,0:m-1),n,m)  
+      !WRITE(*,*) "B after is"
+      !CALL linal_printmat_2Dreal8(b(0:n-1,0:m-1),n,m)  
 
       !generate new sigma vectors
-      WRITE(*,*)
-      WRITE(*,*) "S before is..."
-      CALL linal_printmat_2Dreal8(s(0:n-1,0:m-1),n,m)  
+      !WRITE(*,*)
+      !WRITE(*,*) "S before is..."
+      !CALL linal_printmat_2Dreal8(s(0:n-1,0:m-1),n,m)  
       ALLOCATE(stemp(0:n-1,0:m-1))
       stemp(0:n-1,0:m-2) = s(0:n-1,0:m-2)
       CALL linal_smv_2Dreal8(A(0:n-1,0:n-1),bm(0:n-1),n)
@@ -410,13 +410,13 @@ MODULE linal
       ALLOCATE(s(0:n-1,0:m-1))
       s(0:n-1,0:m-1) = stemp(0:n-1,0:m-1)
       DEALLOCATE(stemp)
-      WRITE(*,*) "S after is..."
-      CALL linal_printmat_2Dreal8(s(0:n-1,0:m-1),n,m)  
+      !WRITE(*,*) "S after is..."
+      !CALL linal_printmat_2Dreal8(s(0:n-1,0:m-1),n,m)  
     
       !generate new A~ matrix
-      WRITE(*,*) 
-      WRITE(*,*) "Old A~"
-      CALL linal_printmat_2Dreal8(An(0:m-2,0:m-2),m-1,m-1)
+      !WRITE(*,*) 
+      !WRITE(*,*) "Old A~"
+      !CALL linal_printmat_2Dreal8(An(0:m-2,0:m-2),m-1,m-1)
       DEALLOCATE(Ap)
       ALLOCATE(Ap(0:m-1,0:m-1))
       Ap = 0.0D0
@@ -427,10 +427,9 @@ MODULE linal
       END DO
       ALLOCATE(An(0:m-1,0:m-1))
       An = Ap
-      WRITE(*,*) "New A~"
-      CALL linal_printmat_2Dreal8(An(0:m-1,0:m-1),m,m)
+      !WRITE(*,*) "New A~"
+      !CALL linal_printmat_2Dreal8(An(0:m-1,0:m-1),m,m)
 
-      WRITE(*,*) "HEre 4"
       !diagonalize An, using LAPACK 
       DEALLOCATE(w)
       DEALLOCATE(work)
@@ -438,21 +437,22 @@ MODULE linal
       ALLOCATE(work(0:1))
       lwork = -1
       CALL DSYEV('V','U',m,Ap,m,w,work,lwork,info)
-      WRITE(*,*) "HEre 5"
       lwork = CEILING(MAX(2.0,work(0)))
-      WRITE(*,*) "lwork is...", lwork
       DEALLOCATE(work)
       ALLOCATE(work(0:lwork-1))
       CALL DSYEV('V','U',m,Ap,m,w,work,lwork,info)
 
-      WRITE(*,*) "HEre 6"
       !grab kth eigenvalue and eigenvector
       DEALLOCATE(al)
       ALLOCATE(al(0:m-1))
       al = Ap(0:m-1,k-1)
       la = w(k-1)
 
-      STOP
+      !WRITE(*,*) "new eigenvalue:"
+      !WRITE(*,*) la
+      !WRITE(*,*) "new eigenvector:"
+      !WRITE(*,*) al(0:m-1)
+      !WRITE(*,*) "----------------------"
 
     END DO
 

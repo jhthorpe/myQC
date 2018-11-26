@@ -23,31 +23,6 @@ PROGRAM test
   !testing lanczos
   CALL random_seed(iseed)
  
-  ALLOCATE(A(0:1,0:1))
-  ALLOCATE(WR(0:1))
-  ALLOCATE(WI(0:1))
-  ALLOCATE(VL(0:1,0:1))
-  ALLOCATE(VR(0:1,0:1))
-  ALLOCATE(WORK(0:10))
-  A(0,0) = 1
-  A(1,0) = 3
-  A(0,1) = 3
-  A(1,1) = 1
-  CALL linal_printmat_2Dreal8(A,2,2)
-  CALL DGEEV('N','V',2,A,2,WR,WI,VL,2,VR,2,WORK,11,i)
-  WRITE(*,*) "Eigenvalues"
-  WRITE(*,*) WR(0)
-  WRITE(*,*) WR(1)
-  WRITE(*,*) "Eigenvectors"
-  !CALL linal_printmat_2Dreal8(VR,2,2)
-  WRITE(*,*) VR
-  WRITE(*,*) "orthonormal..."
-  WRITE(*,*) VR(0,0:1)/SUM(VR(0,0:1)*VR(0,0:1))
-  WRITE(*,*) VR(1,0:1)/SUM(VR(1,0:1)*VR(1,0:1))
-  WRITE(*,*) VR(0:1,0)/SUM(VR(0:1,0)*VR(0:1,0))
-  WRITE(*,*) VR(0:1,1)/SUM(VR(0:1,1)*VR(0:1,1))
-  STOP
-
   n = 3
   m = 1
 
@@ -121,35 +96,36 @@ PROGRAM test
   WRITE(*,*) "Smallest eigenvalue..."
   WRITE(*,*) MINVAL(Td(:))
   write(*,*)
-  write(*,*) "eigenvectors are"
   
   write(*,*) 
   WRITE(*,*) "my code finished in:", t2-t1 
 
   call cpu_time(t1)
   Anew = A
-  CALL dsyev('N','U',n,Anew,n,wshit,WORK,LWORK,INFO) 
+  CALL dsyev('V','U',n,Anew,n,wshit,WORK,LWORK,INFO) 
   call cpu_time(t2)
-  WRITE(*,*) "The actual values are"
-  DO i=0,MIN(m-1,9)
-    WRITE(*,*) wshit(i)
-  END DO
-  WRITE(*,*) 
+  WRITE(*,*) "The actual value is"
+  WRITE(*,*) wshit(0)
+  WRITE(*,*) "actual eigenvector is"
+  WRITE(*,*) Anew(0:n-1,0)
   WRITE(*,*) "lapack finished in", t2-t1
+  WRITE(*,*) 
 
   !//////////////////////////////////////////////////////////////////
-  WRITE(*,*)
-  WRITE(*,*) "Testing Davidson"
+  !DAVIDSON
   ALLOCATE(sigma(0:n-1,0))
   ALLOCATE(b(0:n-1,0))
   b=0
-  b(0,0) = 1.0D0
-  sigma=0
-
-  DO j=0,n-1
-    sigma(j,0) = A(0,j)*b(j,0)
-  !  write(*,*) A(0,j)*b(j,0)
-  END DO
+  sigma = 0
+  b(0,0) = 0.90D0
+  b(1,0) = 0.0D0
+  b(2,0) = 0.0D0
+  WRITE(*,*) "b is..."
+  WRITE(*,*) b(0:n-1,0)
+  sigma(0:n-1,0) = b(0:n-1,0)
+  CALL linal_smv_2Dreal8(A(0:n-1,0:n-1),sigma(0:n-1,0),n)
+  WRITE(*,*) "sigma is:"
+  WRITE(*,*) sigma(0:n-1,0)
 
   !WRITE(*,*) "b is:"
   !WRITE(*,*) b(:,0)
