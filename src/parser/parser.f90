@@ -33,7 +33,7 @@ PROGRAM parser
   !10) multiplicity	: int
   !11) units		: 0-angstrom,1-bohr
   !12) ao2mo alg        : 0-fast,1-slow
-  !13) excitation       : 0-none,
+  !13) excitation       : 0-none,1-cis
   !14) root algorithm   : 0-lanczos
   !15) number ex. states: number
 
@@ -89,7 +89,13 @@ PROGRAM parser
   !build molecule
   CALL build(atoms,radii,options,xyz)
 
-  CLOSE (unit=1, status="keep")
+  !check no contradicting options
+  flag = check_options(options)
+  IF (flag) THEN
+    WRITE(*,*) "==========================================="
+    STOP "Bad options in ZMAT"
+  END IF
+
   WRITE(*,*) "==========================================="
 
   !if requested, print options
@@ -715,16 +721,16 @@ PROGRAM parser
     INTEGER(KIND=8), DIMENSION(0:), INTENT(IN) ::  options
 999 FORMAT(1x,A22,I8)
     WRITE(*,*) "Options"
-    WRITE(*,*) "Basis               : ",options(2)
-    WRITE(*,*) "Calculation         : ",options(1)
-    WRITE(*,*) "Charge              : ",options(9)
-    WRITE(*,*) "Memory (MB)         : ",options(6)
-    WRITE(*,*) "Multiplicity        : ",options(10)
-    WRITE(*,*) "Nodes               : ",options(5)
-    WRITE(*,*) "Parallel Algorithm  : ",options(4)
     WRITE(*,*) "Read type           : ",options(0)
+    WRITE(*,*) "Calculation         : ",options(1)
+    WRITE(*,*) "Basis               : ",options(2)
     WRITE(*,*) "Reference           : ",options(3)
+    WRITE(*,*) "Parallel Algorithm  : ",options(4)
+    WRITE(*,*) "Nodes               : ",options(5)
+    WRITE(*,*) "Memory (MB)         : ",options(6)
     WRITE(*,*) "SCF Convergence     : ",options(8)
+    WRITE(*,*) "Charge              : ",options(9)
+    WRITE(*,*) "Multiplicity        : ",options(10)
     WRITE(*,*) "Units               : ",options(11)
     WRITE(*,*) "ao2mo               : ",options(12)
     WRITE(*,*) "excite              : ",options(13)
@@ -733,5 +739,30 @@ PROGRAM parser
     WRITE(*,*) "==========================================="
   END SUBROUTINE print_options
 !---------------------------------------------------------------------
+!			Check options	
+!---------------------------------------------------------------------
+  LOGICAL FUNCTION check_options(options)
+    IMPLICIT NONE
+    INTEGER(KIND=8), DIMENSION(0:), INTENT(IN) :: options
+    LOGICAL :: flag
 
+    flag = .TRUE. 
+
+    !Excitation checks
+    IF (options(13) .NE. 0) THEN
+      IF (options(1) .NE. 0) THEN
+        WRITE(*,*) "Sorry, only SCF CIS coded"
+        flag = .FALSE.
+      END IF
+      IF (options(3) .NE. 1) THEN
+        WRITE(*,*) "Sorry, only UHF CIS references are coded"
+        flag = .FALSE.
+      END IF
+    END IF
+
+    check_options = flag
+
+  END FUNCTION check_options
+
+!---------------------------------------------------------------------
 END PROGRAM parser

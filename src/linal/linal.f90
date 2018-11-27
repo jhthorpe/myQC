@@ -109,14 +109,14 @@ MODULE linal
     CALL DSTEDC('I',m,Td,Ts,evec,m,work,-1,iwork,2,info)
     WRITE(*,*) "work is:", work
     lwork = CEILING(MAX(2.0,work(0)))
-    WRITE(*,*) "lwork is", lwork
+    !WRITE(*,*) "lwork is", lwork
     DEALLOCATE(work)
     ALLOCATE(work(0:lwork-1))
 
     CALL DSTEDC('I',m,Td,Ts,evec,m,work,lwork,iwork,-1,info)
     WRITE(*,*) "iwork is:", iwork 
     liwork = MAX(2,iwork(0))
-    WRITE(*,*) "liwork is", liwork
+    !WRITE(*,*) "liwork is", liwork
     DEALLOCATE(iwork)
     ALLOCATE(iwork(0:liwork-1))
    

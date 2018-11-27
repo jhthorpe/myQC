@@ -68,7 +68,8 @@ PROGRAM myQC
   END IF
 
 !~~~~
-IF (options(1) .GT. 0) THEN
+!ao2mo transform
+IF (options(1) .GT. 0 .OR. options(13) .GT. 0) THEN
   CALL EXECUTE_COMMAND_LINE('ao2mo')
   INQUIRE (file='error',EXIST=ex)
   IF (ex) THEN
@@ -76,7 +77,9 @@ IF (options(1) .GT. 0) THEN
     STOP "Error from ao2mo"
   END IF
 END IF
+
 !~~~
+!mp2
 IF (options(1) .EQ. 1) THEN
   CALL EXECUTE_COMMAND_LINE('mp2')
   INQUIRE (file='error',EXIST=ex)
@@ -84,10 +87,10 @@ IF (options(1) .EQ. 1) THEN
     WRITE(*,*) "Error from mp2, exiting"
     STOP "Error from mp2"
   END IF
-END IF
 
 !~~~
-IF (options(1) .EQ. 2) THEN
+!cis
+ELSE IF (options(13) .EQ. 1) THEN
   CALL EXECUTE_COMMAND_LINE('CIS')
   INQUIRE (file='error',EXIST=ex)
   IF (ex) THEN

@@ -15,8 +15,11 @@ export bindir = /Users/jamesthorpe/local-hbar/myQC/myQC/bin
 export LFLAGS=-rcs
 export LC=ar
 
+#both
+export pwd = $(shell pwd)
+export ML= $(pwd)/linal
 
-progdirs:= myQC parser clean integrals I2G dens scf ao2mo mp2 linal 
+progdirs:= myQC parser clean integrals I2G dens scf ao2mo mp2 linal CIS 
 
 .PHONY: all prog clean
 
