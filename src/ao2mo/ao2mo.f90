@@ -18,7 +18,6 @@
   ! noccB       :       int, number of electrons in beta orbitals
   ! options     :       1D int, options array
   ! ntot        :       int, total number of orbitals
-  ! 
 
 PROGRAM ao2mo
   USE env
@@ -499,7 +498,7 @@ PROGRAM ao2mo
     !first index (uv|ld) -> (iv|ld)
     WRITE(*,*) "Transforming (uv|ld) -> <ij|ab>"
     ALLOCATE(Lm(0:noccA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(noccA,ntot,ntot,ntot,ntot,Km,Cm(0:ntot-1,0:noccA-1,Lm)
+    CALL idx1_trans(noccA,ntot,ntot,ntot,ntot,Km,Cm(0:ntot-1,0:noccA-1),Lm)
     DEALLOCATE(Km)
 
     !second index (iv|ld) -> (ia|ld) 
@@ -937,7 +936,7 @@ PROGRAM ao2mo
 
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntotA-1),Lm)
+    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
 
     !second index (av|ld) -> (ai|ld) 
     ALLOCATE(Mm(0:nvrtA-1,0:noccA-1,0:ntot-1,0:ntot-1))
@@ -951,7 +950,7 @@ PROGRAM ao2mo
 
     !fourth index (ai|jd) -> (ai|jb) 
     ALLOCATE(Om(0:nvrtA-1,0:noccA-1,0:noccA-1,0:nvrtA-1))
-    CALL idx4_trans(nvrtA,noccA,noccA,nvrtA,ntot,Nm,CmA(0:ntot-1,noccA:ntot-1,Om)
+    CALL idx4_trans(nvrtA,noccA,noccA,nvrtA,ntot,Nm,CmA(0:ntot-1,noccA:ntot-1),Om)
     DEALLOCATE(Nm)
     
     !We are writing vector by vector
@@ -981,11 +980,11 @@ PROGRAM ao2mo
 
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntotA-1),Lm)
+    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
 
     !second index (av|ld) -> (ab|ld) 
     ALLOCATE(Mm(0:nvrtA-1,0:nvrtA-1,0:ntot-1,0:ntot-1))
-    CALL idx2_trans(nvrtA,nvrtA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,noccA:ntotA-1),Mm)
+    CALL idx2_trans(nvrtA,nvrtA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,noccA:ntot-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ab|ld) -> (ab|jd) 
@@ -995,7 +994,7 @@ PROGRAM ao2mo
 
     !fourth index (ab|jd) -> (ab|ji) 
     ALLOCATE(Om(0:nvrtA-1,0:nvrtA-1,0:noccA-1,0:noccA-1))
-    CALL idx4_trans(nvrtA,nvrtA,noccA,noccA,ntot,Nm,CmA(0:ntot-1,0:noccA-1,Om)
+    CALL idx4_trans(nvrtA,nvrtA,noccA,noccA,ntot,Nm,CmA(0:ntot-1,0:noccA-1),Om)
     DEALLOCATE(Nm)
 
     !We are writing vector by vector
@@ -1016,6 +1015,51 @@ PROGRAM ao2mo
       END DO
     END DO
     CLOSE(unit=107)
+    DEALLOCATE(Om)
+    DEALLOCATE(vec)
+
+    !Spin Case AB
+    WRITE(*,*) "Spin Case AB"
+    !(uv|ld) -> (ai|jb) -> <aj|ib>
+    WRITE(*,*) "Transforming (uv|ld) -> <aj|ib>"
+  
+    !first index (uv|ld) -> (av|ld)
+    ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
+
+    !second index (av|ld) -> (ai|ld) 
+    ALLOCATE(Mm(0:nvrtA-1,0:noccA-1,0:ntot-1,0:ntot-1))
+    CALL idx2_trans(nvrtA,noccA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,0:ntot-1),Mm)
+    DEALLOCATE(Lm)
+
+    !third index (ai|ld) -> (ai|jd) 
+    ALLOCATE(Nm(0:nvrtA-1,0:noccA-1,0:noccB-1,0:ntot-1))
+    CALL idx3_trans(nvrtA,noccA,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
+    DEALLOCATE(Mm)
+
+    !fourth index (ai|jd) -> (ai|jb) 
+    ALLOCATE(Om(0:nvrtA-1,0:noccA-1,0:noccB-1,0:nvrtB-1))
+    CALL idx4_trans(nvrtA,noccA,noccB,nvrtB,ntot,Nm,CmB(0:ntot-1,noccB:ntot-1),Om)
+    DEALLOCATE(Nm)
+    
+    !We are writing vector by vector
+    WRITE(*,*) "Writing to ajib_AA" 
+    ALLOCATE(vec(0:noccA*nvrtA-1))
+    OPEN(unit=108,file="ajib_AB",status="replace",form="unformatted")
+    DO j=0,noccB-1
+      DO b=0,nvrtB-1
+        vec = 0.0D0
+        idx = 0
+        DO i=0,noccA-1
+          DO a=0,nvrtA-1
+            vec(idx) = Om(a,i,j,b)
+            idx = idx + 1  
+          END DO
+        END DO
+        WRITE(108) vec(0:noccA*nvrtA-1)
+      END DO
+    END DO
+    CLOSE(unit=108)
     DEALLOCATE(Om)
     DEALLOCATE(vec)
 
