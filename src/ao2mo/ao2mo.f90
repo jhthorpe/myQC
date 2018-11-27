@@ -885,12 +885,14 @@ PROGRAM ao2mo
     DEALLOCATE(CmB) 
 
   END SUBROUTINE slow_ao2mo_MP2_UHF
+
 !---------------------------------------------------------------------
 !       slow_ao2mo_CIS_UHF
 !               James H. Thorpe
 !               Nov. 1, 2018
 !       -uses do loops to create ajib_AA, ajbi_AA, ajib_AB, ajib_BB,
 !          and ajbi_BB 
+!	-this is terrible, aweful code of which I am not proud
 !---------------------------------------------------------------------
   !Variables
   ! noccA,B     :       int, number of occupied A,B orbitals
@@ -926,84 +928,31 @@ PROGRAM ao2mo
     READ(101,*) CmB(:,:)
     CLOSE(unit=101)
 
-
     !Spin Case AA
     WRITE(*,*) "Spin Case AA"
-    !(uv|ld) -> (ai|jb)
-    WRITE(*,*) "Transforming (uv|ld) -> <ai|jb>"
+
+    !------------------------------
+    !(uv|ld) -> (ai|jb) -> <aj|ib>
+    WRITE(*,*) "Transforming (uv|ld) -> <aj|ib>"
+
     !first index (uv|ld) -> (av|ld)
-    !WRITE(*,*) "Transforming (uv|ld) -> (av|ld)"
     ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    Lm = 0.0D0
-    DO a=0,nvrtA-1
-      DO v=0,ntot-1
-        DO l=0,ntot-1
-          DO d=0,ntot-1
-            sum1 = 0.0D0
-            DO u=0,ntot-1
-              sum1 = sum1 + (Km(u,v,l,d) & 
-                            *CmA(u,a+noccA))
-            END DO
-            Lm(a,v,l,d) = sum1
-          END DO
-        END DO
-      END DO
-    END DO
+    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntotA-1),Lm)
+
     !second index (av|ld) -> (ai|ld) 
-    !WRITE(*,*) "Transforming (av|ld) -> (ai|ld)"
     ALLOCATE(Mm(0:nvrtA-1,0:noccA-1,0:ntot-1,0:ntot-1))
-    DO a=0,nvrtA-1
-      DO i=0,noccA-1
-        DO l=0,ntot-1
-          DO d=0,ntot-1
-            sum1 = 0.0D0
-            DO v=0,ntot-1
-              sum1 = sum1 + (Lm(a,v,l,d) &
-                     *CmA(v,a+noccA))
-            END DO
-            Mm(a,i,l,d) = sum1
-          END DO
-        END DO
-      END DO 
-    END DO
+    CALL idx2_trans(nvrtA,noccA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,0:ntot-1),Mm)
     DEALLOCATE(Lm)
+
     !third index (ai|ld) -> (ai|jd) 
-    !WRITE(*,*) "Transforming (ai|ld) -> (ai|jd)"
     ALLOCATE(Nm(0:nvrtA-1,0:noccA-1,0:noccA-1,0:ntot-1))
-    DO a=0,nvrtA-1
-      DO i=0,noccA-1
-        DO j=0,noccA-1
-          DO d=0,ntot-1
-            sum1 = 0.0D0
-            DO l=0,ntot-1
-              sum1 = sum1 + (Mm(a,i,l,d) &
-                     *CmA(l,j))
-            END DO
-            Nm(a,i,j,d) = sum1
-          END DO
-        END DO
-      END DO
-    END DO
+    CALL idx3_trans(nvrtA,noccA,noccA,ntot,ntot,Mm,CmA(0:ntot-1,0:noccA-1),Nm)
     DEALLOCATE(Mm)
+
     !fourth index (ai|jd) -> (ai|jb) 
-    !WRITE(*,*) "Transforming (ai|jd) -> (ai|jb)"
     ALLOCATE(Om(0:nvrtA-1,0:noccA-1,0:noccA-1,0:nvrtA-1))
-    DO a=0,nvrtA-1
-      DO i=0,noccA-1
-        DO j=0,noccA-1
-          DO b=0,nvrtA-1
-            sum1 = 0.0D0
-            DO d=0,ntot-1
-              sum1 = sum1 + (Nm(a,i,j,d) &
-                     *CmA(d,b+noccA))
-            END DO
-            Om(a,i,j,b) = sum1 
-          END DO
-        END DO
-      END DO
-    END DO
+    CALL idx4_trans(nvrtA,noccA,noccA,nvrtA,ntot,Nm,CmA(0:ntot-1,noccA:ntot-1,Om)
     DEALLOCATE(Nm)
-    STOP !workpoint
     
     !We are writing vector by vector
     WRITE(*,*) "Writing to ajib_AA" 
@@ -1025,6 +974,53 @@ PROGRAM ao2mo
     CLOSE(unit=106)
     DEALLOCATE(Om)
     DEALLOCATE(vec)
+    
+    !------------------------------
+    !(uv|ld) -> (ab|ji) -> <aj|bi>
+    WRITE(*,*) "Transforming (uv|ld) -> <aj|bi>"
+
+    !first index (uv|ld) -> (av|ld)
+    ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
+    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntotA-1),Lm)
+
+    !second index (av|ld) -> (ab|ld) 
+    ALLOCATE(Mm(0:nvrtA-1,0:nvrtA-1,0:ntot-1,0:ntot-1))
+    CALL idx2_trans(nvrtA,nvrtA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,noccA:ntotA-1),Mm)
+    DEALLOCATE(Lm)
+
+    !third index (ab|ld) -> (ab|jd) 
+    ALLOCATE(Nm(0:nvrtA-1,0:nvrtA-1,0:noccA-1,0:ntot-1))
+    CALL idx3_trans(nvrtA,nvrtA,noccA,ntot,ntot,Mm,CmA(0:ntot-1,0:noccA-1),Nm)
+    DEALLOCATE(Mm)
+
+    !fourth index (ab|jd) -> (ab|ji) 
+    ALLOCATE(Om(0:nvrtA-1,0:nvrtA-1,0:noccA-1,0:noccA-1))
+    CALL idx4_trans(nvrtA,nvrtA,noccA,noccA,ntot,Nm,CmA(0:ntot-1,0:noccA-1,Om)
+    DEALLOCATE(Nm)
+
+    !We are writing vector by vector
+    WRITE(*,*) "Writing to ajbi_AA" 
+    ALLOCATE(vec(0:noccA*nvrtA-1))
+    OPEN(unit=107,file="ajbi_AA",status="replace",form="unformatted")
+    DO j=0,noccA-1
+      DO b=0,nvrtA-1
+        vec = 0.0D0
+        idx = 0
+        DO i=0,noccA-1
+          DO a=0,nvrtA-1
+            vec(idx) = Om(a,b,j,i)
+            idx = idx + 1  
+          END DO
+        END DO
+        WRITE(107) vec(0:noccA*nvrtA-1)
+      END DO
+    END DO
+    CLOSE(unit=107)
+    DEALLOCATE(Om)
+    DEALLOCATE(vec)
+
+    STOP !workpoint
+    !//////////
 
     !Spin Case BB
     WRITE(*,*) 
