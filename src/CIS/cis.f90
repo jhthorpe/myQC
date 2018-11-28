@@ -358,12 +358,13 @@ PROGRAM cis
     INTEGER,INTENT(IN) :: noccA,noccB,nvrtA,nvrtB
     !Internal
     INTEGER, DIMENSION(:), ALLOCATABLE :: sgn1
-    CHARACTER(LEN=2), DIMENSION(0:9) :: spin 
-    REAL(KIND=8), DIMENSION(0:9) :: Cia
-    INTEGER, DIMENSION(0:9,0:3) :: iajb
-    INTEGER, DIMENSION(0:9) :: sgn2
+    CHARACTER(LEN=2), DIMENSION(0:9) :: spin,tspin 
+    REAL(KIND=8), DIMENSION(0:9) :: Cia,tCia
+    INTEGER, DIMENSION(0:9,0:3) :: iajb,tiajb
+    INTEGER, DIMENSION(0:9) :: sgn2,tsgn2
     INTEGER :: upA,upB,idx,loc
     INTEGER :: i,j,a,b
+
 999 FORMAT(4x,I3,1x,I3,1x,I3,1x,I3,4x,F15.10,4x,A2)
     spin  = 'NA'
     Cia = 0
@@ -409,7 +410,23 @@ PROGRAM cis
     END DO
 
     !Dirty sort
-    
+    DO i=0,8
+      loc = MAXLOC(Cia(i:9),1)-1+i
+      IF (loc .NE. i) THEN
+        tCia(i) = Cia(loc)
+        tsgn2(i) = sgn2(loc)
+        tiajb(i,0:3) = iajb(loc,0:3)
+        tspin(i) = spin(loc)
+        Cia(loc) = Cia(i)
+        sgn2(loc) = sgn2(i)
+        iajb(loc,0:3) = iajb(i,0:3)
+        spin(loc) = spin(i) 
+        Cia(i) = tCia(i)
+        sgn2(i) = tsgn2(i)
+        iajb(i,0:3) = tiajb(i,0:3)
+        spin(i) = tspin(i)
+      END IF
+    END DO
 
     !write out the results
     WRITE(*,*) "     i   a   j   b      val             spin" 
