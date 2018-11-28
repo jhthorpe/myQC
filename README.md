@@ -15,6 +15,4 @@ My crummy implementation of Quantum Chemical Techniques
 - Save considerable time by keeping the intermediate 'XX' file, which contains the two electron integrals.
 - Two electron integrals potentially need a more stringent incomplete error function evaluation.
 
-One electron integrals implimented, two electron integrals implimented, but slow.
-RHF and UHF SCF implimented. You can now visualize your molecule with the molden program.
- 
+WIKI: https://github.com/jhthorpe/myQC/wiki 

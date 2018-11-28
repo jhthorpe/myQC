@@ -8,7 +8,7 @@ all : $(objects)
 
 mp2.o : mp2.f90
 #local
-	$(FC) $(FFLAGS) -o mp2.o mp2.f90 -CB $(envprog) -I$(envdir) $(LINAL)
+	$(FC) $(FFLAGS) -o mp2.o mp2.f90 $(envprog) -I$(envdir) $(LINAL)
 
 clean :
 	rm -f *.o *.mod

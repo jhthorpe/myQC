@@ -149,7 +149,6 @@ PROGRAM int2e
     noint = ((norb+1)*norb)**2/8+((norb+1)*norb)/4
     WRITE(*,*) "Total primative integrals :", npri**4
     WRITE(*,*) "Total to be evaluated :", npint
-    WRITE(*,*) "testing: norb, npri", norb, npri
 
     ALLOCATE(Ck(0:setK))
     ALLOCATE(Ckp(0:setK))
