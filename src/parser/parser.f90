@@ -93,6 +93,7 @@ PROGRAM parser
   flag = check_options(options)
   IF (flag) THEN
     WRITE(*,*) "==========================================="
+    CALL EXECUTE_COMMAND_LINE('touch error')
     STOP "Bad options in ZMAT"
   END IF
 
@@ -746,17 +747,17 @@ PROGRAM parser
     INTEGER(KIND=8), DIMENSION(0:), INTENT(IN) :: options
     LOGICAL :: flag
 
-    flag = .TRUE. 
+    flag = .FALSE.
 
     !Excitation checks
     IF (options(13) .NE. 0) THEN
       IF (options(1) .NE. 0) THEN
         WRITE(*,*) "Sorry, only SCF CIS coded"
-        flag = .FALSE.
+        flag = .TRUE.
       END IF
       IF (options(3) .NE. 1) THEN
         WRITE(*,*) "Sorry, only UHF CIS references are coded"
-        flag = .FALSE.
+        flag = .TRUE.
       END IF
     END IF
 
