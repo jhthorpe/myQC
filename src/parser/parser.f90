@@ -36,12 +36,13 @@ PROGRAM parser
   !13) excitation       : 0-none,1-cis
   !14) root algorithm   : 0-lanczos
   !15) number ex. states: number
+  !16) prop level	: 0-none, 1-first order, 2-second order
 
   ! Variables
   REAL(KIND=8),DIMENSION(:),ALLOCATABLE:: radii
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: xyz 
   INTEGER,DIMENSION(:),ALLOCATABLE :: atoms
-  INTEGER(KIND=8),DIMENSION(0:15) :: options 
+  INTEGER(KIND=8),DIMENSION(0:16) :: options 
 
   !internal variables
   CHARACTER(LEN=20),DIMENSION(0:1) :: line
@@ -56,7 +57,7 @@ PROGRAM parser
   i = 0
 
   !defaults
-  options = [0,0,0,0,0,1,1000,1,7,0,1,0,1,0,0,0]
+  options = [0,0,0,0,0,1,1000,1,7,0,1,0,1,0,0,0,0]
 
   CALL EXECUTE_COMMAND_LINE('cat ZMAT')
 
@@ -412,6 +413,23 @@ PROGRAM parser
     END IF
   END FUNCTION gete_num
 !---------------------------------------------------------------------
+!                       Get PROP
+!---------------------------------------------------------------------
+  INTEGER FUNCTION get_prop(chr)
+    IMPLICIT NONE
+    CHARACTER(LEN=20), INTENT(IN) :: chr
+    IF (chr .EQ. 'NONE' .OR. chr .EQ. "ZERO" .OR. chr .EQ. "0") THEN 
+      get_prop = 0
+    ELSE IF (chr .EQ. 'FIRST' .OR. chr .EQ. "1") THEN  
+      get_prop = 1
+    ELSE IF (chr .EQ. 'SECOND' .OR. chr .EQ. "2") THEN
+      get_prop = 2
+    ELSE
+      WRITE(*,*) "Sorry, only 0,1,2 order properties are coded"
+      get_prop = 0 
+    END IF
+  END FUNCTION get_prop
+!---------------------------------------------------------------------
 !		Build the molecule (nucpos and envdat files)	
 !---------------------------------------------------------------------
   SUBROUTINE build(atoms, radii, options, xyz)
@@ -707,6 +725,8 @@ PROGRAM parser
         options(14) = getroot_alg(line(1))
       ELSE IF (line(0) == 'E_NUM=') THEN
         options(15) = gete_num(line(1))
+      ELSE IF (line(0) == 'PROP=') THEN
+        options(16) = get_prop(line(1))
       ELSE
         WRITE(*,*) "parser could not understand options line ", i
       END IF
@@ -737,6 +757,7 @@ PROGRAM parser
     WRITE(*,*) "excite              : ",options(13)
     WRITE(*,*) "root algorithm      : ",options(14)
     WRITE(*,*) "num excite          : ",options(15)
+    WRITE(*,*) "property order      : ",options(16)
     WRITE(*,*) "==========================================="
   END SUBROUTINE print_options
 !---------------------------------------------------------------------
@@ -761,6 +782,18 @@ PROGRAM parser
       END IF
     END IF
 
+    !property checks
+    IF (options(16) .NE. 0) THEN
+      IF (options(1) .NE. 0) THEN
+        WRITE(*,*) "Sorry, only SCF properties are coded"
+        flag = .TRUE.
+      END IF
+      IF (options(3) .NE. 0) THEN
+        WRITE(*,*) "Sorry, only RHF reference properites are coded"
+        flag = .TRUE.
+      END IF
+    END IF
+    
     check_options = flag
 
   END FUNCTION check_options

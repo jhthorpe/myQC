@@ -647,7 +647,7 @@ PROGRAM scf
 997 FORMAT(1x,I3,2x,ES15.5,2x,A7)
     WRITE(*,*)
     IF (verb .GE. 1) THEN
-      WRITE(*,*) "Eigenvalues of the overlap integrals"
+      WRITE(*,*) "Lowest eigenvalues of the overlap integrals"
     ELSE
       WRITE(*,*) "Checking for dangerous overlap eigenvalues"
     END IF
@@ -696,7 +696,7 @@ PROGRAM scf
     END IF
 
     !print eigenvalues
-    DO i=0,norb-1
+    DO i=0,MIN(norb-1,4)
       IF (W(i) .LT. 1.0E-4) THEN
         WRITE(*,997) i+1, W(i), "WARNING"
       ELSE IF (verb .GE. 1) THEN

@@ -19,7 +19,7 @@ export LC=ar
 export pwd = $(shell pwd)
 export ML= $(pwd)/linal
 
-progdirs:= myQC parser clean integrals I2G dens scf ao2mo mp2 linal CIS 
+progdirs:= myQC parser clean integrals I2G dens scf ao2mo mp2 linal CIS props 
 
 .PHONY: all prog clean
 
