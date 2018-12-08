@@ -749,6 +749,7 @@ PROGRAM parser
     WRITE(*,*) "Parallel Algorithm  : ",options(4)
     WRITE(*,*) "Nodes               : ",options(5)
     WRITE(*,*) "Memory (MB)         : ",options(6)
+    WRITE(*,*) "Verbosity           : ",options(7)
     WRITE(*,*) "SCF Convergence     : ",options(8)
     WRITE(*,*) "Charge              : ",options(9)
     WRITE(*,*) "Multiplicity        : ",options(10)

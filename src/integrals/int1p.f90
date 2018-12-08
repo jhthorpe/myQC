@@ -74,13 +74,13 @@ PROGRAM int1p
   fmem = fmem - 2*norb*norb*8.0/1.D6
   IF (fmem .LT. 0.0D0) THEN
     CALL EXECUTE_COMMAND_LINE('touch error')
-    WRITE(*,*) "int1e: max memory reached"
+    WRITE(*,*) "int1p: max memory reached"
     STOP
   ELSE
     ALLOCATE(Px(0:2,0:norb-1,0:norb-1),STAT=stat1)
     IF(stat1+stat2 .NE. 0) THEN
       CALL EXECUTE_COMMAND_LINE('touch error')
-      WRITE(*,*) "int1e: could not allocate memory"
+      WRITE(*,*) "int1p: could not allocate memory"
       STOP
     END IF
   END IF
@@ -93,7 +93,6 @@ PROGRAM int1p
     CALL proc1p(Px,bas,basinfo,atoms,options,fmem,nnuc,xyz,norb,set,setinfo)
     WRITE(*,*) "Dipole moment integrals written to Pxuv"
   ELSE
-    CALL EXECUTE_COMMAND_LINE('touch Pxuvold')
     WRITE(*,*) "Reading Dipole integrals from Pxuv"
   END IF
 
@@ -109,8 +108,6 @@ PROGRAM int1p
   CALL CPU_TIME(timeF)
 
   CONTAINS 
-!=====================================================================
-!			SUBROUTINES
 
 !---------------------------------------------------------------------
 !		proc1p
@@ -157,7 +154,7 @@ PROGRAM int1p
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: nucpos
     REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Dk
     INTEGER, DIMENSION(:), ALLOCATABLE :: Ck,Ok
-    REAL(KIND=8), DIMENSION(0:2) :: PA, PB, AB, PP
+    REAL(KIND=8), DIMENSION(0:2) :: PA,PB,AB,PP
     INTEGER, DIMENSION(0:2) :: la,lb,amax,bmax
     REAL(KIND=8) :: EIJ, valSb, valFb, p, m, aa, bb, tempSb, tempFb
     REAL(KIND=8) :: timeS, timeF
@@ -228,7 +225,7 @@ PROGRAM int1p
 
         !dipole
         CALL dipole(Px,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,coef,&
-        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ,nnuc,PP)
+        setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ,nnuc,PP,AB)
 
         DEALLOCATE(coef)
 
@@ -240,6 +237,8 @@ PROGRAM int1p
       WRITE(100,*) Px(1,:,:)
       WRITE(100,*) Px(2,:,:)
     CLOSE(unit=1)
+
+    IF (options(7) .GE. 3) CALL print_Px(Px,norb)
  
     DEALLOCATE(Dk)
     DEALLOCATE(Ck)
@@ -265,14 +264,15 @@ PROGRAM int1p
   ! seta,setb   : 1D int, array of setinfo for sets a and b
   ! nncu	: int, number of nuclei
   ! PP		: 1D real*8, list of overlap locations, [x,y,z]
+  ! CC		: 1D real*8, radius between center A and center B (x,y,z)
 
-  SUBROUTINE dipole(Px,u,v,a,b,p,basa,basb,basinfo,coef,seta,setb,aa,bb,EIJ,nnuc,PP)
+  SUBROUTINE dipole(Px,u,v,a,b,p,basa,basb,basinfo,coef,seta,setb,aa,bb,EIJ,nnuc,PP,CC)
     IMPLICIT NONE
     REAL(KIND=8),PARAMETER :: Pi = 3.1415926535897931
     ! Inout
     REAL(KIND=8), DIMENSION(0:,-2:,-2:,-2:), INTENT(IN) :: coef
     REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(INOUT) :: Px
-    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa, basb,PP
+    REAL(KIND=8), DIMENSION(0:), INTENT(IN) :: basa, basb,PP,CC
     INTEGER, DIMENSION(0:), INTENT(IN) :: basinfo, seta, setb
     REAL(KIND=8), INTENT(IN) :: aa, bb, EIJ, p
     INTEGER, INTENT(IN) :: u,v,a,b, nnuc
@@ -322,44 +322,64 @@ PROGRAM int1p
           lb(ori) = basinfo(1+5*orbb+2)
         END IF
 
-        !loop over each center
-        DO c=0,nnuc-1
-          
-          !get distances to center
-          DO k=0,2
-            CP(k) = nucpos(c,k) - PP(k)
-          END DO
-
-          !xpart
-          temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
-          temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
-          temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
-          temp = temp * coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
-          temp = temp * (coef(0,1,la(0),lb(0)) + CP(0)*coef(0,0,la(0),lb(0)))
-          Px(0,u,v) =  Px(0,u,v) + temp
-
-          !ypart
-          temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
-          temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
-          temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
-          temp = temp * coef(0,0,la(0),lb(0))*coef(2,0,la(2),lb(2))
-          temp = temp * (coef(1,1,la(1),lb(1)) + CP(1)*coef(1,0,la(1),lb(1)))
-          Px(1,u,v) =  Px(1,u,v) + temp
-
-          !zpart
-          temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
-          temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
-          temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
-          temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))
-          temp = temp * (coef(2,1,la(2),lb(2)) + CP(2)*coef(2,0,la(2),lb(2)))
-          Px(2,u,v) =  Px(2,u,v) + temp
- 
+        !get distances to center
+        DO k=0,2
+          CP(k) = CC(k) - PP(k)
         END DO
+
+        !xpart
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
+        temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
+        temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
+        temp = temp * coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
+        temp = temp * (coef(0,1,la(0),lb(0)) + CP(0)*coef(0,0,la(0),lb(0)))
+        Px(0,u,v) =  Px(0,u,v) + temp
+
+        !ypart
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
+        temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
+        temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
+        temp = temp * coef(0,0,la(0),lb(0))*coef(2,0,la(2),lb(2))
+        temp = temp * (coef(1,1,la(1),lb(1)) + CP(1)*coef(1,0,la(1),lb(1)))
+        Px(1,u,v) =  Px(1,u,v) + temp
+
+        !zpart
+        temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
+        temp = temp * gtoD(basinfo(1+5*orba+2),aa)                !basis set coefficients
+        temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
+        temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))
+        temp = temp * (coef(2,1,la(2),lb(2)) + CP(2)*coef(2,0,la(2),lb(2)))
+        Px(2,u,v) =  Px(2,u,v) + temp
+
       END DO
     END DO
 
 
   END SUBROUTINE dipole
+!---------------------------------------------------------------------
+!	print_Px
+!		James H. Thorpe
+!		Dec 8, 2018
+!	-print Px integrals
+!---------------------------------------------------------------------
+  ! Px		:  3D real*8, dipole integrals (x,u,v)
+  ! norb	:  int, number of orbitals
+  SUBROUTINE print_Px(Px,norb)
+    IMPLICIT NONE
+    REAL(KIND=8), DIMENSION(0:,0:,0:), INTENT(IN) :: Px
+    INTEGER, INTENT(IN) :: norb
+    INTEGER :: u,v
+999 FORMAT(4x,I3,1x,I3,1x,F15.8,1x,F15.8,4x,F15.8)
+998 FORMAT(4x,A50)
+    WRITE(*,*) "One electron dipole moments"
+    WRITE(*,998) "  u   v      Dx              Dy                 Dz"
+    DO u=0,norb-1
+      DO v=0,norb-1
+        WRITE(*,999) u,v,Px(0,u,v),Px(1,u,v),Px(2,u,v)
+      END DO
+    END DO 
+
+  END SUBROUTINE print_Px
 !---------------------------------------------------------------------
 
 
