@@ -34,6 +34,7 @@ PROGRAM ao2mo
 
 999 FORMAT(1x,A24,2x,F8.4)
 
+
   CALL CPU_TIME(timeS)
   WRITE(*,*) 
   WRITE(*,*)"                STARTING AO TRANSFORM"
@@ -60,7 +61,7 @@ PROGRAM ao2mo
 
   IF (options(1) .EQ. 1) THEN !MP2
     IF (options(3) .EQ. 0) THEN !RHF
-      CALL slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot)
+      CALL slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot,options)
       !IF (mem_lvl(0) .EQ. 3) THEN !memory
       !  IF (options(12) .EQ. 0) THEN !fast
       !    !CALL uvld_ijab_AAAA_high(noccA,nvrtA,ntot,options)
@@ -461,12 +462,13 @@ PROGRAM ao2mo
 !       -slow version, explicit do loops, O(N^5) ao -> mo transform
 !       -useful for checking code
 !---------------------------------------------------------------------
-  SUBROUTINE slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot)
+  SUBROUTINE slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot,options)
     ! ij        :       int, occupied indicies
     ! ab        :       int, virtual indicies
     ! uvld      :       int, ao indicies
     ! Km        :       4D real8, matrix of (uv|ld) ao integrals
     ! Cm        :       2D real8, matrix of Cui's from SCF
+    ! options	: 	1D int, array of options
 
     !Inout
     INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
@@ -474,9 +476,11 @@ PROGRAM ao2mo
     !Internal
     REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: Km,Lm,Mm,Nm,Om
     REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Cm
+    INTEGER, DIMENSION(0:) :: options
     REAL(KIND=8) :: sum1
     INTEGER :: u,v,l,d,p,q,r,s,i,j,a,b
-
+997 FORMAT(4x,A22)
+996 FORMAT(4x,I3,1x,I3,1x,I3,1x,I3,4x,F15.8)
     !spin case AB, the only one we need now
     WRITE(*,*)
     WRITE(*,*) "Spin Case AB"
@@ -576,6 +580,21 @@ PROGRAM ao2mo
       END DO
     END DO
     CLOSE(unit=107)
+
+    IF (options(7) .GE. 3) THEN
+    WRITE(*,*) "Two electron Integrals by Orbital (<ij|ab>)"
+    WRITE(*,997) "i   j   a   b    Value"
+    DO i=0,noccA-1
+      DO j=i,noccA-1
+        DO a=0,nvrtA-1
+          DO b=a,nvrtA-1
+            IF (Om(i,a,j,b) .NE. 0.0D0) WRITE(*,996) i,j,a,b,Om(i,a,j,b)
+          END DO
+        END DO
+      END DO
+    END DO
+
+    END IF
 
     WRITE(*,*)
     DEALLOCATE(Om)
