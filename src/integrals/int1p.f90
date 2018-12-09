@@ -218,12 +218,7 @@ PROGRAM int1p
         END IF 
 
         kmax = -1
-
         CALL getcoef_dipole(coef,PA,PB,aa,bb,amax,bmax) 
-        CALL getDk(coef,setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl), &
-        bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,Dk,Ck,Ok,kmax,EIJ,setl,aa,bb)
-
-        !dipole
         CALL dipole(Px,u,v,a,b,p,bas(a*OpS:(a+1)*Ops-1),bas(b*Ops:(b+1)*OpS-1),basinfo,coef,&
         setinfo(1+a*setl+1:1+(a+1)*setl),setinfo(1+b*setl+1:1+(b+1)*setl),aa,bb,EIJ,nnuc,PP,AB)
 
@@ -257,6 +252,7 @@ PROGRAM int1p
 !---------------------------------------------------------------------
   ! Values
   ! Px          : 3D real*8, dipole matrix (coord,u,v)
+  ! u,v		: int, center number(???) - NOT orbital number 
   ! a,b         : int, set number we're on
   ! la,lb       : 1D int, angular quantum numbers 
   ! ta,tb       : int, tracking a and b
@@ -324,7 +320,8 @@ PROGRAM int1p
 
         !get distances to center
         DO k=0,2
-          CP(k) = CC(k) - PP(k)
+          !CP(k) = CC(k) - PP(k)
+          CP(k) = PP(k) !I am not sure which is correct...
         END DO
 
         !xpart
@@ -333,7 +330,7 @@ PROGRAM int1p
         temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
         temp = temp * coef(1,0,la(1),lb(1))*coef(2,0,la(2),lb(2))
         temp = temp * (coef(0,1,la(0),lb(0)) + CP(0)*coef(0,0,la(0),lb(0)))
-        Px(0,u,v) =  Px(0,u,v) + temp
+        Px(0,orba,orbb) =  Px(0,orba,orbb) + temp
 
         !ypart
         temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
@@ -341,7 +338,7 @@ PROGRAM int1p
         temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(2,0,la(2),lb(2))
         temp = temp * (coef(1,1,la(1),lb(1)) + CP(1)*coef(1,0,la(1),lb(1)))
-        Px(1,u,v) =  Px(1,u,v) + temp
+        Px(1,orba,orbb) =  Px(1,orba,orbb) + temp
 
         !zpart
         temp = EIJ*(Pi/p)**(3.0D0/2.0D0)*basa(i)*basb(j)          !pre-exponential and basis weights
@@ -349,7 +346,7 @@ PROGRAM int1p
         temp = temp * gtoD(basinfo(1+5*orbb+2),bb)                !basis set coefficeints
         temp = temp * coef(0,0,la(0),lb(0))*coef(1,0,la(1),lb(1))
         temp = temp * (coef(2,1,la(2),lb(2)) + CP(2)*coef(2,0,la(2),lb(2)))
-        Px(2,u,v) =  Px(2,u,v) + temp
+        Px(2,orba,orbb) =  Px(2,orba,orbb) + temp
 
       END DO
     END DO

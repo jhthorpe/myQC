@@ -30,7 +30,7 @@ PROGRAM props
   REAL(KIND=8) :: fmem, timeS, timeF
   INTEGER :: nnuc,noccA,noccB,nvrtA,nvrtB,ntot,dummy
   LOGICAL :: flag
-
+999 FORMAT(1x,A24,2x,F8.4)
   CALL CPU_TIME(timeS)
   WRITE(*,*) 
   WRITE(*,*)"               STARTING PROPERTY CALCULATIONS"
@@ -67,6 +67,6 @@ PROGRAM props
   END IF
 
   CALL CPU_TIME(timeF)
-  WRITE(*,*) "props completed in (s): ", timeF-timeS
+  WRITE(*,999) "props completed in (s):", timeF-timeS
 
 END PROGRAM props

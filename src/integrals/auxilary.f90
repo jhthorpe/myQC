@@ -427,6 +427,8 @@ MODULE auxilary
     END IF
     ! check for "bad" points
     IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+    !IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0) THEN
+    !I am not sure that i > j+k is correct
       M(l,i,j,k) = 0.0D0
       fmat(l,i,j,k) = .TRUE.
       RETURN
@@ -492,6 +494,8 @@ MODULE auxilary
     END IF
     ! check for "bad" points 
     IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+    !IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0) THEN
+    !I am not sure that i > j+k is correct
       M(l,i,j,k) = 0.0D0
       fmat(l,i,j,k) = .TRUE.
       RETURN
