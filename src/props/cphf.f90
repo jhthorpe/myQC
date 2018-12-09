@@ -107,8 +107,8 @@ PROGRAM cphf
     Ux = 0
     Uy = 0
     Uz = 0
-    DO u=0,noccA-1
-      DO v=0,noccA-1
+    DO u=0,ntot-1
+      DO v = 0,ntot-1
         Ux = Ux - Duv(u,v)*Px(0,v,u) 
         Uy = Uy - Duv(u,v)*Px(1,v,u) 
         Uz = Uz - Duv(u,v)*Px(2,v,u) 
