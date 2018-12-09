@@ -381,8 +381,8 @@ MODULE auxilary
     !initialize coefficient matrices
     DO l=0,2
       DO i=-2,MAXVAL(amax)+MAXVAL(bmax)
-        DO j=-2,MAXVAL(amax)+2
-          DO k=-2,MAXVAL(bmax)+2
+        DO j=-2,MAXVAL(amax)+2 !why are these +2 needed?
+          DO k=-2,MAXVAL(bmax)+2 !why are these +2 needed?
             M(l,i,j,k) = 0.0D0
             fmat(l,i,j,k) = .FALSE.
           END DO
@@ -427,6 +427,8 @@ MODULE auxilary
     END IF
     ! check for "bad" points
     IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+    !IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0) THEN
+    !I am not sure that i > j+k is correct
       M(l,i,j,k) = 0.0D0
       fmat(l,i,j,k) = .TRUE.
       RETURN
@@ -492,6 +494,8 @@ MODULE auxilary
     END IF
     ! check for "bad" points 
     IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0 .OR. i .GT. j+k) THEN
+    !IF (i .LT. 0 .OR. j .LT. 0 .OR. k .LT. 0) THEN
+    !I am not sure that i > j+k is correct
       M(l,i,j,k) = 0.0D0
       fmat(l,i,j,k) = .TRUE.
       RETURN
@@ -627,6 +631,69 @@ MODULE auxilary
     END DO
 
   END SUBROUTINE getDk
+!---------------------------------------------------------------------
+!	getcoef_dipole
+!		James H. Thorpe
+!       -calculate coefficients of dipol Gaussians 
+!---------------------------------------------------------------------
+  ! M         : 2D dp, coefficient matrix d_{i}^{j,k} = M(0,i,j,k)
+  ! PA        : 1D dp, (xa,ya,za) distance from central gaussian
+  ! PB        : 1D dp, (xb,yb,zb) distance from central gaussian
+  ! aa        : dp, coefficient of atom A 
+  ! bb        : dp, coefficient of atom B
+  ! amax      : 1D int, max angular quantum number of A needed
+  ! amax      : 1D int, max angular quantum number of B needed
+  ! nmax      : int, max total quantum number needed
+  ! nn        : int, total number of elements
+  ! fmat      : 3D dp, boolean array, tracks what has been calculated 
+  SUBROUTINE getcoef_dipole(M,PA,PB,aa,bb,amax,bmax)
+    IMPLICIT NONE
+
+    ! Inout
+    REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:,:,:), INTENT(INOUT) :: M
+    REAL(KIND=8), DIMENSION(0:2), INTENT(IN) :: PA, PB
+    INTEGER, DIMENSION(0:2), INTENT(IN) :: amax, bmax
+    REAL(KIND=8), INTENT(IN) :: aa,bb
+
+    ! Internal
+    LOGICAL, DIMENSION(:,:,:,:), ALLOCATABLE :: fmat
+    INTEGER, DIMENSION(0:2) :: nmax,nn
+    REAL(KIND=8) :: pp
+    INTEGER :: l,i,j,k
+
+    pp = aa+bb
+    nmax = [amax(0)+bmax(0),amax(1)+bmax(1),amax(2)+bmax(2)]
+
+    ALLOCATE(M(0:2,-2:MAX(MAXVAL(amax)+MAXVAL(bmax),2),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
+    ALLOCATE(fmat(0:2,-2:MAX(MAXVAL(amax)+MAXVAL(bmax),2),-2:MAXVAL(amax)+2,-2:MAXVAL(bmax)+2))
+
+    !initialize coefficient matrices
+    DO l=0,2
+      DO i=-2,MAX(MAXVAL(amax)+MAXVAL(bmax),2)
+        DO j=-2,MAXVAL(amax)+2 !why are these +2 needed?
+          DO k=-2,MAXVAL(bmax)+2 !why are these +2 needed?
+            M(l,i,j,k) = 0.0D0
+            fmat(l,i,j,k) = .FALSE.
+          END DO
+        END DO
+      END DO
+    END DO
+
+    ! d_{0}^{n,nbar} 
+    DO l=0,2
+      CALL lrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
+      CALL rrec(M,l,0,amax(l),bmax(l),PA,PB,pp,fmat)
+    END DO
+
+    ! d_{1}^{n,nbar} 
+    DO l=0,2
+      CALL lrec(M,l,1,amax(l),bmax(l),PA,PB,pp,fmat)
+      CALL rrec(M,l,1,amax(l),bmax(l),PA,PB,pp,fmat)
+    END DO
+
+    DEALLOCATE (fmat)
+
+  END SUBROUTINE getcoef_dipole
 
 !=====================================================================
 !                       FUNCTIONS

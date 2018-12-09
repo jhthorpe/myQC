@@ -100,6 +100,17 @@ ELSE IF (options(13) .EQ. 1) THEN
 END IF
 
 !~~~
+!properties
+IF (options(16) .GT. 0) THEN
+  CALL EXECUTE_COMMAND_LINE('props')
+  INQUIRE (file='error',EXIST=ex)
+  IF (ex) THEN
+    WRITE(*,*) "Error from CIS, exiting"
+    STOP "Error from CIS"
+  END IF
+END IF
+
+!~~~
 ! Output
   CALL CPU_TIME(timeF)
   WRITE(*,*)
