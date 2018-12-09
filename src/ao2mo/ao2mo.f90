@@ -59,6 +59,26 @@ PROGRAM ao2mo
 
 !  CALL mem_analysis(mem_lvl,noccA,noccB,nvrtA,nvrtB,ntot,fmem,options)  
 
+  !1e- transforms for property calculations
+  !--------------------------------------------
+  IF (options(16) .GE. 2) THEN !we need to transform some one electron stuff
+    IF (options(1) .EQ. 0) THEN !SCF
+      IF (options(3) .EQ. 0) THEN !RHF
+        CALL ao2mo_1e_rhf(noccA,nvrtA,ntot,options)
+      ELSE
+        WRITE(*,*) "Sorry, only RHF 1e transforms are coded"
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        STOP "Bad ref in ao2mo"
+      END IF
+    ELSE
+      WRITE(*,*) "Sorry, only SCF/RHF property transforms coded" 
+        CALL EXECUTE_COMMAND_LINE('touch error')
+        STOP "Bad calc in ao2mo"
+    END IF
+  END IF
+
+  !2e- transforms
+  !--------------------------------------------
   IF (options(1) .EQ. 1) THEN !MP2
     IF (options(3) .EQ. 0) THEN !RHF
       CALL slow_ao2mo_MP2_RHF(noccA,nvrtA,ntot,options)
@@ -88,10 +108,6 @@ PROGRAM ao2mo
       CALL EXECUTE_COMMAND_LINE('touch error')
       STOP "Bad ref in ao2mo"
     END IF
-  ELSE
-    WRITE(*,*) "Sorry, that transform type has not been coded yet"
-    CALL EXECUTE_COMMAND_LINE('touch error')
-    STOP "Bad calc in ao2mo"
   END IF
   
   CALL CPU_TIME(timeF)
@@ -503,7 +519,7 @@ PROGRAM ao2mo
     !first index (uv|ld) -> (iv|ld)
     WRITE(*,*) "Transforming (uv|ld) -> <ij|ab>"
     ALLOCATE(Lm(0:noccA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(noccA,ntot,ntot,ntot,ntot,Km,Cm(0:ntot-1,0:noccA-1),Lm)
+    CALL idx1_2e_trans(noccA,ntot,ntot,ntot,ntot,Km,Cm(0:ntot-1,0:noccA-1),Lm)
     DEALLOCATE(Km)
 
     !second index (iv|ld) -> (ia|ld) 
@@ -521,7 +537,7 @@ PROGRAM ao2mo
     !    END DO
     !  END DO 
     !END DO
-    CALL idx2_trans(noccA,nvrtA,ntot,ntot,ntot,Lm,Cm(0:ntot-1,noccA:ntot-1),Mm)
+    CALL idx2_2e_trans(noccA,nvrtA,ntot,ntot,ntot,Lm,Cm(0:ntot-1,noccA:ntot-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ia|ld) -> (ia|jd) 
@@ -540,7 +556,7 @@ PROGRAM ao2mo
     !    END DO
     !  END DO
     !END DO
-    CALL idx3_trans(noccA,nvrtA,noccA,ntot,ntot,Mm,Cm(0:ntot-1,0:noccA-1),Nm)
+    CALL idx3_2e_trans(noccA,nvrtA,noccA,ntot,ntot,Mm,Cm(0:ntot-1,0:noccA-1),Nm)
     DEALLOCATE(Mm)
 
     !fourth index (ia|jd) -> (ia|jb) 
@@ -559,7 +575,7 @@ PROGRAM ao2mo
     !    END DO
     !  END DO
     !END DO
-    CALL idx4_trans(noccA,nvrtA,noccA,nvrtA,ntot,Nm,Cm(0:ntot-1,noccA:ntot-1),Om)
+    CALL idx4_2e_trans(noccA,nvrtA,noccA,nvrtA,ntot,Nm,Cm(0:ntot-1,noccA:ntot-1),Om)
     DEALLOCATE(Nm)
    
     !for now only
@@ -952,21 +968,21 @@ PROGRAM ao2mo
 
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
+    CALL idx1_2e_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
 
     !second index (av|ld) -> (ai|ld) 
     ALLOCATE(Mm(0:nvrtA-1,0:noccA-1,0:ntot-1,0:ntot-1))
-    CALL idx2_trans(nvrtA,noccA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,0:noccA-1),Mm)
+    CALL idx2_2e_trans(nvrtA,noccA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,0:noccA-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ai|ld) -> (ai|jd) 
     ALLOCATE(Nm(0:nvrtA-1,0:noccA-1,0:noccA-1,0:ntot-1))
-    CALL idx3_trans(nvrtA,noccA,noccA,ntot,ntot,Mm,CmA(0:ntot-1,0:noccA-1),Nm)
+    CALL idx3_2e_trans(nvrtA,noccA,noccA,ntot,ntot,Mm,CmA(0:ntot-1,0:noccA-1),Nm)
     DEALLOCATE(Mm)
 
     !fourth index (ai|jd) -> (ai|jb) 
     ALLOCATE(Om(0:nvrtA-1,0:noccA-1,0:noccA-1,0:nvrtA-1))
-    CALL idx4_trans(nvrtA,noccA,noccA,nvrtA,ntot,Nm,CmA(0:ntot-1,noccA:ntot-1),Om)
+    CALL idx4_2e_trans(nvrtA,noccA,noccA,nvrtA,ntot,Nm,CmA(0:ntot-1,noccA:ntot-1),Om)
     DEALLOCATE(Nm)
     
     !We are writing vector by vector
@@ -987,31 +1003,6 @@ PROGRAM ao2mo
       END DO
     END DO
     CLOSE(unit=106)
-    !testing testing testgin
-    !WRITE(*,*) "TESTING TESTING TESTING"
-    !ALLOCATE(testM(0:noccA*nvrtA-1,0:noccA*nvrtA-1))
-    !idxB = 0
-    !DO j=0,noccA-1
-    !  DO b=0,nvrtA-1
-    !    idxA = 0
-    !    DO i=0,noccA-1
-    !      DO a=0,nvrtA-1
-    !        testM(idxA,idxB) = Om(a,i,j,b)
-    !        idxA = idxA + 1
-    !      END DO
-    !    END DO 
-    !    idxB = idxB + 1
-    !  END DO
-    !END DO
-    !CALL linal_printmat_2Dreal8(testM,noccA*nvrtA,noccA*nvrtA)
-    !WRITE(*,*) "bleh"
-    !CALL linal_printmat_2Dreal8(CmA,ntot,ntot)
-    !WRITE(*,*) "CmA occupied" 
-    !WRITE(*,*) CmA(0:ntot-1,0:noccB-1)
-    !WRITE(*,*) "CmB virtual"
-    !WRITE(*,*) CmA(0:ntot-1,noccB:ntot-1)
-    !DEALLOCATE(testM)
-    !WRITE(*,*) "TESTING TESTING TESTING"
     DEALLOCATE(Om)
     DEALLOCATE(vec)
    
@@ -1021,21 +1012,21 @@ PROGRAM ao2mo
 
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
+    CALL idx1_2e_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
 
     !second index (av|ld) -> (ab|ld) 
     ALLOCATE(Mm(0:nvrtA-1,0:nvrtA-1,0:ntot-1,0:ntot-1))
-    CALL idx2_trans(nvrtA,nvrtA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,noccA:ntot-1),Mm)
+    CALL idx2_2e_trans(nvrtA,nvrtA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,noccA:ntot-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ab|ld) -> (ab|jd) 
     ALLOCATE(Nm(0:nvrtA-1,0:nvrtA-1,0:noccA-1,0:ntot-1))
-    CALL idx3_trans(nvrtA,nvrtA,noccA,ntot,ntot,Mm,CmA(0:ntot-1,0:noccA-1),Nm)
+    CALL idx3_2e_trans(nvrtA,nvrtA,noccA,ntot,ntot,Mm,CmA(0:ntot-1,0:noccA-1),Nm)
     DEALLOCATE(Mm)
 
     !fourth index (ab|jd) -> (ab|ji) 
     ALLOCATE(Om(0:nvrtA-1,0:nvrtA-1,0:noccA-1,0:noccA-1))
-    CALL idx4_trans(nvrtA,nvrtA,noccA,noccA,ntot,Nm,CmA(0:ntot-1,0:noccA-1),Om)
+    CALL idx4_2e_trans(nvrtA,nvrtA,noccA,noccA,ntot,Nm,CmA(0:ntot-1,0:noccA-1),Om)
     DEALLOCATE(Nm)
 
     !We are writing vector by vector
@@ -1066,21 +1057,21 @@ PROGRAM ao2mo
   
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtA-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
+    CALL idx1_2e_trans(nvrtA,ntot,ntot,ntot,ntot,Km,CmA(0:ntot-1,noccA:ntot-1),Lm)
 
     !second index (av|ld) -> (ai|ld) 
     ALLOCATE(Mm(0:nvrtA-1,0:noccA-1,0:ntot-1,0:ntot-1))
-    CALL idx2_trans(nvrtA,noccA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,0:noccA-1),Mm)
+    CALL idx2_2e_trans(nvrtA,noccA,ntot,ntot,ntot,Lm,CmA(0:ntot-1,0:noccA-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ai|ld) -> (ai|jd) 
     ALLOCATE(Nm(0:nvrtA-1,0:noccA-1,0:noccB-1,0:ntot-1))
-    CALL idx3_trans(nvrtA,noccA,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
+    CALL idx3_2e_trans(nvrtA,noccA,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
     DEALLOCATE(Mm)
 
     !fourth index (ai|jd) -> (ai|jb) 
     ALLOCATE(Om(0:nvrtA-1,0:noccA-1,0:noccB-1,0:nvrtB-1))
-    CALL idx4_trans(nvrtA,noccA,noccB,nvrtB,ntot,Nm,CmB(0:ntot-1,noccB:ntot-1),Om)
+    CALL idx4_2e_trans(nvrtA,noccA,noccB,nvrtB,ntot,Nm,CmB(0:ntot-1,noccB:ntot-1),Om)
     DEALLOCATE(Nm)
     
     !We are writing vector by vector
@@ -1111,21 +1102,21 @@ PROGRAM ao2mo
 
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtB-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtB,ntot,ntot,ntot,ntot,Km,CmB(0:ntot-1,noccB:ntot-1),Lm)
+    CALL idx1_2e_trans(nvrtB,ntot,ntot,ntot,ntot,Km,CmB(0:ntot-1,noccB:ntot-1),Lm)
 
     !second index (av|ld) -> (ai|ld) 
     ALLOCATE(Mm(0:nvrtB-1,0:noccB-1,0:ntot-1,0:ntot-1))
-    CALL idx2_trans(nvrtB,noccB,ntot,ntot,ntot,Lm,CmB(0:ntot-1,0:noccB-1),Mm)
+    CALL idx2_2e_trans(nvrtB,noccB,ntot,ntot,ntot,Lm,CmB(0:ntot-1,0:noccB-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ai|ld) -> (ai|jd) 
     ALLOCATE(Nm(0:nvrtB-1,0:noccB-1,0:noccB-1,0:ntot-1))
-    CALL idx3_trans(nvrtB,noccB,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
+    CALL idx3_2e_trans(nvrtB,noccB,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
     DEALLOCATE(Mm)
 
     !fourth index (ai|jd) -> (ai|jb) 
     ALLOCATE(Om(0:nvrtB-1,0:noccB-1,0:noccB-1,0:nvrtB-1))
-    CALL idx4_trans(nvrtB,noccB,noccB,nvrtB,ntot,Nm,CmB(0:ntot-1,noccB:ntot-1),Om)
+    CALL idx4_2e_trans(nvrtB,noccB,noccB,nvrtB,ntot,Nm,CmB(0:ntot-1,noccB:ntot-1),Om)
     DEALLOCATE(Nm)
     
     !We are writing vector by vector
@@ -1146,31 +1137,6 @@ PROGRAM ao2mo
       END DO
     END DO
     CLOSE(unit=109)
-    !testing testing testgin
-    !WRITE(*,*) "TESTING TESTING TESTING"
-    !ALLOCATE(testM(0:noccB*nvrtB-1,0:noccB*nvrtB-1))
-    !idxB = 0
-    !DO j=0,noccB-1
-    !  DO b=0,nvrtB-1
-    !    idxA = 0
-    !    DO i=0,noccB-1
-    !      DO a=0,nvrtB-1
-    !        testM(idxA,idxB) = Om(a,i,j,b)
-    !        idxA = idxA + 1
-    !      END DO
-    !    END DO 
-    !    idxB = idxB + 1
-    !  END DO
-    !END DO
-    !CALL linal_printmat_2Dreal8(testM,noccB*nvrtB,noccB*nvrtB)
-    !WRITE(*,*) "bleh"
-    !CALL linal_printmat_2Dreal8(CmB,ntot,ntot)
-    !WRITE(*,*) "CmB occupied" 
-    !WRITE(*,*) CmB(0:ntot-1,0:noccB-1)
-    !WRITE(*,*) "CmB virtual"
-    !WRITE(*,*) CmB(0:ntot-1,noccB:ntot-1)
-    !DEALLOCATE(testM)
-    !WRITE(*,*) "TESTING TESTING TESTING"
     DEALLOCATE(Om)
     DEALLOCATE(vec)
    
@@ -1180,21 +1146,21 @@ PROGRAM ao2mo
 
     !first index (uv|ld) -> (av|ld)
     ALLOCATE(Lm(0:nvrtB-1,0:ntot-1,0:ntot-1,0:ntot-1))
-    CALL idx1_trans(nvrtB,ntot,ntot,ntot,ntot,Km,CmB(0:ntot-1,noccB:ntot-1),Lm)
+    CALL idx1_2e_trans(nvrtB,ntot,ntot,ntot,ntot,Km,CmB(0:ntot-1,noccB:ntot-1),Lm)
 
     !second index (av|ld) -> (ab|ld) 
     ALLOCATE(Mm(0:nvrtB-1,0:nvrtB-1,0:ntot-1,0:ntot-1))
-    CALL idx2_trans(nvrtB,nvrtB,ntot,ntot,ntot,Lm,CmB(0:ntot-1,noccB:ntot-1),Mm)
+    CALL idx2_2e_trans(nvrtB,nvrtB,ntot,ntot,ntot,Lm,CmB(0:ntot-1,noccB:ntot-1),Mm)
     DEALLOCATE(Lm)
 
     !third index (ab|ld) -> (ab|jd) 
     ALLOCATE(Nm(0:nvrtB-1,0:nvrtB-1,0:noccB-1,0:ntot-1))
-    CALL idx3_trans(nvrtB,nvrtB,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
+    CALL idx3_2e_trans(nvrtB,nvrtB,noccB,ntot,ntot,Mm,CmB(0:ntot-1,0:noccB-1),Nm)
     DEALLOCATE(Mm)
 
     !fourth index (ab|jd) -> (ab|ji) 
     ALLOCATE(Om(0:nvrtB-1,0:nvrtB-1,0:noccB-1,0:noccB-1))
-    CALL idx4_trans(nvrtB,nvrtB,noccB,noccB,ntot,Nm,CmB(0:ntot-1,0:noccB-1),Om)
+    CALL idx4_2e_trans(nvrtB,nvrtB,noccB,noccB,ntot,Nm,CmB(0:ntot-1,0:noccB-1),Om)
     DEALLOCATE(Nm)
 
     !We are writing vector by vector
@@ -1225,6 +1191,82 @@ PROGRAM ao2mo
     DEALLOCATE(Km)
 
   END SUBROUTINE slow_ao2mo_CIS_UHF
+!---------------------------------------------------------------------
+!	ao2mo_1e_rhf
+!		James H. Thorpe
+!		Dec 9, 2018
+!	-perform one electron AO -> MO transformation needed for rhf
+!	 property calculations
+!---------------------------------------------------------------------
+  ! noccA	:	int, number of occupied alpha orbitals
+  ! nvrtA	:	int, number of virtual alpha orbitals
+  ! ntot	:	int, total number of orbitals
+  ! options	: 	1D int, options array
+  ! i,j		:	int, MO indices
+  ! u,v		:	int, AO indices
+  ! Cui		: 	int, SCF coeficients
+  ! X,Y,Z	:	2D real*8, arbitrary intermediate matrices
+
+  SUBROUTINE ao2mo_1e_rhf(noccA,nvrtA,ntot,options)
+    IMPLICIT NONE 
+    !Inout
+    INTEGER, DIMENSION(0:), INTENT(IN) :: options
+    INTEGER, INTENT(IN) :: noccA,nvrtA,ntot
+    !Internal
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Xuv,Yiv,Zij,CuiA
+    INTEGER :: cord
+    INTEGER :: i,j,u,v
+
+    WRITE(*,*) "Spin Case : AA"
+    ALLOCATE(Xuv(0:ntot-1,0:ntot-1))
+    ALLOCATE(Yiv(0:noccA-1,0:ntot-1))
+    ALLOCATE(Zij(0:noccA-1,0:noccA-1))
+
+    !Read in Cui
+    ALLOCATE(CuiA(0:ntot-1,0:ntot-1)) 
+    OPEN(unit=100,file='Cui',status='old',access='sequential')
+    READ(100,*) CuiA
+    CLOSE(unit=100)
+    
+    !Dipole integrals
+    WRITE(*,*) "Transforming (u|x|v) -> <i|x|j>"    
+    WRITE(*,*) "Writing to Pxij_AA"
+    OPEN(unit=101,file='Pxuv',status='old')
+    OPEN(unit=102,file='Pxij_AA',status='replace',form='unformatted')
+
+    DO cord=0,2
+      READ(101,*) Xuv(0:ntot-1,0:ntot-1) !read x density Px(u,v)
+      !first index (u|x|v) -> (i|x|v)
+      CALL idx1_1e_trans(noccA,ntot,ntot,CuiA(0:ntot-1,0:noccA-1),&
+                         Xuv(0:ntot-1,0:ntot-1),Yiv(0:noccA-1,0:ntot-1))
+      !second index (i|x|v) -> <i|x|j>
+      CALL idx2_1e_trans(noccA,noccA,ntot,Yiv(0:noccA-1,0:ntot-1),&
+                         CuiA(0:ntot-1,0:noccA-1),Zij(0:noccA-1,0:noccA-1))
+      WRITE(102) Zij(0:noccA-1,0:noccA-1) 
+    END DO
+    CLOSE(unit=102)
+
+    !Density Matrix
+    WRITE(*,*) "Transforming Duv -> Dij"
+    WRITE(*,*) "Writing to Dij_AA"
+    !Read in density
+    OPEN(unit=103,file='Da',status='old',access='sequential',form='unformatted')
+    READ(103) Xuv
+    CLOSE(unit=103)
+    !first index Duv ->  Div
+    CALL idx1_1e_trans(noccA,ntot,ntot,CuiA(0:ntot-1,0:noccA-1),&
+                       Xuv(0:ntot-1,0:ntot-1),Yiv(0:noccA-1,0:ntot-1))
+    !second index Div -> Dij 
+    CALL idx2_1e_trans(noccA,noccA,ntot,Yiv(0:noccA-1,0:ntot-1),&
+                       CuiA(0:ntot-1,0:noccA-1),Zij(0:noccA-1,0:noccA-1))
+    OPEN(unit=104,file='Dij_AA',status='replace',form='unformatted')
+    WRITE(104) Zij(0:noccA-1,0:noccA-1) 
+    CLOSE(unit=104)
+
+    
+    CLOSE(unit=101)
+  END SUBROUTINE ao2mo_1e_rhf
+!---------------------------------------------------------------------
 
 !---------------------------------------------------------------------
 !       slow_ao2mo_CIS_RHF
@@ -1291,7 +1333,7 @@ PROGRAM ao2mo
   END SUBROUTINE
 
 !---------------------------------------------------------------------
-!	idx1_trans
+!	idx1_2e_trans
 !		James H. Thorpe
 !		Nov 26,2018
 !	-transforms index 1 of array A into array B
@@ -1303,7 +1345,7 @@ PROGRAM ao2mo
   ! A		: 2Dreal8, matrix to be transformed
   ! x		: 1Dreal8, vector that defines coefs of transform
   ! B		: 2Dreal8, new array that has been transformed
-  SUBROUTINE idx1_trans(n1,n2,n3,n4,n5,A,x,B)
+  SUBROUTINE idx1_2e_trans(n1,n2,n3,n4,n5,A,x,B)
     IMPLICIT NONE
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(INOUT) :: B
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(IN) :: A
@@ -1325,10 +1367,10 @@ PROGRAM ao2mo
         END DO
       END DO
     END DO
-  END SUBROUTINE idx1_trans
+  END SUBROUTINE idx1_2e_trans
 
 !---------------------------------------------------------------------
-!	idx2_trans
+!	idx2_2e_trans
 !		James H. Thorpe
 !		Nov 26, 2018
 !	-transforms index 2 of array A into array B
@@ -1340,7 +1382,7 @@ PROGRAM ao2mo
   ! A		: 2Dreal8, matrix to be transformed
   ! x		: 1Dreal8, vector that defines coefs of transform
   ! B		: 2Dreal8, new array that has been transformed
-  SUBROUTINE idx2_trans(n1,n2,n3,n4,n5,A,x,B)
+  SUBROUTINE idx2_2e_trans(n1,n2,n3,n4,n5,A,x,B)
     IMPLICIT NONE
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(INOUT) :: B
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(IN) :: A
@@ -1362,10 +1404,10 @@ PROGRAM ao2mo
         END DO
       END DO
     END DO
-  END SUBROUTINE idx2_trans
+  END SUBROUTINE idx2_2e_trans
 
 !---------------------------------------------------------------------
-!	idx3_trans
+!	idx3_2e_trans
 !		James H. Thorpe
 !		Nov 26, 2018
 !	-transforms index 3 of array A into array B
@@ -1377,7 +1419,7 @@ PROGRAM ao2mo
   ! A		: 2Dreal8, matrix to be transformed
   ! x		: 1Dreal8, vector that defines coefs of transform
   ! B		: 2Dreal8, new array that has been transformed
-  SUBROUTINE idx3_trans(n1,n2,n3,n4,n5,A,x,B)
+  SUBROUTINE idx3_2e_trans(n1,n2,n3,n4,n5,A,x,B)
     IMPLICIT NONE
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(INOUT) :: B
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(IN) :: A
@@ -1399,10 +1441,10 @@ PROGRAM ao2mo
         END DO
       END DO
     END DO
-  END SUBROUTINE idx3_trans
+  END SUBROUTINE idx3_2e_trans
 
 !---------------------------------------------------------------------
-!	idx4_trans
+!	idx4_2e_trans
 !		James H. Thorpe
 !		Nov 26, 2018
 !	-transforms index 4 array A into array B
@@ -1414,7 +1456,7 @@ PROGRAM ao2mo
   ! A		: 2Dreal8, matrix to be transformed
   ! x		: 1Dreal8, vector that defines coefs of transform
   ! B		: 2Dreal8, new array that has been transformed
-  SUBROUTINE idx4_trans(n1,n2,n3,n4,n5,A,x,B)
+  SUBROUTINE idx4_2e_trans(n1,n2,n3,n4,n5,A,x,B)
     IMPLICIT NONE
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(INOUT) :: B
     REAL(KIND=8), DIMENSION(0:,0:,0:,0:),INTENT(IN) :: A
@@ -1436,7 +1478,55 @@ PROGRAM ao2mo
         END DO
       END DO
     END DO
-  END SUBROUTINE idx4_trans
+  END SUBROUTINE idx4_2e_trans
+!---------------------------------------------------------------------
+!	idx1_1e_trans
+!		James H. Thorpe
+!		Dec 9, 2018
+!	-idx1 1e- integral transformation using BLAS  
+!	-performs Z = X**T.Y
+!---------------------------------------------------------------------
+  ! n1		: int, number of rows of X**T 
+  ! n2		: int, number of cols of Y
+  ! n3		: int, number of cols/rows of X**T/Y
+  ! X		: 2D real*8, matrix to be transposed, size [n2,n1]
+  ! Y		: 2D real*8, matrix size [n3,n2]
+  ! Z		: 2D real*8, matrix size [n1,n3]
+  SUBROUTINE idx1_1e_trans(n1,n2,n3,X,Y,Z)
+    IMPLICIT NONE
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Z
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: X,Y
+    INTEGER, INTENT(IN) :: n1,n2,n3
+
+    Z = 0.0D0
+    CALL DGEMM('T','N',n1,n2,n3,1.0D0,X(0:n3-1,0:n1-1),n3,&
+            Y(0:n3-1,0:n2-1),n3,0.0D0,Z(0:n1-1,0:n2-1),n1)
+
+  END SUBROUTINE idx1_1e_trans
+!---------------------------------------------------------------------
+!	idx2_1e_trans
+!		James H. Thorpe
+!		Dec 9, 2018
+!	-idx2 1e- integral transformation using BLAS  
+!	-performs Z = X.Y
+!---------------------------------------------------------------------
+  ! n1		: int, number of rows of X
+  ! n2		: int, number of cols of Y
+  ! n3		: int, number of cols/rows of X/Y
+  ! X		: 2D real*8, matrix to be transposed, size [n1,n2]
+  ! Y		: 2D real*8, matrix size [n2,n3]
+  ! Z		: 2D real*8, matrix size [n1,n3]
+  SUBROUTINE idx2_1e_trans(n1,n2,n3,X,Y,Z)
+    IMPLICIT NONE
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(INOUT) :: Z
+    REAL(KIND=8), DIMENSION(0:,0:), INTENT(IN) :: X,Y
+    INTEGER, INTENT(IN) :: n1,n2,n3
+
+    Z = 0.0D0
+    CALL DGEMM('N','N',n1,n2,n3,1.0D0,X(0:n1-1,0:n3-1),n1,&
+            Y(0:n3-1,0:n2-1),n3,0.0D0,Z(0:n1-1,0:n2-1),n1)
+
+  END SUBROUTINE idx2_1e_trans
 !---------------------------------------------------------------------
 !       linal_printmat_2Dreal8
 !               James H. Thorpe

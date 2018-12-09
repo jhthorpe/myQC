@@ -61,6 +61,7 @@ PROGRAM cphf
 
 
   CONTAINS
+
 !---------------------------------------------------------------------
 !	cphf_dipole_rhf
 !		James H. Thorpe
@@ -73,9 +74,10 @@ PROGRAM cphf
   ! atoms		: 1D int, ids (Z) of atoms 
   ! fmem		: real*8, free memory in MB
   ! options		: 1D int, list of options 
-  ! Px			: 3D real*8, dipole integrals
+  ! Pxuv		: 3D real*8, dipole integrals in AO basis
   ! Ux,y,z		: real*8, x,y,z components of dipole moment 
   ! Duv			: 2D real*8, SCF density matrix, AO basis
+  ! Cui			: 2D real*8, SCF coefficients in AO basis
 
   SUBROUTINE cphf_dipole_rhf(nnuc,noccA,nvrtA,ntot,xyz,atoms,fmem,options)
     IMPLICIT NONE
@@ -85,33 +87,38 @@ PROGRAM cphf
     REAL(KIND=8), INTENT(INOUT) :: fmem
     INTEGER, INTENT(IN) :: nnuc,noccA,nvrtA,ntot
     !internal
-    REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: Px
-    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Duv
+    REAL(KIND=8), DIMENSION(:,:,:), ALLOCATABLE :: Pxuv
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: Duv,Cui
     REAL(KIND=8) :: Ux,Uy,Uz
     INTEGER :: i,j,k,l,a,b,c,d,p,q,r,s,u,v
 999 FORMAT(F15.6,F15.6,F15.6)
 
-    ALLOCATE(Px(0:2,0:ntot-1,0:ntot-1))
+    ALLOCATE(Pxuv(0:2,0:ntot-1,0:ntot-1))
     ALLOCATE(Duv(0:ntot-1,0:ntot-1))
+    ALLOCATE(Cui(0:ntot-1,0:ntot-1))
 
     OPEN(unit=100,file='Pxuv',status='old',access='sequential')
-    READ(100,*) Px(0,:,:)
-    READ(100,*) Px(1,:,:)
-    READ(100,*) Px(2,:,:)
+    READ(100,*) Pxuv(0,:,:)
+    READ(100,*) Pxuv(1,:,:)
+    READ(100,*) Pxuv(2,:,:)
     CLOSE(unit=100)
     OPEN(unit=101,file='Da',status='old',access='sequential',form='unformatted')
     READ(101) Duv
     CLOSE(unit=101)
+    OPEN(unit=102,file='Cui',status='old',access='sequential')
+    READ(102,*) Cui
+    CLOSE(unit=102)
 
-    !Dipole moment
+    !First order properties
+    !Dipole moment in AO basis
     Ux = 0
     Uy = 0
     Uz = 0
     DO u=0,ntot-1
       DO v = 0,ntot-1
-        Ux = Ux - Duv(u,v)*Px(0,v,u) 
-        Uy = Uy - Duv(u,v)*Px(1,v,u) 
-        Uz = Uz - Duv(u,v)*Px(2,v,u) 
+        Ux = Ux - Duv(u,v)*Pxuv(0,v,u) 
+        Uy = Uy - Duv(u,v)*Pxuv(1,v,u) 
+        Uz = Uz - Duv(u,v)*Pxuv(2,v,u) 
       END DO
     END DO
 
@@ -127,6 +134,11 @@ PROGRAM cphf
    WRITE(*,999) Ux,Uy,Uz
    WRITE(*,*) "----------------------------------------------" 
 
+   !second order properties
+   IF (options(16) .LT. 2) RETURN
+
+   !Polarizability
+   
 
   END SUBROUTINE cphf_dipole_rhf
 !---------------------------------------------------------------------

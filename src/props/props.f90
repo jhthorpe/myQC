@@ -50,7 +50,6 @@ PROGRAM props
     WRITE(*,*) "Property order   :  first"
     IF (options(1) .EQ. 0) THEN
       WRITE(*,*) "Property method  :  cphf"
-      CALL EXECUTE_COMMAND_LINE('int1p')
       CALL EXECUTE_COMMAND_LINE('cphf')
     ELSE 
       WRITE(*,*) "Sorry, only cphf properties for RHF available"
@@ -59,7 +58,6 @@ PROGRAM props
     WRITE(*,*) "Property order   :  second"
     IF (options(1) .EQ. 0) THEN
       WRITE(*,*) "Property method  :  cphf"
-      CALL EXECUTE_COMMAND_LINE('int1p')
       CALL EXECUTE_COMMAND_LINE('cphf')
     ELSE 
       WRITE(*,*) "Sorry, only cphf properties for RHF available"

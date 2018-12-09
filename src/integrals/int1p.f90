@@ -45,6 +45,7 @@ PROGRAM int1p
 
 ! input managment 
   CALL CPU_TIME(timeS)
+  WRITE(*,*) 
   WRITE(*,*) "int1p called"
   CALL getenv(nnuc,nelcA,nelcB,xyz,atoms,fmem,options)
   INQUIRE(file='error',EXIST=flag)
@@ -67,9 +68,6 @@ PROGRAM int1p
   DO i=0,norb-1
       npri = npri + basinfo(1+i*5+4) 
   END DO
-  WRITE(*,*) "               STARTING PROPERTY INTEGRALS" 
-  WRITE(*,*) "------------------------------------------------------------"
-
   WRITE(*,999) "Allocating space for int1p (MB)", 2*norb*norb*8/1.0D6
   fmem = fmem - 2*norb*norb*8.0/1.D6
   IF (fmem .LT. 0.0D0) THEN
@@ -84,7 +82,6 @@ PROGRAM int1p
       STOP
     END IF
   END IF
-  WRITE(*,*)
   CALL nmem(fmem)
 
   INQUIRE(file='Pxuv',EXIST=flag)

@@ -345,7 +345,7 @@ PROGRAM parser
   INTEGER FUNCTION getunits(chr)
     IMPLICIT NONE
     CHARACTER(LEN=20),INTENT(IN) :: chr
-    IF (chr .EQ. 'Bohr') THEN
+    IF (chr .EQ. 'Bohr' .OR. chr .EQ. 'bohr' .OR. chr .EQ. '1') THEN
       getunits = 1
   !    WRITE(*,*) "Units : Bohr"
     ELSE

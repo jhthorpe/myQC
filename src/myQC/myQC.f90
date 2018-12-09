@@ -49,6 +49,18 @@ PROGRAM myQC
     WRITE(*,*) "Error from int1e, exiting"
     STOP "Error from int1e"
   END IF
+
+!~~~~~
+! 1 electron property integrals
+  IF (options(16) .GE. 1) THEN
+    CALL EXECUTE_COMMAND_LINE('int1p')
+    INQUIRE(file='error', EXIST=ex)
+    IF (ex) THEN
+      WRITE(*,*) "Error from int1e, exiting"
+      STOP "Error from int1p"
+    END IF
+  END IF
+
 !~~~~~
 ! 2 electron integrals
   CALL EXECUTE_COMMAND_LINE('int2e')
@@ -69,7 +81,8 @@ PROGRAM myQC
 
 !~~~~
 !ao2mo transform
-IF (options(1) .GT. 0 .OR. options(13) .GT. 0) THEN
+IF (options(1) .GT. 0 .OR. options(13) .GT. 0 &
+    .OR. options(16) .GT. 0) THEN
   CALL EXECUTE_COMMAND_LINE('ao2mo')
   INQUIRE (file='error',EXIST=ex)
   IF (ex) THEN

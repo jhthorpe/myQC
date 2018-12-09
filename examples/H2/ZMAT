@@ -12,4 +12,4 @@ MEMORY= 1000
 VERB= 3
 SCF_Conv= 11
 ao2mo= 1
-PROP= 1
+PROP= 2
